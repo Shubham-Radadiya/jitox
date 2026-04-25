@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- Primary SEO -->
+    <title>Jitox — Agri Business Dashboard, ERP &amp; Inventory</title>
+    <meta
+      name="description"
+      content="Jitox is an agri-business dashboard for orders, inventory, accounts, vouchers, and field teams. Manage dealers, distributors, and retail operations in one place."
+    />
+    <meta
+      name="keywords"
+      content="Jitox, agri ERP, agriculture software, farm inventory, dealer management, agribusiness dashboard, order management, accounting vouchers, India agri tech"
+    />
+    <meta name="author" content="Jitox" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="%SITE_URL%/" />
+
+    <!-- Theme & app -->
+    <meta name="theme-color" content="#0f766e" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("jitox-theme");
+          if (t === "light") return;
+          if (t === "dark") document.documentElement.classList.add("dark");
+          else if (window.matchMedia("(prefers-color-scheme: dark)").matches)
+            document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Jitox" />
+    <meta name="application-name" content="Jitox" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Icons (Jitox logo) -->
+    <link rel="icon" type="image/png" href="/jitox-logo.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/jitox-logo.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/jitox-logo.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Jitox" />
+    <meta property="og:locale" content="en_IN" />
+    <meta
+      property="og:title"
+      content="Jitox — Agri Business Dashboard &amp; ERP"
+    />
+    <meta
+      property="og:description"
+      content="Run agri operations with orders, stock, accounts, vouchers, reports, and team tracking — built for dealers and distributors."
+    />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:image" content="%SITE_URL%/jitox-logo.png" />
+    <meta property="og:image:alt" content="Jitox logo" />
+    <meta property="og:image:type" content="image/png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Jitox — Agri Business Dashboard &amp; ERP" />
+    <meta
+      name="twitter:description"
+      content="Agri-business dashboard for orders, inventory, accounts, and field teams."
+    />
+    <meta name="twitter:image" content="%SITE_URL%/jitox-logo.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Structured data: Organization -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Jitox",
+        "url": "%SITE_URL%/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "Agri-business dashboard and ERP for orders, inventory, accounts, vouchers, and team operations.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Jitox",
+          "url": "%SITE_URL%/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

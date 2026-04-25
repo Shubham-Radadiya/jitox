@@ -1,0 +1,397 @@
+import React, { useState, useRef, useEffect } from "react";
+import {
+  CommonModal,
+  InputField,
+  CommonDropdown,
+  Button,
+} from "../../components/ui/CommanUI";
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
+import { Camera, Edit2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { MODULE_ACCESS_OPTIONS } from "../../constants/accessModules";
+import AddressForm from "../../components/address/AddressForm";
+import { EMPTY_ADDRESS, addressFromUser } from "../../utils/addressFormat";
+
+const ROLE_OPTIONS = [
+  { label: "Admin", value: "admin" },
+  { label: "Manager", value: "manager" },
+  { label: "User", value: "user" },
+];
+
+function mapRoleToApi(value) {
+  const v = (value || "user").toLowerCase();
+  if (v === "admin") return "Admin";
+  if (v === "manager") return "Manager";
+  return "User";
+}
+
+/**
+ * Admin updates user; calls onSave(userId, payload) — parent runs PUT /users/update-user/:id
+ */
+const EditUserModal = ({ open, onClose, user, onSave }) => {
+  const [form, setForm] = useState({
+    name: "",
+    mobile: "",
+    email: "",
+    role: "user",
+    joiningDate: null,
+    region: "",
+    assignedAreas: "",
+    password: "",
+    confirmPassword: "",
+    areaAccess: false,
+    isActive: true,
+  });
+
+  const [selectedPerms, setSelectedPerms] = useState(() => new Set(["dashboard"]));
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
+  const [errors, setErrors] = useState({});
+  const [addrErrors, setAddrErrors] = useState({});
+  const [address, setAddress] = useState(() => ({ ...EMPTY_ADDRESS }));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open || !user) return;
+    const name = user["User Name"] || user.name || "";
+    const nextAddr = addressFromUser({
+      streetAddress: user.streetAddress,
+      area: user.area,
+      city: user.city || user.Region,
+      taluka: user.taluka,
+      district: user.district || user.Area,
+      state: user.state,
+      country: user.country,
+      pincode: user.pincode,
+      address: user.address,
+    });
+    setAddress({ ...EMPTY_ADDRESS, ...nextAddr });
+    setForm({
+      name,
+      mobile: user["Phone No"] || user.mobile || "",
+      email: user.Email || user.email || "",
+      role: (user.Role || user.role || "User").toLowerCase(),
+      joiningDate: user["Joining Date"]
+        ? dayjs(user["Joining Date"])
+        : null,
+      region: user.Region || user.region || nextAddr.city || "",
+      assignedAreas: user.Area || user.assignedAreas || nextAddr.district || "",
+      password: "",
+      confirmPassword: "",
+      areaAccess: user.areaAccess || false,
+      isActive: user.isActive !== undefined ? user.isActive : true,
+    });
+    const existing = user.permissions;
+    if (Array.isArray(existing) && existing.length > 0) {
+      setSelectedPerms(new Set(existing));
+    } else if ((user.Role || user.role) === "Admin") {
+      setSelectedPerms(new Set(MODULE_ACCESS_OPTIONS.map((m) => m.key)));
+    } else {
+      setSelectedPerms(new Set(["dashboard"]));
+    }
+    setImagePreview(user.image || null);
+    setErrors({});
+    setAddrErrors({});
+  }, [user, open]);
+
+  const apiRole = mapRoleToApi(form.role);
+  const isAdminRole = apiRole === "Admin";
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
+    if (errors[name]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
+  };
+
+  const togglePerm = (key) => {
+    setSelectedPerms((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (key === "dashboard" && next.size === 1) {
+          toast.error("Keep at least Dashboard access.");
+          return prev;
+        }
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    const ae = {};
+    if (!form.name.trim()) newErrors.name = "Name is required";
+    if (!form.email.trim()) newErrors.email = "Email is required";
+    if (form.password && form.password !== form.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
+    if (!String(address.streetAddress || "").trim()) {
+      ae.streetAddress = "Required";
+    }
+    if (!String(address.city || "").trim()) {
+      ae.city = "Required";
+    }
+    if (!String(address.state || "").trim()) {
+      ae.state = "Required";
+    }
+    const pin = String(address.pincode || "").replace(/\D/g, "");
+    if (pin.length < 5 || pin.length > 10) {
+      ae.pincode = "5–10 digits";
+    }
+    setAddrErrors(ae);
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0 && Object.keys(ae).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validate() || !user?._id) return;
+    const parts = form.name.trim().split(/\s+/);
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ") || firstName;
+
+    const payload = {
+      firstName,
+      lastName,
+      email: form.email.trim().toLowerCase(),
+      role: apiRole,
+      phone: form.mobile?.trim() || undefined,
+      permissions: isAdminRole ? [] : Array.from(selectedPerms),
+      streetAddress: address.streetAddress.trim(),
+      area: address.area.trim(),
+      city: (address.city || form.region || "").trim(),
+      taluka: address.taluka.trim(),
+      district: (address.district || form.assignedAreas || "").trim(),
+      state: address.state.trim(),
+      country: address.country.trim() || "India",
+      pincode: String(address.pincode || "").replace(/\D/g, ""),
+    };
+
+    if (form.password?.trim()) {
+      payload.password = form.password;
+    }
+
+    setSaving(true);
+    try {
+      await onSave(user._id, payload);
+      onClose();
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || err?.message || "Update failed"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <CommonModal open={open} onClose={onClose} title="Edit Details" width="1000px">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col items-center">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            accept="image/*"
+          />
+          <div className="relative group">
+            <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden border-2 border-primary/20 shadow-sm">
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt="Profile photo preview"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-gray-400">
+                  {form.name?.charAt(0) || "U"}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-1 right-1 bg-primary p-1.5 rounded-full text-white border-2 border-white hover:bg-primary/90 shadow-md"
+            >
+              <Edit2 size={12} />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
+          <div className="text-sm font-semibold text-dark mb-4">
+            Basic Information
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="flex flex-col gap-1">
+              <InputField
+                label="Name"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+              />
+              {errors.name && (
+                <span className="text-[10px] text-red-500">{errors.name}</span>
+              )}
+            </div>
+            <InputField
+              label="Mobile"
+              name="mobile"
+              value={form.mobile}
+              onChange={handleChange}
+            />
+            <div className="flex flex-col gap-1">
+              <InputField
+                label="Email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+              />
+              {errors.email && (
+                <span className="text-[10px] text-red-500">{errors.email}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <CommonDropdown
+              label="Role"
+              addNavigateTo="/dashboard/user-master"
+              value={form.role}
+              onChange={(v) => setForm({ ...form, role: v })}
+              options={ROLE_OPTIONS}
+            />
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-medium text-dark">
+                Joining Date
+              </label>
+              <DatePicker
+                className="w-full px-3 py-2 border border-light-border rounded-lg text-sm"
+                value={form.joiningDate}
+                onChange={(d) => setForm({ ...form, joiningDate: d })}
+              />
+            </div>
+            <CommonDropdown
+              label="Region (city)"
+              addNavigateTo="/dashboard/user-master"
+              value={form.region}
+              onChange={(v) => setForm({ ...form, region: v })}
+              options={[
+                { label: "North", value: "North" },
+                { label: "South", value: "South" },
+                { label: "Surat", value: "Surat" },
+              ]}
+            />
+          </div>
+
+          <div className="mt-4">
+            <InputField
+              label="Area / district"
+              name="assignedAreas"
+              value={form.assignedAreas}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-light-border">
+            <div className="text-sm font-semibold text-dark mb-2">Address</div>
+            <AddressForm
+              value={address}
+              onChange={(patch) => setAddress((p) => ({ ...p, ...patch }))}
+              errors={addrErrors}
+            />
+          </div>
+        </div>
+
+        {!isAdminRole && (
+          <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
+            <div className="text-sm font-semibold text-dark mb-2">
+              Module access
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+              {MODULE_ACCESS_OPTIONS.map(({ key, label }) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-2 text-xs text-dark cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    className="accent-primary rounded"
+                    checked={selectedPerms.has(key)}
+                    onChange={() => togglePerm(key)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
+          <div className="text-sm font-semibold text-dark mb-2">
+            New password (optional)
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <InputField
+              label="Password"
+              name="password"
+              type="password"
+              placeholder="Leave blank to keep current"
+              value={form.password}
+              onChange={handleChange}
+            />
+            <InputField
+              label="Confirm"
+              name="confirmPassword"
+              type="password"
+              value={form.confirmPassword}
+              onChange={handleChange}
+            />
+          </div>
+          {errors.confirmPassword && (
+            <span className="text-[10px] text-red-500">
+              {errors.confirmPassword}
+            </span>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 mt-4">
+          <Button
+            label="Cancel"
+            variant="outline"
+            onClick={onClose}
+            className="px-12 py-3 rounded-xl"
+            disabled={saving}
+          />
+          <Button
+            label={saving ? "Saving…" : "Save"}
+            variant="primary"
+            onClick={handleSave}
+            className="px-16 py-3 rounded-xl"
+            disabled={saving}
+          />
+        </div>
+      </div>
+    </CommonModal>
+  );
+};
+
+export default EditUserModal;

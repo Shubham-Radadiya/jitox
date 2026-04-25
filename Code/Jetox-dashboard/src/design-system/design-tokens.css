@@ -1,0 +1,133 @@
+/**
+ * JETOX dashboard — layout & spacing design tokens (8px base).
+ * Tailwind spacing: space-2=8px, space-4=16px, space-6=24px, space-8=32px,
+ * space-10=40px, space-12=48px, space-16=64px.
+ * Prefer these utilities in JSX; use variables below for custom CSS only.
+ */
+:root {
+  --ds-space-1: 8px;
+  --ds-space-2: 16px;
+  --ds-space-3: 24px;
+  --ds-space-4: 32px;
+  --ds-space-5: 40px;
+  --ds-space-6: 48px;
+  --ds-space-8: 64px;
+
+  --ds-container-max: 1280px;
+  --ds-page-px-mobile: 16px;
+  --ds-page-px-tablet: 24px;
+  --ds-page-px-desktop: 32px;
+
+  --ds-section-gap: 16px;
+  --ds-section-gap-lg: 16px;
+  --ds-component-gap: 16px;
+  --ds-element-gap: 12px;
+
+  --ds-card-padding: 16px;
+  --ds-card-padding-sm: 12px;
+
+  --ds-input-py: 12px;
+  --ds-input-px: 16px;
+
+  --ds-btn-py: 12px;
+  --ds-btn-px: 24px;
+
+  --ds-line-height-body: 1.6;
+  --ds-line-height-heading: 1.25;
+}
+
+@layer components {
+  /* Vertical rhythm between stacked sections inside a page */
+  .ds-stack-page {
+    @apply flex flex-col gap-3 min-w-0;
+  }
+
+  .ds-stack-section {
+    @apply flex flex-col gap-3 min-w-0;
+  }
+
+  /* Tight groups: labels, chips, inline tools (8–16px) */
+  .ds-stack-tight {
+    @apply flex flex-col gap-2;
+  }
+
+  .ds-card-pad {
+    @apply p-3 sm:p-4;
+  }
+
+  .ds-heading-follow {
+    @apply mt-2;
+  }
+
+  .ds-prose {
+    line-height: var(--ds-line-height-body);
+  }
+
+  /* 12-column responsive grid: 1 col mobile, 2 tablet, 12 desktop tracks */
+  .ds-grid-12 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--ds-component-gap);
+  }
+
+  @media (min-width: 640px) {
+    .ds-grid-12 {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+  }
+
+  /* Form layouts inside modals (8px / 12px rhythm) */
+  .ds-form-grid-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-2.5;
+  }
+
+  .ds-form-grid-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5;
+  }
+
+  .ds-form-grid-4 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5;
+  }
+
+  /* Modal form vertical stack between sections */
+  .ds-form-stack {
+    @apply flex flex-col gap-3;
+  }
+
+  /* Page roots: space between major blocks (cards, toolbars, sections) */
+  .ds-stack-major {
+    @apply flex flex-col gap-4 min-w-0;
+  }
+
+  /* Inside CommonModal body (modal already applies px/py) */
+  .ds-modal-body-stack {
+    @apply flex flex-col gap-3 min-w-0;
+  }
+
+  /**
+   * Dashboard surface — use on page cards instead of raw `bg-white` so dark mode matches shell.
+   * Example: `className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col gap-3"`
+   */
+  .jitox-panel {
+    @apply border border-light-border bg-white dark:border-slate-700 dark:bg-slate-900;
+  }
+
+  .jitox-panel--shadow {
+    @apply shadow-sm dark:shadow-[0_2px_12px_rgba(0,0,0,0.45)];
+  }
+
+  /** Compact date/time chip in page headers (Payables, Receivables, etc.) */
+  .jitox-header-pill {
+    @apply flex items-center gap-2 text-sm font-medium text-light bg-white px-3 py-1.5 rounded-lg border border-light-border shadow-sm dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300;
+  }
+
+  /** Firefox + themed track for order table horizontal scroll in dark mode */
+  .jitox-orders-table-wrap {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) rgb(248 250 252);
+  }
+
+  .dark .jitox-orders-table-wrap {
+    scrollbar-color: rgb(71 85 105) rgb(15 23 42);
+  }
+}

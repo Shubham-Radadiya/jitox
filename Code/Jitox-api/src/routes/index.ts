@@ -1,0 +1,38 @@
+import userRouter from "./user.routes";
+import taskRouter from "./task.routes";
+import accountRouter from "./account.routes";
+import productRoute from "./product.routes";
+import purchaseVoucherRoute from "./purchaseVoucher.routes";
+import purchaseReturnVoucherRoute from "./purchaseReturnVoucher.routes";
+import paymentVoucherRoute from "./paymentVoucher.routes";
+import receiptVoucherRoute from "./reciptVoucher.routes";
+import expenseVoucherRoute from "./expenseVoucher.routes";
+import cashVoucherRoute from "./cashVoucher.routes";
+import journalVoucherRoute from "./journalVoucher.routes";
+import quotationRoute from "./quotation.routes";
+import dayBookRoute from "./dayBook.routes";
+import dashboardUiRouter from "./dashboardUi.routes";
+import notificationRouter from "./notification.routes";
+import customerRouter from "./customer.routes";
+import hrmApiRouter from "./hrm.api.routes";
+import { Express } from "express";
+
+export const setupRoutes = (app: Express) => {
+  app.use("/dashboard-ui", dashboardUiRouter);
+  app.use("/api", hrmApiRouter);
+  app.use("/users", userRouter);
+  app.use("/notifications", notificationRouter);
+  app.use("/tasks", taskRouter);
+  app.use("/customers", customerRouter);
+  app.use("/accounts", accountRouter);
+  app.use("/products", productRoute);
+  app.use("/purchaseVouchers", purchaseVoucherRoute);
+  app.use("/purchaseReturnVouchers", purchaseReturnVoucherRoute);
+  app.use("/paymentVouchers", paymentVoucherRoute);
+  app.use("/receiptVouchers", receiptVoucherRoute);
+  app.use("/expenseVouchers", expenseVoucherRoute);
+  app.use("/cashVouchers", cashVoucherRoute);
+  app.use("/journalVouchers", journalVoucherRoute);
+  app.use("/quotations", quotationRoute);
+  app.use("/dayBooks", dayBookRoute);
+};
