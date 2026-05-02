@@ -28,151 +28,159 @@ const PurchaseDetails = ({ open, onClose, data }) => {
   return (
     <div className="fixed inset-0 z-[1000] flex justify-end">
       <div
-        className="absolute inset-0 bg-black/20"
+        className="absolute inset-0 bg-black/25 transition-opacity dark:bg-black/65"
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside className="relative h-full w-full max-w-xl bg-white shadow-2xl flex flex-col">
+      <aside className="relative flex h-full w-full max-w-xl flex-col border-l border-slate-200/90 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
         {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 bg-headBg">
-          <div>
-            <div className="text-xl font-semibold text-dark">{voucherNo}</div>
-            <div className="text-xs text-light">Purchase Details</div>
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-white px-4 py-3.5 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary dark:text-emerald-400">
+              Purchase Details
+            </p>
+            <div className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">
+              {voucherNo}
+            </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-light hover:text-dark transition bg-headBg rounded-md"
+            className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-200/90 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
             aria-label="Close"
           >
-            <X size={20} />
+            <X size={20} strokeWidth={2} />
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {/* Purchase Date & Status */}
-          <section className="flex justify-between">
-            <div>
-              <div className="text-xs text-light tracking-wide">
-                Purchase Date
+          <section className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-4 shadow-sm ring-1 ring-slate-900/[0.03] dark:border-slate-700 dark:bg-slate-800/40 dark:ring-white/5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Purchase Date
+                </div>
+                <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {purchaseDate}
+                </div>
               </div>
-              <div className="text-sm text-dark font-semibold">
-                {purchaseDate}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-xs  text-light tracking-wide">Payment</div>
-              <span className="inline-flex items-center px-3 py-1 rounded-md bg-primary text-white text-xs font-medium">
-                {status}
-              </span>
-            </div>
-            {(path === "/dashboard/accounting-voucher/sales" ||
-              path === "/sales-return") && (
               <div className="flex flex-col gap-1">
-                <div className="text-xs text-light tracking-wide">Status</div>
-                <span className="inline-flex items-center px-3 py-1 rounded-md bg-primary text-white text-xs font-medium">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Payment
+                </div>
+                <span className="inline-flex items-center rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white shadow-sm dark:shadow-none">
                   {status}
                 </span>
               </div>
-            )}
+              {(path === "/dashboard/accounting-voucher/sales" ||
+                path === "/sales-return") && (
+                <div className="flex flex-col gap-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Status
+                  </div>
+                  <span className="inline-flex items-center rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white shadow-sm dark:shadow-none">
+                    {status}
+                  </span>
+                </div>
+              )}
+            </div>
           </section>
-          <hr className="border-light-border" />
 
           {narration ? (
-            <>
-              <section className="flex flex-col gap-1">
-                <div className="text-xs font-semibold uppercase tracking-wide text-light">
-                  Narration
-                </div>
-                <p className="whitespace-pre-wrap text-sm text-dark">{narration}</p>
-              </section>
-              <hr className="border-light-border" />
-            </>
+            <section className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/30">
+              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                Narration
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                {narration}
+              </p>
+            </section>
           ) : null}
 
-          {/* Customer */}
           <InfoSection title="Customer Details" rows={customer} />
-          <hr className="border-light-border" />
-
-          {/* Party */}
           <InfoSection title="Party Details" rows={party} />
-          <hr className="border-light-border" />
 
           {/* Product table */}
           <section className="flex flex-col gap-2">
-            <div className="text-sm font-semibold text-dark">
+            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
               Product Details
             </div>
-            <div className="border border-light-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-headBg text-xs  text-light">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium text-dark">
-                      Product Name ({products.length})
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-dark">
-                      Qty
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-dark">
-                      Rate (₹)
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-dark">
-                      GST (₹)
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-dark">
-                      Subtotal (₹)
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((item) => (
-                    <tr
-                      key={item.name}
-                      className="border-t border-light-border"
-                    >
-                      <td className="px-4 py-2 text-light border-r border-light-border">
-                        {item.name}
-                      </td>
-                      <td className="px-4 py-2 text-light border-r border-light-border">
-                        {item.qty}
-                      </td>
-                      <td className="px-4 py-2 text-light border-r border-light-border">
-                        {item.rate}
-                      </td>
-                      <td className="px-4 py-2 text-light border-r border-light-border">
-                        {item.gst}
-                      </td>
-                      <td className="px-4 py-2 text-light">{item.subtotal}</td>
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600">
+              <div className="max-h-[min(40vh,22rem)] overflow-auto">
+                <table className="w-full min-w-[420px] text-sm">
+                  <thead className="sticky top-0 z-[1] bg-slate-100 text-xs dark:bg-slate-800">
+                    <tr className="border-b border-slate-200 dark:border-slate-600">
+                      <th className="px-3 py-2.5 text-left font-semibold text-slate-700 dark:text-slate-200">
+                        Product Name ({products.length})
+                      </th>
+                      <th className="px-3 py-2.5 text-right font-semibold text-slate-700 dark:text-slate-200">
+                        Qty
+                      </th>
+                      <th className="px-3 py-2.5 text-right font-semibold text-slate-700 dark:text-slate-200">
+                        Rate (₹)
+                      </th>
+                      <th className="px-3 py-2.5 text-right font-semibold text-slate-700 dark:text-slate-200">
+                        GST (₹)
+                      </th>
+                      <th className="px-3 py-2.5 text-right font-semibold text-slate-700 dark:text-slate-200">
+                        Subtotal (₹)
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-light-border">
-                    <td className="px-4 py-2 text-left align-middle font-medium text-dark">
-                      Total
-                    </td>
-                    <td className="px-4 py-2 text-right align-middle tabular-nums text-light" />
-                    <td className="px-4 py-2 text-right align-middle tabular-nums text-light" />
-                    <td className="px-4 py-2 text-right align-middle tabular-nums text-light" />
-                    <td className="px-4 py-2 text-right align-middle font-semibold tabular-nums border-l border-light-border text-dark">
-                      {totals.totalAmount}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody>
+                    {products.map((item, i) => (
+                      <tr
+                        key={`${item.name}-${i}`}
+                        className="border-t border-slate-100 dark:border-slate-700/80"
+                      >
+                        <td className="border-r border-slate-100 px-3 py-2 text-slate-800 dark:border-slate-700 dark:text-slate-200">
+                          {item.name}
+                        </td>
+                        <td className="border-r border-slate-100 px-3 py-2 text-right tabular-nums text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                          {item.qty}
+                        </td>
+                        <td className="border-r border-slate-100 px-3 py-2 text-right tabular-nums text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                          {item.rate}
+                        </td>
+                        <td className="border-r border-slate-100 px-3 py-2 text-right tabular-nums text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                          {item.gst}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums font-medium text-slate-900 dark:text-slate-100">
+                          {item.subtotal}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/90">
+                      <td className="px-3 py-2.5 align-middle text-left text-sm font-bold text-slate-900 dark:text-slate-50">
+                        Total
+                      </td>
+                      <td className="px-3 py-2.5" />
+                      <td className="px-3 py-2.5" />
+                      <td className="px-3 py-2.5" />
+                      <td className="border-l border-slate-200 px-3 py-2.5 text-right text-sm font-bold tabular-nums text-primary dark:border-slate-600 dark:text-emerald-400">
+                        {totals.totalAmount}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </section>
-          <hr className="border-light-border" />
 
           {/* Payment */}
-          <section className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-dark">
+          <section className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 Payment Details
               </div>
               {totals.reference && (
                 <a
                   href="#"
-                  className="text-blue underline text-sm font-medium hover:underline"
+                  className="text-sm font-semibold text-primary underline-offset-2 hover:underline dark:text-emerald-400"
+                  onClick={(e) => e.preventDefault()}
                 >
                   {totals.reference}
                 </a>
@@ -190,10 +198,14 @@ const PurchaseDetails = ({ open, onClose, data }) => {
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="flex items-center justify-between text-sm text-dark font-medium"
+                  className="flex items-center justify-between gap-4 border-b border-slate-200/70 pb-2 text-sm last:border-0 last:pb-0 dark:border-slate-600/80"
                 >
-                  <span>{item.label}</span>
-                  <span>{item.value}</span>
+                  <span className="font-medium text-slate-600 dark:text-slate-400">
+                    {item.label}
+                  </span>
+                  <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                    {item.value}
+                  </span>
                 </div>
               ))}
             </div>
@@ -201,10 +213,10 @@ const PurchaseDetails = ({ open, onClose, data }) => {
         </div>
 
         {/* Footer — share & exports */}
-        <footer className="grid grid-cols-3 divide-x divide-light-border border-t border-light-border bg-headBg">
+        <footer className="grid shrink-0 grid-cols-3 divide-x divide-slate-200 border-t border-slate-200 bg-slate-50 dark:divide-slate-600 dark:border-slate-700 dark:bg-slate-800/95">
           <button
             type="button"
-            className="flex flex-col items-center justify-center gap-1 py-3 text-xs font-semibold text-dark transition hover:bg-slate-200/80 md:py-3.5 md:text-sm"
+            className="flex flex-col items-center justify-center gap-1 py-3 text-xs font-semibold text-slate-800 transition hover:bg-slate-200/80 dark:text-slate-200 dark:hover:bg-slate-700 md:py-3.5 md:text-sm"
             onClick={async () => {
               const text = buildPurchaseDetailShareText(data);
               const r = await shareOrCopyText(`Purchase ${voucherNo}`, text);
@@ -213,23 +225,23 @@ const PurchaseDetails = ({ open, onClose, data }) => {
               else toast.error("Could not share or copy");
             }}
           >
-            <Share2 size={18} className="text-primary" aria-hidden />
+            <Share2 size={18} className="text-primary dark:text-emerald-400" aria-hidden />
             Share
           </button>
           <button
             type="button"
-            className="flex flex-col items-center justify-center gap-1 py-3 text-xs font-semibold text-dark transition hover:bg-slate-200/80 md:py-3.5 md:text-sm"
+            className="flex flex-col items-center justify-center gap-1 py-3 text-xs font-semibold text-slate-800 transition hover:bg-slate-200/80 dark:text-slate-200 dark:hover:bg-slate-700 md:py-3.5 md:text-sm"
             onClick={() => {
               downloadPurchaseDetailCsv(data);
               toast.success("CSV downloaded");
             }}
           >
-            <FileSpreadsheet size={18} className="text-primary" aria-hidden />
+            <FileSpreadsheet size={18} className="text-primary dark:text-emerald-400" aria-hidden />
             Excel
           </button>
           <button
             type="button"
-            className="flex flex-col items-center justify-center gap-1 py-3 text-xs font-semibold text-dark transition hover:bg-slate-200/80 md:py-3.5 md:text-sm"
+            className="flex flex-col items-center justify-center gap-1 py-3 text-xs font-semibold text-slate-800 transition hover:bg-slate-200/80 dark:text-slate-200 dark:hover:bg-slate-700 md:py-3.5 md:text-sm"
             onClick={() => {
               const ok = printPurchaseDetailBill(data);
               if (ok) {
@@ -241,7 +253,7 @@ const PurchaseDetails = ({ open, onClose, data }) => {
               }
             }}
           >
-            <Printer size={18} className="text-primary" aria-hidden />
+            <Printer size={18} className="text-primary dark:text-emerald-400" aria-hidden />
             PDF
           </button>
         </footer>
@@ -251,16 +263,20 @@ const PurchaseDetails = ({ open, onClose, data }) => {
 };
 
 const InfoSection = ({ title, rows }) => (
-  <section className="flex flex-col gap-2">
-    <div className="text-sm font-semibold text-dark">{title}</div>
-    <div className="flex flex-col text-sm gap-2">
+  <section className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/30">
+    <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{title}</div>
+    <div className="mt-3 flex flex-col gap-2.5">
       {rows.map((row) => (
         <div
           key={row.label}
-          className="flex items-start justify-between text-dark text-xs gap-4"
+          className="flex flex-wrap items-baseline gap-x-1.5 text-xs"
         >
-          <span className="tracking-wide">{row.label}:</span>
-          <span className="text-right">{row.value}</span>
+          <span className="font-medium tracking-wide text-slate-500 dark:text-slate-400">
+            {row.label}:
+          </span>
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {row.value}
+          </span>
         </div>
       ))}
     </div>

@@ -138,28 +138,23 @@ const ProductIndex = () => {
     return (
       <tfoot className="sticky bottom-0 z-[1] border-t-2 border-gray-300 bg-gray-100/95 dark:border-slate-600 dark:bg-slate-800/95">
         <tr>
-          {productColumns.map((col) => {
-            if (col === "Date") {
-              return (
-                <td key={col} className={tableFooterTdClasses(col)}>
-                  Total
-                </td>
-              );
-            }
-            if (col === "Amount") {
-              return (
-                <td
-                  key={col}
-                  className={tableFooterTdClasses(col, {
-                    extra: "text-emerald-700 dark:text-emerald-300",
-                  })}
-                >
-                  {formatted}
-                </td>
-              );
-            }
-            return <td key={col} className={tableFooterTdClasses(col)} />;
-          })}
+          <td
+            colSpan={5}
+            className={tableFooterTdClasses("Date", {
+              alignClass: "text-right",
+              extra: "pr-2 font-semibold text-slate-800 dark:text-slate-200",
+            })}
+          >
+            Total
+          </td>
+          <td
+            className={tableFooterTdClasses("Amount", {
+              extra: "text-emerald-700 dark:text-emerald-300",
+            })}
+          >
+            {formatted}
+          </td>
+          <td className={tableFooterTdClasses("Actions")} />
         </tr>
       </tfoot>
     );
@@ -232,23 +227,50 @@ const ProductIndex = () => {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
-            { label: "Total products", value: isLoading ? "…" : totalProducts },
-            { label: "Stock disabled", value: isLoading ? "…" : inactiveCount },
+            {
+              label: "Total products",
+              value: isLoading ? "…" : totalProducts,
+              tone:
+                "from-emerald-100 to-teal-100 text-emerald-800 dark:from-emerald-900/50 dark:to-teal-900/40 dark:text-emerald-200",
+              cardTone:
+                "from-white to-emerald-50/90 dark:from-slate-900 dark:to-emerald-950/30",
+              borderTone: "border-emerald-200/80 dark:border-emerald-800/60",
+            },
+            {
+              label: "Stock disabled",
+              value: isLoading ? "…" : inactiveCount,
+              tone:
+                "from-emerald-100 to-teal-100 text-emerald-800 dark:from-emerald-900/50 dark:to-teal-900/40 dark:text-emerald-200",
+              cardTone:
+                "from-white to-emerald-50/90 dark:from-slate-900 dark:to-emerald-950/30",
+              borderTone: "border-emerald-200/80 dark:border-emerald-800/60",
+            },
             {
               label: "At / below reorder",
               value: isLoading ? "…" : lowQty,
+              tone:
+                "from-emerald-100 to-teal-100 text-emerald-800 dark:from-emerald-900/50 dark:to-teal-900/40 dark:text-emerald-200",
+              cardTone:
+                "from-white to-emerald-50/90 dark:from-slate-900 dark:to-emerald-950/30",
+              borderTone: "border-emerald-200/80 dark:border-emerald-800/60",
             },
           ].map((s) => (
             <div
               key={s.label}
-              className="flex items-center justify-between gap-2 rounded-lg jitox-panel jitox-panel--shadow px-3 py-2.5"
+              className={`group relative overflow-hidden rounded-xl border bg-gradient-to-r p-3 shadow-sm transition-shadow duration-200 hover:shadow-md ${s.cardTone} ${s.borderTone}`}
             >
-              <span className="text-xs font-medium text-gray-500 dark:text-slate-400">{s.label}</span>
-              <span className="text-lg font-semibold tabular-nums text-gray-900 dark:text-slate-100">
-                {s.value}
-              </span>
+              <div className="flex min-h-9 items-center justify-between gap-3">
+                <span className="block min-w-0 flex-1 truncate text-left text-sm font-semibold leading-tight text-slate-700 dark:text-slate-200">
+                  {s.label}
+                </span>
+                <div
+                  className={`inline-flex min-w-10 shrink-0 items-center justify-center rounded-md border border-white/70 bg-gradient-to-br px-3 py-1 text-sm font-bold tabular-nums shadow-sm dark:border-slate-700/70 ${s.tone}`}
+                >
+                  {s.value}
+                </div>
+              </div>
             </div>
           ))}
         </div>

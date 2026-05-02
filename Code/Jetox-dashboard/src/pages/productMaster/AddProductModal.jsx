@@ -38,6 +38,14 @@ const DEFAULT_GROUP_OPTIONS = [
   { value: "grp2", label: "Group 2" },
 ];
 
+/** Green section titles — same font size as dense `FormSection`, bold forced. */
+const ADD_PRODUCT_SECTION_TITLE_CLASS =
+  "!font-bold !text-primary dark:!text-emerald-400";
+
+/** Smaller **value** text only — keeps default control heights (`h-10`, paddings). */
+const ADD_PRODUCT_VALUE_TEXT =
+  "!text-[12px] !leading-snug !placeholder:text-[12px]";
+
 const AddProductModal = ({
   open,
   onClose,
@@ -216,7 +224,7 @@ const AddProductModal = ({
             variant="primary"
             size="sm"
             onClick={() => onSwitchToEdit?.()}
-            className="min-w-[5.5rem] !min-h-8 !py-1.5 text-[13px]"
+            className="min-w-[5.5rem] !min-h-8 !py-1.5 text-[13px] !text-white hover:!text-white dark:!text-white dark:hover:!text-white"
           />,
         ]
       : [
@@ -234,7 +242,7 @@ const AddProductModal = ({
             variant="primary"
             size="sm"
             onClick={handleSave}
-            className="min-w-[5.5rem] !min-h-8 !py-1.5 text-[13px]"
+            className="min-w-[5.5rem] !min-h-8 !py-1.5 text-[13px] !text-white hover:!text-white dark:!text-white dark:hover:!text-white"
             disabled={saving}
           />,
         ];
@@ -244,13 +252,17 @@ const AddProductModal = ({
       open={open}
       onClose={onClose}
       title={modalTitle}
-      width="1040px"
-      bodyClassName="!pt-2.5 !pb-10 sm:!px-4 sm:!pb-12"
+      width="780px"
+      bodyClassName="!pt-2 !pb-8 sm:!px-3.5 sm:!pb-10"
       footer={footerActions}
     >
       <div className="flex flex-col gap-3">
-        <FormSection title="Product" dense>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <FormSection
+          title="Product"
+          dense
+          titleClassName={ADD_PRODUCT_SECTION_TITLE_CLASS}
+        >
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <InputField
               readOnly={isReadOnly}
               label="Product name"
@@ -258,10 +270,12 @@ const AddProductModal = ({
               value={form.productName}
               onChange={handleChange}
               placeholder="Name of product"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
 
             <CommonDropdown
               label="Category"
+              compactValue
               searchable
               searchPlaceholder="Search categories…"
               value={form.category}
@@ -297,6 +311,7 @@ const AddProductModal = ({
                       variant="primary"
                       size="sm"
                       onClick={() => submitNewCategory(closeCatModal)}
+                      className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
                     />,
                   ]}
                 >
@@ -306,6 +321,7 @@ const AddProductModal = ({
                     value={newCategoryName}
                     onChange={(e) => setNewCategoryName(e.target.value)}
                     placeholder="e.g. Organic inputs"
+                    inputClassName={ADD_PRODUCT_VALUE_TEXT}
                   />
                 </CommonModal>
               )}
@@ -313,6 +329,7 @@ const AddProductModal = ({
 
             <CommonDropdown
               label="Group"
+              compactValue
               value={form.group}
               onChange={(v) => setForm((f) => ({ ...f, group: v }))}
               placeholder="Select or create"
@@ -329,6 +346,7 @@ const AddProductModal = ({
               value={form.billingRate}
               onChange={handleChange}
               placeholder="Amount"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
 
             <InputField
@@ -338,10 +356,12 @@ const AddProductModal = ({
               value={form.mrp}
               onChange={handleChange}
               placeholder="MRP"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
 
             <CommonDropdown
               label="GST rate"
+              compactValue
               value={form.gstRate}
               onChange={(v) => setForm((f) => ({ ...f, gstRate: v }))}
               placeholder="Select or create"
@@ -362,10 +382,12 @@ const AddProductModal = ({
               value={form.hsnCode}
               onChange={handleChange}
               placeholder="e.g. 31021000"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
 
             <CommonDropdown
               label="Units"
+              compactValue
               value={form.units}
               onChange={(v) => setForm((f) => ({ ...f, units: v }))}
               placeholder="e.g. Ltr, Kg, Nos"
@@ -380,6 +402,7 @@ const AddProductModal = ({
 
             <CommonDropdown
               label="Alternate units"
+              compactValue
               value={form.alternateUnits}
               onChange={(v) => setForm((f) => ({ ...f, alternateUnits: v }))}
               placeholder="Alternate unit"
@@ -394,6 +417,7 @@ const AddProductModal = ({
 
             <CommonDropdown
               label="Packing style"
+              compactValue
               value={form.packingStyle}
               onChange={(v) => setForm((f) => ({ ...f, packingStyle: v }))}
               placeholder="Select or create"
@@ -408,6 +432,7 @@ const AddProductModal = ({
 
             <CommonDropdown
               label="Packaging"
+              compactValue
               value={form.packagingType}
               onChange={(v) => setForm((f) => ({ ...f, packagingType: v }))}
               placeholder="Bag, box, etc."
@@ -430,10 +455,11 @@ const AddProductModal = ({
               value={form.defaultPackSize}
               onChange={handleChange}
               placeholder="e.g. 50 kg / 12 pcs"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
           </div>
 
-          <div className="flex flex-wrap items-end gap-2 sm:gap-3 mt-1 pt-2.5 border-t border-light-border/80">
+          <div className="mt-1 flex flex-wrap items-end gap-2 pt-2.5 border-t border-light-border/80 sm:gap-3">
             <span className="text-[12px] font-medium text-slate-600 leading-none pb-2.5 shrink-0 w-full sm:w-auto sm:min-w-[2.75rem]">
               Where
             </span>
@@ -445,6 +471,7 @@ const AddProductModal = ({
                 value={form.whereFrom}
                 onChange={handleChange}
                 placeholder="From"
+                inputClassName={ADD_PRODUCT_VALUE_TEXT}
               />
             </div>
             <span
@@ -461,6 +488,7 @@ const AddProductModal = ({
                 value={form.whereTo}
                 onChange={handleChange}
                 placeholder="To"
+                inputClassName={ADD_PRODUCT_VALUE_TEXT}
               />
             </div>
           </div>
@@ -474,42 +502,51 @@ const AddProductModal = ({
             multiline
             rows={2}
             placeholder="Short description (specs, grade, notes)"
-            inputClassName="resize-y min-h-[4rem] max-h-32 leading-snug"
+            inputClassName={`resize-y min-h-[4rem] max-h-32 leading-snug ${ADD_PRODUCT_VALUE_TEXT}`}
           />
         </FormSection>
 
-        <FormSection title="Opening balance" dense>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <FormSection
+          title="Opening balance"
+          dense
+          titleClassName={ADD_PRODUCT_SECTION_TITLE_CLASS}
+        >
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <InputField
               readOnly={isReadOnly}
               label="Batch no."
               name="batchNo"
               value={form.batchNo}
               onChange={handleChange}
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
 
-            <div className="flex flex-col min-w-0">
-              <label className="text-[12px] font-medium text-slate-600 mb-1 leading-tight">
+            <div className="relative flex min-w-0 flex-col">
+              <label className="mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200">
                 Mfg date
               </label>
-              <DatePicker
-                className="w-full"
-                disabled={isReadOnly}
-                value={form.mfgDate ? dayjs(form.mfgDate) : null}
-                onChange={(d) => setForm((f) => ({ ...f, mfgDate: d }))}
-              />
+              <div className="relative min-w-0">
+                <DatePicker
+                  className="w-full jitox-picker-form jitox-picker-value-sm"
+                  disabled={isReadOnly}
+                  value={form.mfgDate ? dayjs(form.mfgDate) : null}
+                  onChange={(d) => setForm((f) => ({ ...f, mfgDate: d }))}
+                />
+              </div>
             </div>
 
-            <div className="flex flex-col min-w-0">
-              <label className="text-[12px] font-medium text-slate-600 mb-1 leading-tight">
+            <div className="relative flex min-w-0 flex-col">
+              <label className="mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200">
                 Exp date
               </label>
-              <DatePicker
-                className="w-full"
-                disabled={isReadOnly}
-                value={form.expDate ? dayjs(form.expDate) : null}
-                onChange={(d) => setForm((f) => ({ ...f, expDate: d }))}
-              />
+              <div className="relative min-w-0">
+                <DatePicker
+                  className="w-full jitox-picker-form jitox-picker-value-sm"
+                  disabled={isReadOnly}
+                  value={form.expDate ? dayjs(form.expDate) : null}
+                  onChange={(d) => setForm((f) => ({ ...f, expDate: d }))}
+                />
+              </div>
             </div>
 
             <InputField
@@ -519,6 +556,7 @@ const AddProductModal = ({
               value={form.qty}
               onChange={handleChange}
               placeholder="Qty"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
 
             <InputField
@@ -528,6 +566,7 @@ const AddProductModal = ({
               value={form.rate}
               onChange={handleChange}
               placeholder="Rate"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
 
             <InputField
@@ -537,32 +576,52 @@ const AddProductModal = ({
               value={form.amount}
               onChange={handleChange}
               placeholder="Amount"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
           </div>
         </FormSection>
 
-        <FormSection title="Stock" dense>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-            <label
-              className={`inline-flex items-center gap-2.5 select-none pb-0.5 ${isReadOnly ? "cursor-default opacity-80" : "cursor-pointer"}`}
+        <FormSection
+          title="Stock"
+          dense
+          titleClassName={ADD_PRODUCT_SECTION_TITLE_CLASS}
+        >
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 md:items-center">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.stockEnabled}
+              disabled={isReadOnly}
+              onClick={() =>
+                setForm((p) => ({ ...p, stockEnabled: !p.stockEnabled }))
+              }
+              className={`inline-flex max-w-full items-center gap-2.5 rounded-lg py-1 text-left outline-none select-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 ${
+                isReadOnly
+                  ? "cursor-default opacity-80"
+                  : "cursor-pointer"
+              }`}
             >
-              <input
-                type="checkbox"
-                disabled={isReadOnly}
-                checked={form.stockEnabled}
-                onChange={() =>
-                  setForm((p) => ({ ...p, stockEnabled: !p.stockEnabled }))
-                }
-                className="sr-only peer"
-              />
-              <span className="relative w-11 h-6 shrink-0 rounded-full bg-gray-300 transition-colors peer-checked:bg-primary after:content-[''] after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-5" />
-              <span className="text-[12px] font-medium text-slate-600">
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  form.stockEnabled
+                    ? "bg-primary"
+                    : "bg-gray-300 dark:bg-slate-600"
+                }`}
+                aria-hidden
+              >
+                <span
+                  className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform dark:bg-slate-100 ${
+                    form.stockEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </span>
+              <span className="text-[12px] font-medium text-slate-600 dark:text-slate-300">
                 Track stock
               </span>
               <span className="text-[12px] font-semibold text-primary tabular-nums">
                 {form.stockEnabled ? "On" : "Off"}
               </span>
-            </label>
+            </button>
 
             <InputField
               readOnly={isReadOnly}
@@ -571,6 +630,7 @@ const AddProductModal = ({
               value={form.minReorderLevel}
               onChange={handleChange}
               placeholder="50"
+              inputClassName={ADD_PRODUCT_VALUE_TEXT}
             />
           </div>
         </FormSection>

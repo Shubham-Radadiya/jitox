@@ -199,7 +199,7 @@ function denseOrderTdBase(columnKey) {
       ? ""
       : "min-w-0 overflow-hidden";
   return [
-    "px-3 py-2.5 text-sm leading-snug align-middle text-slate-800 dark:text-slate-100",
+    "px-2 py-2.5 text-sm leading-snug align-middle text-slate-800 dark:text-slate-100",
     TABLE_CELL_BORDER,
     "transition-colors duration-150",
     getTableCellAlignClass(columnKey),
@@ -341,8 +341,8 @@ export const TABLE_ACTIONS_ROW_DENSE =
 
 /** Icon button in Actions column (32px) */
 export const TABLE_ACTION_ICON_BTN =
-  "inline-flex shrink-0 items-center justify-center h-8 w-8 rounded-md border border-gray-200 bg-white text-gray-600 text-sm shadow-sm transition-colors duration-150 hover:bg-gray-50 hover:text-emerald-600 hover:border-gray-300 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:border-slate-500 dark:hover:text-emerald-400";
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-500/60 bg-transparent text-slate-700 text-sm transition-colors duration-150 hover:border-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-500/70 dark:bg-transparent dark:text-slate-200 dark:hover:border-emerald-400/70 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300 [&_svg]:opacity-100";
 
 /** Order table action icons (28px; fits four + gaps inside fixed Actions column). */
 export const TABLE_ACTION_ICON_BTN_DENSE =
-  "inline-flex shrink-0 items-center justify-center h-7 w-7 rounded-md border border-gray-200 bg-white text-gray-600 text-sm shadow-sm transition-colors duration-150 hover:bg-gray-50 hover:text-emerald-600 hover:border-gray-300 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:border-slate-500 dark:hover:text-emerald-400";
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-500/60 bg-transparent text-slate-700 text-sm transition-colors duration-150 hover:border-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-500/70 dark:bg-transparent dark:text-slate-200 dark:hover:border-emerald-400/70 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300 [&_svg]:opacity-100";

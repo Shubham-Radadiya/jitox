@@ -120,7 +120,7 @@ const DayBookIndex = () => {
         <button
           type="button"
           title="View"
-          className={TABLE_ACTION_ICON_BTN}
+          className={`${TABLE_ACTION_ICON_BTN} !bg-transparent !shadow-none !border-slate-500/70 !text-slate-200 hover:!bg-emerald-400/10 hover:!text-emerald-300`}
           onClick={(e) => {
             e.stopPropagation();
             handleView(row);
@@ -131,7 +131,7 @@ const DayBookIndex = () => {
         <button
           type="button"
           title="Edit"
-          className={TABLE_ACTION_ICON_BTN}
+          className={`${TABLE_ACTION_ICON_BTN} !bg-transparent !shadow-none !border-slate-500/70 !text-slate-200 hover:!bg-emerald-400/10 hover:!text-emerald-300`}
           onClick={(e) => {
             e.stopPropagation();
             handleEdit(row);
@@ -142,7 +142,7 @@ const DayBookIndex = () => {
         <button
           type="button"
           title="Document"
-          className={TABLE_ACTION_ICON_BTN}
+          className={`${TABLE_ACTION_ICON_BTN} !bg-transparent !shadow-none !border-slate-500/70 !text-slate-200 hover:!bg-emerald-400/10 hover:!text-emerald-300`}
           onClick={(e) => {
             e.stopPropagation();
             handleDocument(row);

@@ -34,12 +34,9 @@ import { dashboardUiApi } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { isManagerUser } from "../../utils/authSession";
 import {
-  paymentStatusBadgeClasses,
-  orderStatusBadgeClasses,
   orderTableThClasses,
   orderTableTdClasses,
   getCellTextAlign,
-  STATUS_CELL_INNER_DENSE,
   TABLE_ACTION_ICON_BTN_DENSE,
   TABLE_ACTIONS_ROW_DENSE,
 } from "../../utils/tableUi";
@@ -473,6 +470,43 @@ function DashboardHome() {
     []
   );
 
+  const dashboardBadgeClasses = (type, rawValue) => {
+    const value = String(rawValue ?? "").trim().toLowerCase().replace(/\s+/g, "");
+    const base =
+      "inline-flex min-w-19 items-center justify-center rounded-full border px-0 py-1 text-[10px] font-semibold leading-none tracking-wide";
+
+    if (type === "payment") {
+      if (value === "paid") {
+        return `${base} border-emerald-300/80 bg-emerald-50 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/35 dark:text-emerald-300`;
+      }
+      if (value === "pending") {
+        return `${base} border-amber-300/80 bg-amber-50 text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/35 dark:text-amber-300`;
+      }
+      return `${base} border-slate-300/90 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200`;
+    }
+
+    const orderTone = {
+      approved:
+        "border-emerald-300/80 bg-emerald-50 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/35 dark:text-emerald-300",
+      processing:
+        "border-sky-300/80 bg-sky-50 text-sky-700 dark:border-sky-700/60 dark:bg-sky-950/35 dark:text-sky-300",
+      dispatched:
+        "border-violet-300/80 bg-violet-50 text-violet-700 dark:border-violet-700/60 dark:bg-violet-950/35 dark:text-violet-300",
+      pending:
+        "border-amber-300/80 bg-amber-50 text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/35 dark:text-amber-300",
+      cancelled:
+        "border-rose-300/80 bg-rose-50 text-rose-700 dark:border-rose-700/60 dark:bg-rose-950/35 dark:text-rose-300",
+      partsupply:
+        "border-orange-300/80 bg-orange-50 text-orange-700 dark:border-orange-700/60 dark:bg-orange-950/35 dark:text-orange-300",
+      "part-supply":
+        "border-orange-300/80 bg-orange-50 text-orange-700 dark:border-orange-700/60 dark:bg-orange-950/35 dark:text-orange-300",
+    };
+    return `${base} ${
+      orderTone[value] ||
+      "border-slate-300/90 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200"
+    }`;
+  };
+
   const renderRowCell = (key, value, row) => {
     if (key === "Date" && value && /^\d{4}-\d{2}-\d{2}/.test(String(value))) {
       const formatted = dayjs(value).format("DD MMM YYYY");
@@ -501,8 +535,8 @@ function DashboardHome() {
     if (key === "Payment Status") {
       return (
         <td key={key} className={orderTableTdClasses(key)}>
-          <div className={STATUS_CELL_INNER_DENSE}>
-            <span className={paymentStatusBadgeClasses(value, { dense: true })}>
+          <div className="flex min-h-0 items-center justify-center overflow-hidden py-0.5">
+            <span className={dashboardBadgeClasses("payment", value)}>
               {value}
             </span>
           </div>
@@ -512,8 +546,8 @@ function DashboardHome() {
     if (key === "Order Status") {
       return (
         <td key={key} className={orderTableTdClasses(key)}>
-          <div className={STATUS_CELL_INNER_DENSE}>
-            <span className={orderStatusBadgeClasses(value, { dense: true })}>
+          <div className="flex min-h-0 items-center justify-center overflow-hidden py-0.5">
+            <span className={dashboardBadgeClasses("order", value)}>
               {value ?? "—"}
             </span>
           </div>
@@ -688,40 +722,51 @@ function DashboardHome() {
                 />
               </>
             ) : rp?.months?.length ? (
-              <div className="min-w-0 overflow-x-auto text-xs max-h-44 overflow-y-auto">
-                <table className="w-full min-w-full table-auto border-collapse text-left">
-                  <thead>
-                    <tr className="border-b border-light-border text-light dark:border-slate-700 dark:text-slate-400">
-                      <th className="w-[42%] py-2.5 pr-3 align-middle font-medium text-left">
-                        Month
-                      </th>
-                      <th className="w-[29%] py-2.5 pr-3 align-middle font-medium tabular-nums text-right">
-                        Rec.
-                      </th>
-                      <th className="w-[29%] py-2.5 align-middle font-medium tabular-nums text-right">
-                        Pay.
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rp.months.map((m, i) => (
-                      <tr
-                        key={m}
-                        className="border-b border-light-border/60 transition-colors duration-200 hover:bg-emerald-50/40 dark:border-slate-700/60 dark:hover:bg-slate-800/60"
-                      >
-                        <td className="py-2.5 pr-3 align-middle text-dark whitespace-nowrap dark:text-slate-100">
-                          {m}
-                        </td>
-                        <td className="py-2.5 pr-3 align-middle tabular-nums text-right whitespace-nowrap dark:text-slate-200">
-                          {rp.receivables[i]}
-                        </td>
-                        <td className="py-2.5 align-middle tabular-nums text-right whitespace-nowrap dark:text-slate-200">
-                          {rp.payables[i]}
-                        </td>
+              <div className="mt-2 min-w-0 overflow-hidden rounded-lg border border-light-border bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="max-h-90 min-w-0 overflow-x-auto overflow-y-auto overscroll-y-contain text-xs">
+                  <table className="w-full min-w-full table-fixed border-collapse text-left">
+                    <thead className="sticky top-0 z-10 border-b border-sky-200/90 bg-sky-50 dark:border-sky-800/70 dark:bg-sky-950/55">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="w-[42%] rounded-tl-lg py-2.5 pl-3 pr-2 align-middle text-left text-[11px] font-semibold uppercase tracking-wider text-sky-900 dark:text-sky-100"
+                        >
+                          Month
+                        </th>
+                        <th
+                          scope="col"
+                          className="w-[29%] py-2.5 pr-2 align-middle text-right text-[11px] font-semibold uppercase tracking-wider tabular-nums text-sky-900 dark:text-sky-100"
+                        >
+                          Rec.
+                        </th>
+                        <th
+                          scope="col"
+                          className="w-[29%] rounded-tr-lg py-2.5 pr-3 align-middle text-right text-[11px] font-semibold uppercase tracking-wider tabular-nums text-sky-900 dark:text-sky-100"
+                        >
+                          Pay.
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-light-border/80 dark:divide-slate-700/90">
+                      {rp.months.map((m, i) => (
+                        <tr
+                          key={m}
+                          className="transition-colors duration-200 hover:bg-emerald-50/50 dark:hover:bg-slate-800/70"
+                        >
+                          <td className="py-2.5 pl-3 pr-2 align-middle whitespace-nowrap text-slate-900 dark:text-slate-100">
+                            {m}
+                          </td>
+                          <td className="py-2.5 pr-2 align-middle tabular-nums text-right whitespace-nowrap text-slate-800 dark:text-slate-200">
+                            {rp.receivables[i]}
+                          </td>
+                          <td className="py-2.5 pr-3 align-middle tabular-nums text-right whitespace-nowrap text-slate-800 dark:text-slate-200">
+                            {rp.payables[i]}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <div className="flex-1 text-sm text-light flex items-center justify-center py-10 dark:text-slate-500">
@@ -735,36 +780,39 @@ function DashboardHome() {
           <div className="mb-3 text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             All Orders
           </div>
-          <div className="mb-3 flex flex-col gap-3 lg:mb-4 lg:flex-row lg:items-end lg:gap-4">
+          <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2.5 lg:mb-4 lg:gap-3">
             <SearchBar
+              dense
               value={managerQ}
               onChange={setManagerQ}
               placeholder="Search Manager Name"
-              className="w-full sm:w-52"
+              className="w-full min-w-0 shrink-0 sm:w-48"
             />
             <SearchBar
+              dense
               value={orderQ}
               onChange={setOrderQ}
               placeholder="Search Order ID"
-              className="w-full sm:w-52"
+              className="w-full min-w-0 shrink-0 sm:w-48"
             />
             <DateRangePicker
+              filterBar
               placeholder={["Date", "Date"]}
-              className="w-full sm:w-[14rem]"
+              className="w-full min-w-0 shrink-0 sm:w-52 [&_.ant-picker-input>input]:font-medium [&_.ant-picker-input>input]:text-slate-900 [&_.ant-picker-input>input]:placeholder:text-slate-600 [&_.ant-picker-separator]:text-slate-700 dark:[&_.ant-picker-input>input]:text-slate-100 dark:[&_.ant-picker-input>input]:placeholder:text-slate-400 dark:[&_.ant-picker-separator]:text-slate-400"
               value={orderDates}
               onChange={setOrderDates}
             />
-            <div className="relative shrink-0 self-start lg:self-auto">
+            <div className="relative ml-auto flex shrink-0 items-center">
               <button
                 type="button"
                 onClick={() => setOrderSortOpen((o) => !o)}
-                className="p-3 border border-light-border rounded-lg bg-white text-light hover:text-primary min-h-11 min-w-11 inline-flex items-center justify-center dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-primary"
+                className="box-border flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white p-0 text-light shadow-sm hover:bg-slate-50 hover:text-primary dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:hover:text-primary"
                 aria-label="Sort"
               >
-                <LuArrowUpDown size={18} />
+                <LuArrowUpDown size={16} />
               </button>
               {orderSortOpen && (
-                <div className="absolute right-0 mt-1.5 w-44 bg-white shadow-md border border-gray-200 rounded-lg text-sm py-1 z-50 dark:bg-slate-900 dark:border-slate-600">
+                <div className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-lg border border-gray-200 bg-white py-1 text-sm shadow-md dark:border-slate-600 dark:bg-slate-900">
                   {[
                     { label: "Newest First", value: "newest" },
                     { label: "Oldest First", value: "oldest" },
@@ -775,7 +823,7 @@ function DashboardHome() {
                     <button
                       key={opt.value}
                       type="button"
-                      className={`w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700 dark:text-slate-200 dark:hover:bg-slate-800 ${
+                      className={`w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800 ${
                         orderSort === opt.value ? "bg-emerald-50 dark:bg-emerald-950/40" : ""
                       }`}
                       onClick={() => {

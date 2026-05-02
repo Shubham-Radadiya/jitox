@@ -552,20 +552,21 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
       open={open}
       onClose={onClose}
       title="Create Account"
-      size="4xl"
-      shellClassName="!p-1.5 sm:!p-2"
-      className="!max-h-[98vh]"
+      size="xl"
+      shellClassName="!p-1 sm:!p-2"
+      className="!max-h-[90vh]"
       titleClassName="!text-base !font-extrabold !tracking-tight !text-slate-900 dark:!text-slate-50"
       headerClassName="!py-2 !px-3"
-      bodyClassName="!pt-2 !px-3 !pb-10 sm:!pb-12"
+      bodyClassName="!pt-1.5 !px-2.5 !pb-6 sm:!pb-8"
       footerClassName="!py-2 !px-3"
       footer={[
         <Button
           key="cancel"
           label="Cancel"
           variant="outline"
-          size="sm"
+          size="md"
           onClick={onClose}
+          className="min-w-[8rem] font-semibold"
           disabled={saving}
         />,
         <Button
@@ -574,7 +575,7 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
           variant="primary"
           size="md"
           onClick={handleSubmit}
-          className="min-w-[8rem] font-semibold"
+          className="min-w-[8rem] font-semibold !text-white hover:!text-white dark:!text-white dark:hover:!text-white"
           disabled={saving}
         />,
       ]}
@@ -718,15 +719,6 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
                   onChange={handleChange}
                   placeholder="District"
                 />
-                <InputField
-                  dense
-                  className="sm:col-span-3"
-                  label="Country"
-                  name="businessCountry"
-                  value={form.businessCountry}
-                  onChange={handleChange}
-                  placeholder="Country"
-                />
               </div>
             </div>
 
@@ -773,7 +765,17 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-3">
+              <div className="min-w-0">
+                <InputField
+                  dense
+                  label="Country"
+                  name="businessCountry"
+                  value={form.businessCountry}
+                  onChange={handleChange}
+                  placeholder="Country"
+                />
+              </div>
               <div className="min-w-0">
                 <InputField
                   dense
@@ -808,7 +810,7 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
 
         <FormSection title="Personal details" book>
           <div className="flex min-w-0 flex-col gap-2.5">
-            <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-3">
               <InputField
                 dense
                 label="Name"
@@ -833,7 +835,9 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
                 onChange={handleChange}
                 placeholder="name@gmail.com"
               />
-              <div className="min-w-0">
+            </div>
+            <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-3">
+              <div className="min-w-0 sm:col-span-2">
                 <InputField
                   dense
                   multiline
@@ -846,6 +850,14 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
                 />
                 <FieldError message={addrErrors.streetAddress} />
               </div>
+              <InputField
+                dense
+                label="Country"
+                name="country"
+                value={form.country}
+                onChange={handleChange}
+                placeholder="Country"
+              />
             </div>
             <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-3">
               <div className="min-w-0">
@@ -911,15 +923,6 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
                 value={form.district}
                 onChange={handleChange}
                 placeholder="District"
-              />
-              <InputField
-                dense
-                className="sm:col-span-3"
-                label="Country"
-                name="country"
-                value={form.country}
-                onChange={handleChange}
-                placeholder="Country"
               />
             </div>
           </div>
@@ -1058,6 +1061,7 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
             variant="primary"
             size="sm"
             onClick={submitQuickAdd}
+            className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
           />,
         ]}
       >

@@ -195,7 +195,7 @@ const VoucherPage = () => {
       <DashboardLayout>
         <div className="ds-stack-major">
           <VoucherFilter />
-          <div className="rounded-lg border border-light-border bg-white p-4 text-sm text-light">
+          <div className="rounded-lg border border-light-border bg-white p-4 text-sm text-light dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
             Unknown voucher type.
           </div>
         </div>
@@ -376,9 +376,13 @@ const VoucherPage = () => {
                 type="button"
                 ref={columnPickerButtonRef}
                 onClick={toggleColumnPicker}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-light-border bg-white shadow-sm hover:bg-gray-50 hover:shadow-md"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-light-border bg-white shadow-sm hover:bg-gray-50 hover:shadow-md dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
               >
-                <Plus size={16} className="text-dark" />
+                <Plus
+                  size={16}
+                  className="text-slate-800 dark:text-emerald-400"
+                  strokeWidth={2.25}
+                />
               </button>
             </div>
           )}
@@ -400,7 +404,7 @@ const VoucherPage = () => {
       applied && applied.size > 0 ? Array.from(applied) : null;
 
     return (
-      <th key={key} className={tableThClasses(key)}>
+      <th key={key} className={tableThClasses(key, { compact: true })}>
         <div className={`flex w-full min-w-0 items-center gap-1 ${justify}`}>
           <span className="min-w-0 truncate">{label}</span>
           <ExcelColumnFilterHeader
@@ -422,33 +426,58 @@ const VoucherPage = () => {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-3 min-w-0 max-w-full">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-          <div className="flex flex-col gap-1 min-w-0 w-full sm:max-w-xs">
-            <span className="text-xs font-medium text-light">Voucher List</span>
-            <VoucherFilter />
+        <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white via-slate-50/60 to-emerald-50/25 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(16,185,129,0.04)] dark:border-slate-700/80 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/30 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
+          <div className="flex flex-col gap-3 p-3 sm:gap-4 sm:p-4 lg:flex-row lg:items-center lg:justify-start lg:gap-2">
+            <div className="flex w-full min-w-0 flex-row flex-wrap items-center gap-2.5 sm:gap-3 lg:max-w-[min(100%,28rem)] lg:shrink-0">
+              <div className="flex min-w-0 flex-1 flex-row flex-wrap items-center gap-2.5 rounded-xl bg-white/80 p-2 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-800/50 dark:ring-slate-600/50 sm:gap-3">
+                <span className="flex shrink-0 items-center self-center whitespace-nowrap text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Voucher list
+                </span>
+                <div className="min-w-0 flex-1 basis-[min(100%,14rem)] sm:basis-auto">
+                  <VoucherFilter className="max-w-none w-full" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 pt-3 min-h-9 sm:border-t-0 sm:pt-0 lg:border-l lg:border-slate-200/80 lg:pl-3 dark:border-slate-600/80">
+              <h2 className="m-0 min-w-0 flex-1 truncate text-xs font-bold uppercase leading-none tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                {config.title}
+              </h2>
+              {filterButtonFields.length > 0 ? (
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  {filterButtonFields.map((field) => renderFilterField(field))}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
         {paymentSummary && (
-          <div className="bg-white border border-light-border rounded-xl p-2.5 sm:p-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
-              <div className="flex flex-col md:border-r border-gray-200">
-                <div className="text-base sm:text-lg font-bold">
+          <div className="rounded-xl border border-light-border bg-white p-2.5 sm:p-3 dark:border-slate-600 dark:bg-slate-900">
+            <div className="grid grid-cols-1 gap-3 text-center md:grid-cols-3">
+              <div className="flex flex-col border-gray-200 md:border-r dark:border-slate-600">
+                <div className="text-base font-bold text-dark sm:text-lg dark:text-slate-100">
                   {paymentSummary.totalAmount}
                 </div>
-                <div className="text-xs sm:text-sm">Total Amount Paid (₹)</div>
+                <div className="text-xs text-slate-600 sm:text-sm dark:text-slate-400">
+                  Total Amount Paid (₹)
+                </div>
               </div>
-              <div className="flex flex-col md:border-r border-gray-200">
-                <div className="text-base sm:text-lg font-semibold">
+              <div className="flex flex-col border-gray-200 md:border-r dark:border-slate-600">
+                <div className="text-base font-semibold text-dark sm:text-lg dark:text-slate-100">
                   {paymentSummary.cashAmount}
                 </div>
-                <div className="text-xs sm:text-sm">Cash (₹)</div>
+                <div className="text-xs text-slate-600 sm:text-sm dark:text-slate-400">
+                  Cash (₹)
+                </div>
               </div>
               <div className="flex flex-col">
-                <div className="text-base sm:text-lg font-bold">
+                <div className="text-base font-bold text-dark sm:text-lg dark:text-slate-100">
                   {paymentSummary.bankAmount}
                 </div>
-                <div className="text-xs sm:text-sm">Bank (₹)</div>
+                <div className="text-xs text-slate-600 sm:text-sm dark:text-slate-400">
+                  Bank (₹)
+                </div>
               </div>
             </div>
           </div>
@@ -456,35 +485,16 @@ const VoucherPage = () => {
 
         {isManufacturingPage && <ManufacturingOverview rows={displayedRows} />}
 
-        <div className="rounded-xl border border-light-border bg-white dark:bg-slate-900 dark:border-slate-700 shadow-sm">
-          <div className="flex flex-col gap-3 p-3 sm:p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-              <h2 className="text-base sm:text-lg font-semibold text-dark tracking-tight shrink-0">
-                {config.title}
-              </h2>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap sm:justify-end min-w-0 flex-1">
-                {filterButtonFields.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 shrink-0 sm:justify-end">
-                    {filterButtonFields.map((field) =>
-                      renderFilterField(field)
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
         {rowsLoading && !isManufacturingPage ? (
-          <div className="border border-light-border rounded-xl bg-white min-h-[200px] flex items-center justify-center text-light text-sm">
+          <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-light-border bg-white text-sm text-light dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
             Loading…
           </div>
         ) : !rowsLoading && dataRows.length === 0 && config.emptyState ? (
-          <div className="border border-light-border rounded-xl bg-white min-h-[200px] sm:min-h-[240px] flex flex-col items-center justify-center px-4 py-6 sm:px-6 text-center">
-            <p className="text-base sm:text-lg font-semibold text-dark">
+          <div className="flex min-h-[200px] flex-col items-center justify-center rounded-xl border border-light-border bg-white px-4 py-6 text-center sm:min-h-[240px] sm:px-6 dark:border-slate-600 dark:bg-slate-900">
+            <p className="text-base font-semibold text-dark sm:text-lg dark:text-slate-100">
               {config.emptyState.title}
             </p>
-            <p className="text-sm text-light mt-2 max-w-md">
+            <p className="mt-2 max-w-md text-sm text-light dark:text-slate-400">
               {config.emptyState.description}
             </p>
           </div>
@@ -516,37 +526,48 @@ const VoucherPage = () => {
           <div className="fixed inset-0 right-6" style={{ zIndex: 999 }}>
           <div
             ref={columnPickerPopupRef}
-            className="absolute -translate-x-1/2 w-56 bg-white border border-light-border rounded-lg shadow-lg"
+            className="absolute w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-light-border bg-white shadow-lg dark:border-slate-600 dark:bg-slate-900 dark:shadow-xl dark:shadow-black/40"
             style={{
               top: columnPickerPosition.top,
               left: columnPickerPosition.left,
             }}
           >
-            <div className="flex justify-between border-b border-light-border bg-rowBg px-4 py-3 ">
-              <div className="text-sm font-semibold text-dark">Add Column</div>
+            <div className="flex justify-between border-b border-light-border bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-800">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Add Column
+              </div>
               <button
+                type="button"
                 onClick={() => setIsColumnPickerOpen(false)}
-                className="text-dark hover:text-black transition"
+                className="rounded-md p-0.5 text-slate-600 transition hover:bg-slate-200/90 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>
             </div>
-            <div className="p-3 flex flex-col gap-2 max-h-60 overflow-y-auto">
-              {baseColumns.map((column) => {
+            <div className="flex max-h-60 flex-col gap-2 overflow-y-auto p-3 dark:bg-slate-900">
+              {baseColumns.map((column, colIdx) => {
+                const colKey = tableColumnKey(column);
                 const isChecked = selectedColumns.includes(column);
+                const colLabel =
+                  typeof column === "string"
+                    ? column
+                    : column?.label ?? column?.key ?? colKey;
                 return (
                   <label
-                    key={column}
-                    className="flex items-center gap-3 px-1 py-1.5 rounded-md cursor-pointer hover:bg-gray-50"
+                    key={colKey ? `col-${colKey}` : `col-idx-${colIdx}`}
+                    className="flex cursor-pointer items-center gap-3 rounded-md px-1 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     <input
                       type="checkbox"
-                      checked={column === "Actions" ? true : isChecked}
-                      disabled={column === "Actions"}
+                      checked={colKey === "Actions" || colKey === "Action" ? true : isChecked}
+                      disabled={colKey === "Actions" || colKey === "Action"}
                       onChange={() => handleToggleColumn(column)}
-                      className="accent-primary"
+                      className="h-4 w-4 rounded border-slate-300 text-primary accent-primary focus:ring-primary/30 dark:border-slate-500 dark:bg-slate-900"
                     />
-                    <span className="text-sm text-dark">{column}</span>
+                    <span className="text-sm text-slate-800 dark:text-slate-100">
+                      {colLabel}
+                    </span>
                   </label>
                 );
               })}

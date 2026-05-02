@@ -9,6 +9,7 @@ export interface IPurchaseItem {
   unit: string;
   category: string;
   subtotal: Number;
+  remarks?: string;
 }
 
 export interface IPurchaseVoucher extends Document {

@@ -20,8 +20,6 @@ import {
   shareOrCopyText,
 } from "../../utils/voucherShare";
 import { getApiErrorMessage } from "../../utils/apiError";
-
-dayjs.extend(customParseFormat);
 import { IoEyeOutline } from "react-icons/io5";
 import { TbEdit } from "react-icons/tb";
 import {
@@ -39,6 +37,8 @@ import ExpenseModal from "./modals/ExpenseModal";
 import CashTransferModal from "./modals/CashTransferModal";
 import BankToCashModal from "./modals/BankToCashModal";
 import JournalModal from "./modals/JournalModal";
+
+dayjs.extend(customParseFormat);
 
 const withFooter = (columns, cells = []) => (
   <tfoot>
@@ -232,11 +232,23 @@ const quotationColumns = [
 ];
 
 /** Primary CTA in voucher list toolbars — shared Add pattern */
-const voucherAddButton = (overrides) => ({
-  type: "button",
-  label: "Add voucher",
-  ...mergePageAddButton(overrides),
-});
+const voucherAddButton = (overrides = {}) => {
+  const { className: extraCls = "", ...rest } = overrides;
+  return {
+    type: "button",
+    label: "Add voucher",
+    ...mergePageAddButton({
+      size: "sm",
+      className: [
+        "min-h-9 px-3 sm:px-4 text-[13px] font-semibold gap-1 [&_svg]:h-3.5 [&_svg]:w-3.5",
+        extraCls,
+      ]
+        .filter(Boolean)
+        .join(" "),
+      ...rest,
+    }),
+  };
+};
 
 // Helper function to create action buttons with tooltips
 const createActionButtons = (actions, { openDetails, navigate, row, openPurchaseModal }) => {
@@ -253,13 +265,14 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
     delete: "Delete",
   };
 
+  /** Named group so tooltips only react to this wrapper, not the `<tr class="group">` in TableContent */
   const renderButtonWithTooltip = (button, tooltipText, key) => {
     return (
-      <div key={key} className="relative group">
+      <div key={key} className="relative group/acttip">
         {button}
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-dark text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-xs whitespace-nowrap text-white shadow-md opacity-0 transition-opacity duration-200 group-hover/acttip:opacity-100 dark:bg-slate-800 dark:text-slate-50 dark:ring-1 dark:ring-white/10">
           {tooltipText}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-dark"></div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900 dark:border-t-slate-800" aria-hidden />
         </div>
       </div>
     );
@@ -335,7 +348,7 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
               <button
                 type="button"
                 onClick={() => action.onClick?.(row)}
-                className="text-xs font-semibold text-primary hover:underline px-0.5"
+                className="text-xs font-semibold text-primary hover:underline px-0.5 dark:text-emerald-400 dark:hover:text-emerald-300"
                 aria-label="Re-voucher"
               >
                 Re-voucher

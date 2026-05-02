@@ -30,106 +30,102 @@ export default function OrderDetailsDrawer({
         aria-label="Close overlay"
         onClick={onClose}
       />
-      <aside className="relative h-full w-full max-w-xl bg-white shadow-2xl flex flex-col">
-        <header className="flex items-center justify-between px-4 py-3 border-b border-light-border bg-headBg shrink-0">
-          <div>
-            <div className="text-lg font-semibold text-dark">
+      <aside className="relative flex h-full w-full max-w-xl flex-col bg-white shadow-2xl dark:bg-slate-900">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-light-border bg-headBg px-4 py-3 dark:border-slate-700 dark:bg-slate-800/80">
+          <div className="min-w-0">
+            <div className="text-lg font-bold tracking-tight text-dark dark:text-slate-100">
               {row["Order ID"]} — Order Details
             </div>
             {d.createdAt && (
-              <div className="text-xs text-light mt-0.5">Created At: {d.createdAt}</div>
+              <div className="mt-0.5 text-xs text-light dark:text-slate-400">Created At: {d.createdAt}</div>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 text-light"
+            className="rounded-lg p-2 text-light hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-700"
             aria-label="Close"
           >
             <X size={20} />
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 text-sm">
+        <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50/60 px-4 py-4 text-sm dark:bg-slate-950/30">
           <div className="flex flex-wrap gap-3">
             {d.paymentStatus && (
-              <span className="px-3 py-1 rounded-full bg-primary text-white text-xs font-medium">
+              <span className="rounded-full border border-emerald-300/80 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/35 dark:text-emerald-300">
                 {d.paymentStatus}
               </span>
             )}
             {d.orderStatus && (
-              <span className="px-3 py-1 rounded-md text-xs font-medium text-blue border border-blue/30">
+              <span className="rounded-full border border-sky-300/80 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-700/60 dark:bg-sky-950/35 dark:text-sky-300">
                 {d.orderStatus}
               </span>
             )}
           </div>
 
-          <section>
-            <h3 className="text-xs font-semibold text-light uppercase tracking-wide mb-2">
+          <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="mb-2 text-base font-bold text-slate-900 dark:text-slate-100">
               Manager Details
             </h3>
-            <div className="space-y-1 text-dark">
+            <div className="space-y-1.5 text-dark dark:text-slate-100">
               <div>
-                <span className="text-light">Full Name: </span>
+                <span className="font-medium text-light dark:text-slate-400">Full Name: </span>
                 {mgr.fullName || row["Manager Name"]}
               </div>
               {mgr.region && (
                 <div>
-                  <span className="text-light">Region: </span>
+                  <span className="font-medium text-light dark:text-slate-400">Region: </span>
                   {mgr.region}
                 </div>
               )}
               {mgr.area && (
                 <div>
-                  <span className="text-light">Area: </span>
+                  <span className="font-medium text-light dark:text-slate-400">Area: </span>
                   {mgr.area}
                 </div>
               )}
             </div>
           </section>
 
-          <hr className="border-light-border" />
-
-          <section>
-            <h3 className="text-xs font-semibold text-light uppercase tracking-wide mb-2">
+          <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="mb-2 text-base font-bold text-slate-900 dark:text-slate-100">
               Client Details
             </h3>
-            <div className="space-y-1 text-dark">
+            <div className="space-y-1.5 text-dark dark:text-slate-100">
               <div>
-                <span className="text-light">Full Name: </span>
+                <span className="font-medium text-light dark:text-slate-400">Full Name: </span>
                 {client.fullName || row["Client Name"]}
               </div>
               {client.phone && (
                 <div>
-                  <span className="text-light">Phone: </span>
+                  <span className="font-medium text-light dark:text-slate-400">Phone: </span>
                   {client.phone}
                 </div>
               )}
               {client.email && (
                 <div>
-                  <span className="text-light">Email: </span>
+                  <span className="font-medium text-light dark:text-slate-400">Email: </span>
                   {client.email}
                 </div>
               )}
               {client.shippingAddress && (
                 <div className="pt-1">
-                  <span className="text-light block mb-0.5">Shipping Address</span>
+                  <span className="mb-0.5 block font-medium text-light dark:text-slate-400">Shipping Address</span>
                   {client.shippingAddress}
                 </div>
               )}
             </div>
           </section>
 
-          <hr className="border-light-border" />
-
           {products.length > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold text-light uppercase tracking-wide mb-2">
+            <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <h3 className="mb-2 text-base font-bold text-slate-900 dark:text-slate-100">
                 Product Details
               </h3>
-              <div className="border border-light-border rounded-lg overflow-hidden">
+              <div className="overflow-hidden rounded-lg border border-light-border dark:border-slate-700">
                 <table className="w-full text-xs">
-                  <thead className="bg-headBg text-light">
+                  <thead className="bg-headBg text-light dark:bg-slate-800 dark:text-slate-300">
                     <tr>
                       <th className="px-3 py-2 text-left">Product</th>
                       <th className="px-3 py-2">QTY</th>
@@ -149,7 +145,7 @@ export default function OrderDetailsDrawer({
                   </tbody>
                   {d.productsTotal && (
                     <tfoot>
-                      <tr className="bg-rowBg font-semibold">
+                      <tr className="bg-rowBg font-semibold dark:bg-slate-800/80">
                         <td colSpan={3} className="px-3 py-2 text-right align-middle">
                           Total
                         </td>
@@ -165,22 +161,22 @@ export default function OrderDetailsDrawer({
           )}
 
           {dispatch.status && (
-            <section>
-              <h3 className="text-xs font-semibold text-light uppercase tracking-wide mb-1">
+            <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <h3 className="mb-1 text-base font-bold text-slate-900 dark:text-slate-100">
                 Dispatch Details
               </h3>
-              <div className="text-primary font-medium">{dispatch.status}</div>
+              <div className="font-medium text-primary">{dispatch.status}</div>
             </section>
           )}
 
           {delivery.trackingNumber && (
-            <section>
-              <h3 className="text-xs font-semibold text-light uppercase tracking-wide mb-2">
+            <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <h3 className="mb-2 text-base font-bold text-slate-900 dark:text-slate-100">
                 Delivery Details
               </h3>
-              <div className="space-y-1">
+              <div className="space-y-1.5 dark:text-slate-200">
                 <div>
-                  <span className="text-light">Tracking: </span>
+                  <span className="font-medium text-light dark:text-slate-400">Tracking: </span>
                   <button
                     type="button"
                     className="text-blue font-medium hover:underline"
@@ -190,7 +186,7 @@ export default function OrderDetailsDrawer({
                 </div>
                 {delivery.courier && (
                   <div>
-                    <span className="text-light">Courier / Person: </span>
+                    <span className="font-medium text-light dark:text-slate-400">Courier / Person: </span>
                     {delivery.courier}
                   </div>
                 )}
@@ -199,43 +195,43 @@ export default function OrderDetailsDrawer({
           )}
 
           {pay.grandTotal && (
-            <section className="bg-rowBg rounded-xl p-4 space-y-2">
-              <h3 className="text-xs font-semibold text-light uppercase tracking-wide">
+            <section className="space-y-2 rounded-xl border border-light-border bg-rowBg p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/80">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                 Payment Details
               </h3>
               {pay.subTotal && (
-                <div className="flex justify-between">
-                  <span className="text-light">Sub Total</span>
+                <div className="flex justify-between dark:text-slate-100">
+                  <span className="text-light dark:text-slate-400">Sub Total</span>
                   <span>{pay.subTotal}</span>
                 </div>
               )}
               {pay.tax && (
-                <div className="flex justify-between">
-                  <span className="text-light">Tax</span>
+                <div className="flex justify-between dark:text-slate-100">
+                  <span className="text-light dark:text-slate-400">Tax</span>
                   <span>{pay.tax}</span>
                 </div>
               )}
               {pay.discount && (
-                <div className="flex justify-between">
-                  <span className="text-light">Discount</span>
+                <div className="flex justify-between dark:text-slate-100">
+                  <span className="text-light dark:text-slate-400">Discount</span>
                   <span>{pay.discount}</span>
                 </div>
               )}
               {pay.mode && (
-                <div className="flex justify-between">
-                  <span className="text-light">Payment Mode</span>
+                <div className="flex justify-between dark:text-slate-100">
+                  <span className="text-light dark:text-slate-400">Payment Mode</span>
                   <span>{pay.mode}</span>
                 </div>
               )}
               {pay.transactionId && (
-                <div className="flex justify-between items-center">
-                  <span className="text-light">Transaction ID</span>
+                <div className="flex items-center justify-between dark:text-slate-100">
+                  <span className="text-light dark:text-slate-400">Transaction ID</span>
                   <span className="font-mono text-xs" title={pay.transactionId}>
                     {pay.transactionId}
                   </span>
                 </div>
               )}
-              <div className="flex justify-between text-base font-bold pt-2 border-t border-light-border">
+              <div className="flex justify-between border-t border-light-border pt-2 text-base font-bold dark:border-slate-700 dark:text-slate-100">
                 <span>Grand Total</span>
                 <span>{pay.grandTotal}</span>
               </div>
@@ -243,7 +239,8 @@ export default function OrderDetailsDrawer({
           )}
         </div>
 
-        <footer className="p-4 border-t border-light-border flex flex-col gap-2 shrink-0 bg-white">
+        <footer className="shrink-0 border-t border-light-border bg-headBg/70 p-4 shadow-[0_-4px_12px_rgba(15,23,42,0.05)] dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-[0_-4px_14px_rgba(0,0,0,0.35)]">
+          <div className="flex flex-col gap-2">
           <div className="flex gap-3">
             <Button
               label="Edit"
@@ -258,7 +255,7 @@ export default function OrderDetailsDrawer({
             />
             <button
               type="button"
-              className="flex-1 rounded-lg bg-dark text-white py-2 text-sm font-medium hover:opacity-90"
+              className="flex-1 rounded-lg border border-primary bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
               onClick={onGenerateInvoice}
             >
               Generate Invoice
@@ -275,6 +272,7 @@ export default function OrderDetailsDrawer({
               onClose?.();
             }}
           />
+          </div>
         </footer>
       </aside>
     </div>

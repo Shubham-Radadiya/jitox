@@ -11,6 +11,7 @@ export function FormSection({
   hint,
   children,
   className = "",
+  titleClassName = "",
   dense = false,
   book = false,
 }) {
@@ -39,7 +40,13 @@ export function FormSection({
               aria-hidden
             />
           ) : null}
-          <h3 className={book ? `${titleCls} min-w-0 flex-1` : titleCls}>
+          <h3
+            className={
+              book
+                ? `${titleCls} min-w-0 flex-1 ${titleClassName}`.trim()
+                : `${titleCls} ${titleClassName}`.trim()
+            }
+          >
             {title}
             {hint ? (
               <span className="ml-1.5 text-[11px] font-medium normal-case tracking-normal text-slate-500 dark:text-slate-400">

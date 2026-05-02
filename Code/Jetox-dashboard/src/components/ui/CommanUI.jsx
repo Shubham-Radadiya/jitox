@@ -32,9 +32,15 @@ export const InputField = ({
   const isPassword = type === "password" && !multiline;
   const inputType = isPassword && showPassword ? "text" : type;
 
+  const heightLock = multiline
+    ? ""
+    : dense
+      ? "h-9 min-h-9 max-h-9"
+      : "h-10 min-h-10 max-h-10";
+
   const baseClasses = dense
-    ? "w-full min-h-9 rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-[12px] leading-snug text-dark shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] placeholder:text-[11px] placeholder:text-slate-500 hover:border-slate-400 hover:bg-white focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.06] dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus:border-primary dark:focus:ring-primary/30"
-    : "w-full min-h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] leading-snug text-dark shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] placeholder:text-[13px] placeholder:text-slate-500 hover:border-slate-400 hover:bg-white focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.06] dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus:border-primary dark:focus:ring-primary/30";
+    ? `w-full ${heightLock} rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-[12px] leading-snug text-dark shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] placeholder:text-[11px] placeholder:text-slate-500 hover:border-slate-400 hover:bg-white focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.06] dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus:border-primary dark:focus:bg-slate-950 dark:focus:ring-primary/30`
+    : `w-full ${heightLock} rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] leading-snug text-dark shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] placeholder:text-[13px] placeholder:text-slate-500 hover:border-slate-400 hover:bg-white focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.06] dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus:border-primary dark:focus:bg-slate-950 dark:focus:ring-primary/30`;
 
   const InputComponent = multiline ? "textarea" : "input";
 
@@ -91,16 +97,16 @@ export const Button = ({
 }) => {
   const sizeStyle =
     size === "sm"
-      ? "px-4 py-2 rounded-lg text-sm font-medium min-h-9 gap-1.5"
-      : "px-6 py-3 rounded-lg text-sm font-medium min-h-11 gap-2";
+      ? "px-3 py-1 rounded-lg text-xs font-medium min-h-7 gap-1"
+      : "px-4 py-2 rounded-lg text-sm font-medium min-h-9 gap-1.5";
   const baseStyle = `${sizeStyle} transition-all duration-200 flex items-center justify-center`;
 
   const variants = {
-    primary: "bg-primary text-[#ffffff] hover:bg-primary/90",
+    primary: "bg-primary text-[#ffffff] hover:bg-primary/90 hover:!text-white",
     outline:
-      "border border-light-border text-black hover:bg-primary hover:text-white dark:border-slate-600 dark:text-slate-200 dark:hover:text-[#ffffff]",
+      "border border-light-border text-black hover:bg-primary hover:!text-white dark:border-slate-600 dark:text-slate-200 dark:hover:!text-white",
     ghost:
-      "text-primary hover:bg-primary/90 dark:text-emerald-400 dark:hover:bg-emerald-950/40",
+      "!text-primary hover:bg-primary/90 hover:!text-white dark:!text-emerald-400 dark:hover:bg-emerald-950/40 dark:hover:!text-white",
   };
 
   return (
@@ -164,11 +170,12 @@ export const Card = ({
 export const DateInput = ({ label, value, onChange, name }) => (
   <div className="flex flex-col">
     {label && (
-      <label className="mb-1 text-left text-xs font-semibold tracking-wide text-slate-800 dark:text-slate-200">
+      <label className="mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200">
         {label}
       </label>
     )}
     <DatePicker
+      className="w-full jitox-picker-form !text-[13px]"
       format="YYYY-MM-DD"
       value={value ? dayjs(value) : null}
       onChange={(date) => onChange({ target: { name, value: date } })}
@@ -363,7 +370,7 @@ export const CommonModal = ({
   );
 };
 
-export const VoucherFilter = () => {
+export const VoucherFilter = ({ className = "max-w-sm" }) => {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const navigate = useNavigate();
@@ -398,25 +405,25 @@ export const VoucherFilter = () => {
   };
 
   return (
-    <div className="relative w-64"  ref={wrapperRef}>
+    <div className={`relative min-w-0 w-full ${className}`.trim()} ref={wrapperRef}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between border border-light-border bg-white px-4 py-2.5 text-sm hover:border-primary transition min-h-11 dark:border-slate-600 dark:bg-slate-900
-          ${open ? "rounded-t-lg rounded-b-none" : "rounded-lg"}
+        className={`flex h-9 min-h-9 max-h-9 w-full items-center justify-between border border-slate-200/90 bg-white px-3 py-0 text-[11px] font-medium leading-tight shadow-sm ring-1 ring-slate-900/[0.04] transition hover:border-primary/80 hover:bg-emerald-50/40 hover:ring-primary/15 dark:border-slate-600 dark:bg-slate-900/90 dark:ring-white/[0.06] dark:hover:border-primary/70 dark:hover:bg-primary/10
+          ${open ? "rounded-t-lg rounded-b-none border-b-transparent ring-0" : "rounded-lg"}
         `}
       >
-        <span className="text-dark dark:text-slate-100">
+        <span className="truncate text-dark dark:text-slate-100">
           {selected || "Select Voucher Type"}
         </span>
         <ChevronDown
-          size={16}
+          size={14}
           className={`shrink-0 text-slate-500 transition-transform dark:text-slate-400 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
       {open && (
-        <div className="absolute left-0 w-full bg-white border max-h-80 overflow-auto border-light-border border-t-0 rounded-b-lg z-20 p-2 dark:border-slate-600 dark:bg-slate-900">
+        <div className="absolute left-0 z-20 max-h-80 w-full overflow-auto rounded-b-lg border border-t-0 border-slate-200/90 bg-white p-2 shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5 dark:border-slate-600 dark:bg-slate-900 dark:shadow-black/30 dark:ring-white/5">
           {voucherNavItems.map((item, index) => {
             const isSelected = selected === item.name;
             return (

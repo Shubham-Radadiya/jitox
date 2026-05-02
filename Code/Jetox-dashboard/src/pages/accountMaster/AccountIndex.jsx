@@ -129,7 +129,7 @@ const AccountIndex = () => {
   const fmtInr = (n) =>
     `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
-  const renderAccountTableFooter = useCallback(
+    const renderAccountTableFooter = useCallback(
     (displayedRows = []) => {
       if (!displayedRows.length) return null;
       let credit = 0;
@@ -142,9 +142,9 @@ const AccountIndex = () => {
         <tfoot className="sticky bottom-0 z-[1] border-t-2 border-gray-200 bg-gray-50 dark:border-slate-600 dark:bg-slate-800/95">
           <tr>
             {columnsByView.map((col) => {
-              if (col === "Party Name") {
+              if (col === "Account Type") {
                 return (
-                  <td key={col} className={tableFooterTdClasses(col)}>
+                  <td key={col} className={`${tableFooterTdClasses(col)} text-right`}>
                     Total
                   </td>
                 );
@@ -310,9 +310,9 @@ const AccountIndex = () => {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-3 2xl:gap-4">
-        <div className="flex items-center justify-end flex-wrap gap-3">
-          <div className="flex items-center gap-3 flex-wrap justify-end w-full">
-            <div className="inline-flex rounded-lg border border-light-border bg-rowBg p-1 text-xs mr-auto dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+            <div className="inline-flex rounded-lg border border-light-border bg-rowBg p-1 text-xs sm:mr-auto dark:border-slate-700 dark:bg-slate-800/50">
               {VIEW_MODES.map((v) => (
                 <button
                   key={v.id}
@@ -330,8 +330,8 @@ const AccountIndex = () => {
             </div>
 
             {isAdminUser() && (
-              <div className="flex items-center gap-2 text-xs text-light border border-light-border rounded-lg px-2 py-1 bg-white flex-wrap dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                <span className="whitespace-nowrap text-[11px] text-dark/80 dark:text-slate-200">
+              <div className="flex h-10 items-center gap-2 text-xs text-light border border-light-border rounded-lg bg-white px-2 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                <span className="whitespace-nowrap text-[12px] text-dark/80 dark:text-slate-200">
                   Customer activity
                 </span>
                 <input
@@ -339,13 +339,13 @@ const AccountIndex = () => {
                   min={1}
                   max={activityUnit === "days" ? 3660 : 120}
                   title="Customer Activity Timeframe"
-                  className="w-14 border border-light-border rounded px-1 py-0.5 text-dark dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className="h-7 w-14 border border-light-border rounded px-1 text-dark dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   value={activityValueInput}
                   onChange={(e) => setActivityValueInput(e.target.value)}
                   onBlur={persistCustomerActivitySetting}
                 />
                 <select
-                  className="border border-light-border rounded px-1 py-0.5 text-dark text-[11px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className="border border-light-border rounded px-1 py-1.5 text-dark text-[11px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   value={activityUnit}
                   onChange={async (e) => {
                     const next = e.target.value === "days" ? "days" : "months";
@@ -384,7 +384,9 @@ const AccountIndex = () => {
             <Button
               type="button"
               label="Add account"
-              {...mergePageAddButton()}
+              {...mergePageAddButton({
+                className: "w-full sm:w-auto justify-center min-h-9 px-3.5 text-[13px]",
+              })}
               onClick={() => setIsAddAccOpen(true)}
             />
           </div>

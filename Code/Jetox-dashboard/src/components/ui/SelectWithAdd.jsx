@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
  * Props:
  * - `options`, `value`, `onChange`, `placeholder`, `label`, `className` — same as legacy CommonDropdown
  * - `hideAdd` — set `true` on list/filter toolbars where "+ Add" is not wanted (default: row is shown)
+ * - `compactValue` — smaller font for the closed trigger label only (height unchanged)
  * - `searchable` — filter options; list scrolls, "+ Add" stays fixed at bottom
  * - `searchPlaceholder` — defaults to "Search…"
  * - `onAddClick` — called when "+ Add" is clicked; combine with `renderAddModal` for modal flows
@@ -58,6 +59,8 @@ export function SelectWithAdd({
   disabled = false,
   /** Toolbar filters: h-9, text-sm, rounded-md */
   filterBar = false,
+  /** Smaller selected-value font on the trigger; keeps `h-10` / `h-9` sizing */
+  compactValue = false,
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -209,13 +212,21 @@ export function SelectWithAdd({
 
   const addModalClose = useCallback(() => setAddModalOpen(false), []);
 
+  const triggerTextCls = filterBar
+    ? "text-sm"
+    : compactValue
+      ? "text-[12px]"
+      : "text-[13px]";
+
   const triggerCls = filterBar
-    ? "flex h-9 min-h-9 w-full items-center justify-between rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-left shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] hover:border-slate-400 hover:bg-white focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus-visible:ring-primary/30"
-    : "flex min-h-10 w-full items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-left shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] hover:border-slate-400 hover:bg-white focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus-visible:ring-primary/30";
+    ? `flex h-9 min-h-9 max-h-9 w-full items-center justify-between rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-left ${triggerTextCls} shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] hover:border-slate-400 hover:bg-white focus:outline-none focus-visible:border-primary focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus-visible:bg-slate-950 dark:focus-visible:ring-primary/30`
+    : `flex h-10 min-h-10 max-h-10 w-full items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-left ${triggerTextCls} shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] hover:border-slate-400 hover:bg-white focus:outline-none focus-visible:border-primary focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus-visible:bg-slate-950 dark:focus-visible:ring-primary/30`;
 
   const labelCls = filterBar
     ? "mb-1 text-left text-[11px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200"
     : "mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200";
+
+  const valueSizeCls = filterBar ? "text-sm" : compactValue ? "text-[12px]" : "text-[13px]";
 
   const valueTextCls = filterBar
     ? `text-sm leading-snug truncate ${
@@ -223,7 +234,7 @@ export function SelectWithAdd({
           ? "text-gray-400 dark:text-slate-500"
           : "text-gray-900 dark:text-slate-100"
       }`
-    : `text-[13px] leading-snug truncate ${
+    : `${valueSizeCls} leading-snug truncate ${
         selectedLabel === placeholder ? "text-light" : "text-dark"
       }`;
 
@@ -288,7 +299,9 @@ export function SelectWithAdd({
                   }
                 }}
                 placeholder={searchPlaceholder}
-                className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm shadow-sm ring-1 ring-slate-900/[0.04] placeholder:text-slate-500 transition-[border-color,box-shadow,background-color] focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:placeholder:text-slate-500 dark:focus:ring-primary/30"
+                className={`w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 shadow-sm ring-1 ring-slate-900/[0.04] placeholder:text-slate-500 transition-[border-color,box-shadow,background-color] focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.06] dark:placeholder:text-slate-400 dark:focus:bg-slate-950 dark:focus:text-slate-100 dark:focus:ring-primary/30 ${
+                  compactValue ? "text-[12px]" : "text-sm"
+                }`}
                 aria-label={searchPlaceholder}
                 autoFocus
               />
@@ -297,11 +310,16 @@ export function SelectWithAdd({
 
           <div className="flex-1 min-h-0 overflow-y-auto py-1">
             {filteredOptions.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-light dark:text-slate-400">No matches</div>
+              <div
+                className={`px-4 py-3 text-light dark:text-slate-400 ${compactValue ? "text-[12px]" : "text-sm"}`}
+              >
+                No matches
+              </div>
             ) : (
               filteredOptions.map((opt, idx) => {
                 const selected = opt.value === value;
                 const active = idx === activeIndex;
+                const rowText = compactValue ? "text-[12px]" : "text-sm";
                 return (
                   <div
                     key={String(opt.value)}
@@ -311,7 +329,7 @@ export function SelectWithAdd({
                     data-active={active}
                     onMouseEnter={() => setActiveIndex(idx)}
                     onClick={() => !opt.disabled && selectIndex(idx)}
-                    className={`mx-1 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
+                    className={`mx-1 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 ${rowText} transition-colors ${
                       opt.disabled
                         ? "opacity-40 cursor-not-allowed"
                         : active
@@ -337,7 +355,7 @@ export function SelectWithAdd({
           </div>
 
           {showAdd && (
-            <div className="shrink-0 border-t border-light-border bg-white pt-1 pb-1 dark:border-slate-600 dark:bg-slate-900">
+            <div className="shrink-0 border-t border-light-border bg-white px-1 py-1 dark:border-slate-600 dark:bg-slate-900 flex justify-end">
               <button
                 type="button"
                 role="option"
@@ -349,11 +367,16 @@ export function SelectWithAdd({
                   e.stopPropagation();
                   handleAdd();
                 }}
-                className={`mx-1 flex w-[calc(100%-0.5rem)] justify-end rounded-md px-3 py-2.5 text-sm font-medium text-primary hover:bg-emerald-50/80 transition-colors dark:hover:bg-emerald-950/50 ${
-                  activeIndex === filteredOptions.length ? "bg-rowBg dark:bg-slate-800" : ""
+                className={`flex w-auto min-h-9 items-center justify-end gap-1.5 rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-primary transition-colors hover:border-emerald-200 hover:bg-emerald-50/80 dark:hover:border-emerald-800/60 dark:hover:bg-emerald-950/50 ${
+                  activeIndex === filteredOptions.length
+                    ? "border-emerald-200 bg-rowBg dark:border-emerald-800/60 dark:bg-slate-800"
+                    : ""
                 }`}
               >
-                {addLabel}
+                <span className="text-base leading-none" aria-hidden>
+                  +
+                </span>
+                <span>{String(addLabel).replace(/^\+\s*/, "")}</span>
               </button>
             </div>
           )}

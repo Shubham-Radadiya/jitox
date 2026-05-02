@@ -139,12 +139,12 @@ const LedgerTable = () => {
   };
 
   const renderLedgerActions = (row) => (
-    <td className="px-3 py-2.5 align-middle border-b border-gray-200">
+    <td className="px-3 py-2.5 align-middle border-b border-light-border dark:border-slate-700">
       <div className="flex items-center justify-center gap-2">
         <button
           type="button"
           title="View voucher line"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50 hover:text-emerald-600"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-500/70 bg-transparent text-slate-200 transition-colors duration-150 hover:border-emerald-400/70 hover:bg-emerald-400/10 hover:text-emerald-300"
           onClick={(e) => {
             e.stopPropagation();
             setViewRow(row);
@@ -155,7 +155,7 @@ const LedgerTable = () => {
         <button
           type="button"
           title="Print this line"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50 hover:text-emerald-600"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-500/70 bg-transparent text-slate-200 transition-colors duration-150 hover:border-emerald-400/70 hover:bg-emerald-400/10 hover:text-emerald-300"
           onClick={(e) => {
             e.stopPropagation();
             printLedgerRows([row]);
@@ -176,6 +176,7 @@ const LedgerTable = () => {
           <div className="flex gap-3 items-center">
             <div className="text-blue font-semibold">{closingLine}</div>
             <DateRangePicker
+              filterBar
               value={dateRange}
               onChange={setDateRange}
               className="w-60"

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Users } from "lucide-react";
+import { ChevronRight, UserCheck, UserX, Users } from "lucide-react";
 import { customersApi } from "../../services/api";
 
 function pct(part, total) {
@@ -39,22 +39,29 @@ export function CustomerSummaryCard() {
     navigate(`/dashboard/account?status=${encodeURIComponent(status)}`);
   };
 
+  /** Inner KPI tiles: keep border + light shadow (same family as main jitox panel). */
+  const metricTile =
+    "flex min-h-[5.25rem] min-w-0 flex-col items-stretch justify-center rounded-xl border px-3 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.06)] sm:px-3.5 dark:shadow-[0_2px_12px_rgba(0,0,0,0.38)]";
+
+  const metricBtn =
+    `group relative ${metricTile} text-left transition focus:outline-none focus-visible:ring-2 pr-9 sm:pr-10 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_14px_rgba(0,0,0,0.45)]`;
+
   return (
-    <div className="rounded-xl border border-light-border bg-white p-4 shadow-[0_4px_12px_rgba(0,0,0,0.04)] flex flex-col gap-3 min-h-[240px] dark:border-slate-700 dark:bg-slate-900 dark:shadow-[0_4px_12px_rgba(0,0,0,0.25)]">
+    <div className="flex h-full min-h-[240px] flex-col gap-4 rounded-xl jitox-panel p-4 shadow-[0_4px_12px_rgba(0,0,0,0.04)] sm:p-5 dark:shadow-[0_4px_16px_rgba(0,0,0,0.45)]">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3.5 min-w-0">
+        <div className="flex min-w-0 items-center gap-4">
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-blue-500 bg-white text-blue-600 shadow-sm dark:border-blue-400 dark:bg-slate-800 dark:text-blue-300"
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-sky-100/90 text-sky-700 shadow-sm dark:bg-sky-950/55 dark:text-sky-300"
             aria-hidden
           >
             <Users className="h-6 w-6" strokeWidth={1.75} />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-bold text-slate-900 tracking-tight dark:text-slate-100">
+            <h3 className="text-base font-bold tracking-tight text-slate-900 dark:text-slate-100">
               Customers
             </h3>
             <p
-              className="text-xs text-slate-500 mt-0.5 truncate dark:text-slate-400"
+              className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400"
               title={windowLabel}
             >
               {windowLabel}
@@ -62,54 +69,78 @@ export function CustomerSummaryCard() {
           </div>
         </div>
         {isLoading ? (
-          <span className="text-xs text-slate-400 dark:text-slate-500">Loading…</span>
+          <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
+            Loading…
+          </span>
         ) : isError ? (
-          <span className="text-xs text-rose-600 dark:text-rose-400">Could not load</span>
+          <span className="shrink-0 text-xs text-rose-600 dark:text-rose-400">
+            Could not load
+          </span>
         ) : null}
       </div>
 
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
-        <div className="text-left min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Total
-          </p>
-          <p className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums mt-1 leading-none dark:text-slate-100">
-            {isLoading ? "—" : total}
-          </p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div
+          className={`${metricTile} border-light-border bg-slate-50/95 dark:border-slate-600 dark:bg-slate-800/60`}
+          role="group"
+          aria-label="Total customers"
+        >
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Total
+            </p>
+            <p className="text-xl font-bold tabular-nums leading-none tracking-tight text-slate-900 sm:text-2xl dark:text-slate-100">
+              {isLoading ? "—" : total}
+            </p>
+          </div>
         </div>
         <button
           type="button"
           onClick={() => go("active")}
-          className="rounded-xl border border-transparent px-0 py-0 text-left transition hover:bg-emerald-50/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 cursor-pointer min-w-0 dark:hover:bg-emerald-950/30"
+          className={`${metricBtn} cursor-pointer border-emerald-200/80 bg-emerald-50/95 hover:bg-emerald-100/95 focus-visible:ring-emerald-400/40 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/55`}
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600">
-            Active
-          </p>
-          <p className="text-xl sm:text-2xl font-bold text-emerald-700 tabular-nums mt-1 leading-none">
-            {isLoading ? "—" : active}
-          </p>
-          {!isLoading && total > 0 ? (
-            <p className="text-xs font-medium text-emerald-600 mt-1.5 tabular-nums">
-              {activePct}%
-            </p>
-          ) : null}
+          <ChevronRight
+            className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600 opacity-40 transition group-hover:opacity-100 dark:text-emerald-400"
+            strokeWidth={2}
+            aria-hidden
+          />
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+              Active
+            </span>
+            <span className="text-xl font-bold tabular-nums leading-none tracking-tight text-emerald-800 dark:text-emerald-200 sm:text-2xl">
+              {isLoading ? "—" : active}
+            </span>
+            {!isLoading && total > 0 ? (
+              <p className="mt-0.5 text-[11px] font-medium tabular-nums leading-tight text-emerald-600/90 dark:text-emerald-400/90">
+                {activePct}% of total
+              </p>
+            ) : null}
+          </div>
         </button>
         <button
           type="button"
           onClick={() => go("inactive")}
-          className="rounded-xl border border-transparent px-0 py-0 text-left transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 cursor-pointer min-w-0 dark:hover:bg-slate-800/60"
+          className={`${metricBtn} cursor-pointer border-light-border bg-slate-50/95 hover:bg-slate-100/95 focus-visible:ring-slate-400/50 dark:border-slate-600 dark:bg-slate-800/60 dark:hover:bg-slate-800/90`}
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Inactive
-          </p>
-          <p className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums mt-1 leading-none dark:text-slate-100">
-            {isLoading ? "—" : inactive}
-          </p>
-          {!isLoading && total > 0 ? (
-            <p className="text-xs font-medium text-slate-400 mt-1.5 tabular-nums">
-              {inactivePct}%
-            </p>
-          ) : null}
+          <ChevronRight
+            className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 opacity-40 transition group-hover:opacity-100 dark:text-slate-400"
+            strokeWidth={2}
+            aria-hidden
+          />
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Inactive
+            </span>
+            <span className="text-xl font-bold tabular-nums leading-none tracking-tight text-slate-900 sm:text-2xl dark:text-slate-100">
+              {isLoading ? "—" : inactive}
+            </span>
+            {!isLoading && total > 0 ? (
+              <p className="mt-0.5 text-[11px] font-medium tabular-nums leading-tight text-slate-500 dark:text-slate-400">
+                {inactivePct}% of total
+              </p>
+            ) : null}
+          </div>
         </button>
       </div>
 
@@ -117,9 +148,10 @@ export function CustomerSummaryCard() {
         <div
           className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700"
           role="presentation"
+          aria-hidden
         >
           <div
-            className={`h-full bg-emerald-500 transition-all duration-500 ${
+            className={`h-full bg-linear-to-r from-emerald-500 to-emerald-400 transition-all duration-500 dark:from-emerald-500 dark:to-emerald-400/90 ${
               activePct >= 99 ? "rounded-full" : "rounded-l-full"
             }`}
             style={{ width: `${Math.min(100, activePct)}%` }}
@@ -128,47 +160,70 @@ export function CustomerSummaryCard() {
       ) : null}
 
       {!isLoading && !isError && total > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 mt-auto border-t border-slate-100 dark:border-slate-700">
-          <div className="min-w-0 flex flex-col gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+        <div className="mt-auto grid min-h-0 grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2 sm:gap-5 dark:border-slate-700">
+          <div className="flex min-h-0 min-w-0 flex-col gap-2">
+            <p className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-500">
               Active names
             </p>
             <ul
-              className="max-h-[7.5rem] overflow-y-auto text-sm text-emerald-600 font-medium space-y-1.5 pr-1 leading-snug"
+              className="min-h-32 max-h-40 shrink-0 space-y-1.5 overflow-y-auto overflow-x-hidden overscroll-y-contain rounded-lg border border-emerald-100/80 bg-emerald-50/40 px-2.5 py-2 text-left text-sm font-medium leading-snug text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-100"
               aria-label="Active customers"
             >
-              {(data?.activeNames?.length
-                ? data.activeNames
-                : []
-              ).map((name) => (
-                <li key={`a-${name}`} className="truncate" title={name}>
-                  {name}
-                </li>
-              ))}
+              {(data?.activeNames?.length ? data.activeNames : []).map(
+                (name, i) => (
+                  <li
+                    key={`a-${i}-${name}`}
+                    className="flex min-w-0 items-start gap-2"
+                  >
+                    <UserCheck
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                      strokeWidth={2.25}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 truncate" title={name}>
+                      {name}
+                    </span>
+                  </li>
+                )
+              )}
             </ul>
             {!data?.activeNames?.length ? (
-              <p className="text-xs text-slate-400">None</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                None
+              </p>
             ) : null}
           </div>
-          <div className="min-w-0 flex flex-col gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          <div className="flex min-h-0 min-w-0 flex-col gap-2">
+            <p className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
               Inactive names
             </p>
             <ul
-              className="max-h-[7.5rem] overflow-y-auto text-sm text-slate-800 space-y-1.5 pr-1 leading-snug dark:text-slate-200"
+              className="min-h-32 max-h-40 shrink-0 space-y-1.5 overflow-y-auto overflow-x-hidden overscroll-y-contain rounded-lg border border-slate-200/90 bg-slate-50/60 px-2.5 py-2 text-left text-sm leading-snug text-slate-800 dark:border-slate-600/60 dark:bg-slate-800/40 dark:text-slate-200"
               aria-label="Inactive customers"
             >
               {(data?.inactiveNames?.length
                 ? data.inactiveNames
                 : []
-              ).map((name) => (
-                <li key={`i-${name}`} className="truncate" title={name}>
-                  {name}
+              ).map((name, i) => (
+                <li
+                  key={`i-${i}-${name}`}
+                  className="flex min-w-0 items-start gap-2"
+                >
+                  <UserX
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400"
+                    strokeWidth={2.25}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 truncate" title={name}>
+                    {name}
+                  </span>
                 </li>
               ))}
             </ul>
             {!data?.inactiveNames?.length ? (
-              <p className="text-xs text-slate-400">None</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                None
+              </p>
             ) : null}
           </div>
         </div>
