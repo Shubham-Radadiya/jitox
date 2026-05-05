@@ -87,37 +87,37 @@ export default function TargetProductIncentivePage() {
         <p className="text-sm text-slate-500 py-8">Loading…</p>
       ) : (
         <>
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-900">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm border-collapse">
+              <table className="w-full min-w-[900px] border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-100 text-left text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <th className="px-3 py-2">Prod. Group</th>
-                    <th className="px-3 py-2">Prod. Category</th>
-                    <th className="px-3 py-2">Prod. Name</th>
-                    <th className="px-3 py-2">Qty</th>
-                    <th className="px-3 py-2 text-right tabular-nums">Selling Amt</th>
-                    <th className="px-3 py-2 text-right tabular-nums">Total (₹)</th>
-                    <th className="px-3 py-2 text-right">% Incentive</th>
-                    <th className="px-3 py-2 text-right tabular-nums">Incentive Value (₹)</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Prod. Group</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Prod. Category</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Prod. Name</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Qty</th>
+                    <th className="border border-slate-200 px-3 py-2 tabular-nums dark:border-slate-700">Selling Amt</th>
+                    <th className="border border-slate-200 px-3 py-2 tabular-nums dark:border-slate-700">Total (₹)</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">% Incentive</th>
+                    <th className="border border-slate-200 px-3 py-2 tabular-nums dark:border-slate-700">Incentive Value (₹)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr
                       key={r.id}
-                      className="border-t border-slate-100 dark:border-slate-800"
+                      className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                     >
-                      <td className="px-3 py-2">{r.prodGroup}</td>
-                      <td className="px-3 py-2">{r.prodCategory}</td>
-                      <td className="px-3 py-2 font-medium">{r.prodName}</td>
-                      <td className="px-3 py-2">{r.qty}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmt(r.sellingAmt)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium">
+                      <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">{r.prodGroup}</td>
+                      <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">{r.prodCategory}</td>
+                      <td className="border border-slate-200 px-3 py-2 font-medium dark:border-slate-700">{r.prodName}</td>
+                      <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">{r.qty}</td>
+                      <td className="border border-slate-200 px-3 py-2 tabular-nums dark:border-slate-700">{fmt(r.sellingAmt)}</td>
+                      <td className="border border-slate-200 px-3 py-2 tabular-nums font-medium dark:border-slate-700">
                         {fmt(r.total)}
                       </td>
-                      <td className="px-3 py-2 text-right">{r.pctIncentive}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">{r.pctIncentive}</td>
+                      <td className="border border-slate-200 px-3 py-2 tabular-nums dark:border-slate-700">
                         {fmt(r.incentiveValue)}
                       </td>
                     </tr>
@@ -129,17 +129,17 @@ export default function TargetProductIncentivePage() {
                       {productLineFooterCols.map((col) => {
                         if (col === "Prod. Group") {
                           return (
-                            <td key={col} className={tableFooterTdClasses(col)}>
+                            <td key={col} className="border-0 px-3 py-2.5 font-semibold text-slate-900 dark:text-slate-100">
                               Total
                             </td>
                           );
                         }
                         if (col === "Prod. Category" || col === "Prod. Name") {
-                          return <td key={col} className={tableFooterTdClasses(col)} />;
+                          return <td key={col} className="border-0 px-3 py-2.5" />;
                         }
                         if (col === "Qty") {
                           return (
-                            <td key={col} className={tableFooterTdClasses(col)}>
+                            <td key={col} className="border-0 px-3 py-2.5 text-left font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                               {lineTotals.qty.toLocaleString("en-IN")}
                             </td>
                           );
@@ -148,9 +148,7 @@ export default function TargetProductIncentivePage() {
                           return (
                             <td
                               key={col}
-                              className={tableFooterTdClasses(col, {
-                                alignClass: "text-right tabular-nums",
-                              })}
+                              className="border-0 px-3 py-2.5 font-semibold tabular-nums text-slate-900 dark:text-slate-100"
                             >
                               {fmt(lineTotals.selling)}
                             </td>
@@ -158,16 +156,16 @@ export default function TargetProductIncentivePage() {
                         }
                         if (col === "Total (₹)") {
                           return (
-                            <td key={col} className={tableFooterTdClasses(col)}>
+                            <td key={col} className="border-0 px-3 py-2.5 font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                               {fmt(lineTotals.total)}
                             </td>
                           );
                         }
                         if (col === "% Incentive") {
-                          return <td key={col} className={tableFooterTdClasses(col)} />;
+                          return <td key={col} className="border-0 px-3 py-2.5" />;
                         }
                         return (
-                          <td key={col} className={tableFooterTdClasses(col)}>
+                          <td key={col} className="border-0 px-3 py-2.5 font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                             {fmt(lineTotals.incentive)}
                           </td>
                         );
@@ -179,25 +177,28 @@ export default function TargetProductIncentivePage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+          <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-900">
             <div className="px-4 py-2 border-b border-slate-200 bg-slate-50 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800">
               Total Incentive Calculation Summary
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[400px]">
+              <table className="w-full min-w-[400px] border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-100 text-left text-xs font-medium dark:bg-slate-800">
-                    <th className="px-3 py-2">Group</th>
-                    <th className="px-3 py-2 text-right tabular-nums">Total Sales (₹)</th>
-                    <th className="px-3 py-2 text-right tabular-nums">Incentive Earned (₹)</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Group</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">Total Sales (₹)</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">Incentive Earned (₹)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.map((s) => (
-                    <tr key={s.group} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="px-3 py-2">{s.group}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmt(s.totalSales)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmt(s.incentiveEarned)}</td>
+                    <tr
+                      key={s.group}
+                      className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                    >
+                      <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">{s.group}</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">{fmt(s.totalSales)}</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">{fmt(s.incentiveEarned)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -206,20 +207,20 @@ export default function TargetProductIncentivePage() {
                     {sumCols.map((col) => {
                       if (col === "Group") {
                         return (
-                          <td key={col} className={tableFooterTdClasses(col)}>
+                          <td key={col} className="border-0 px-3 py-2.5 font-semibold text-slate-900 dark:text-slate-100">
                             Total
                           </td>
                         );
                       }
                       if (col === "Total Sales (₹)") {
                         return (
-                          <td key={col} className={tableFooterTdClasses(col)}>
+                          <td key={col} className="border-0 px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                             {fmt(totals.sales)}
                           </td>
                         );
                       }
                       return (
-                        <td key={col} className={tableFooterTdClasses(col)}>
+                        <td key={col} className="border-0 px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                           {fmt(totals.incentive)}
                         </td>
                       );

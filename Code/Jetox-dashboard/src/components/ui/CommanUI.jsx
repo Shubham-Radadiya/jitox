@@ -102,7 +102,8 @@ export const Button = ({
   const baseStyle = `${sizeStyle} transition-all duration-200 flex items-center justify-center`;
 
   const variants = {
-    primary: "bg-primary text-[#ffffff] hover:bg-primary/90 hover:!text-white",
+    primary:
+      "bg-primary !text-white hover:bg-primary/90 hover:!text-white focus-visible:!text-white",
     outline:
       "border border-light-border text-black hover:bg-primary hover:!text-white dark:border-slate-600 dark:text-slate-200 dark:hover:!text-white",
     ghost:
@@ -115,7 +116,7 @@ export const Button = ({
       onClick={onClick}
       disabled={disabled}
       className={`${baseStyle} ${variants[variant]} ${disabled
-        ? "cursor-not-allowed bg-white border border-light-border text-gray-400 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-500"
+        ? "cursor-not-allowed bg-white border border-light-border !text-gray-400 dark:bg-slate-800 dark:border-slate-600 dark:!text-slate-500"
         : ""
         } ${className}`}
     >

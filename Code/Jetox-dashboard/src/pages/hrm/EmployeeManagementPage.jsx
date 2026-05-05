@@ -314,25 +314,29 @@ export default function EmployeeManagementPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-4 max-w-6xl min-w-0">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 max-w-6xl min-w-0 sm:gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => navigate("/dashboard/hrm")}
-            className="inline-flex items-center gap-1 text-sm text-light hover:text-dark cursor-pointer"
+            className="inline-flex cursor-pointer items-center gap-1 text-xs text-light hover:text-dark sm:text-sm"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             HRM home
           </button>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+        <div className="flex min-w-0 items-center justify-between gap-2 sm:gap-3">
+          <h1 className="min-w-0 truncate text-base font-bold leading-tight tracking-tight text-slate-900 dark:text-slate-50 sm:text-xl md:text-2xl">
             User management
           </h1>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Button
               label="Add employee"
-              {...mergePageAddButton()}
+              {...mergePageAddButton({
+                size: "sm",
+                className:
+                  "!min-h-7.5 shrink-0 px-2 text-[10px] sm:!min-h-10 sm:px-5 sm:text-[14px]",
+              })}
               onClick={openCreate}
             />
           </div>

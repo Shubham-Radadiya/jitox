@@ -238,7 +238,7 @@ function EmployeeDetailPanel({
       return (
         <td
           key={key}
-          className={`w-12 px-2.5 py-2 align-middle text-center text-slate-400 dark:text-slate-500 ${TABLE_CELL_BORDER}`}
+          className={`w-12 px-2 py-1.5 align-middle text-center text-slate-400 dark:text-slate-500 ${TABLE_CELL_BORDER}`}
         >
           <button
             type="button"

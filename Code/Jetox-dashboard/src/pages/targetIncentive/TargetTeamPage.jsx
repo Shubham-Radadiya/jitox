@@ -160,23 +160,26 @@ export default function TargetTeamPage() {
           Target vs Achievement View
         </h1>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => (
             <div
               key={k.key}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+              className="flex min-h-14 items-center justify-between rounded-xl border border-emerald-200/80 bg-emerald-50/35 px-3.5 py-2.5 shadow-card dark:border-emerald-800/60 dark:bg-emerald-950/20"
             >
-              <p className="text-xs text-slate-500 dark:text-slate-400">{k.label}</p>
-              <p className="text-xl font-semibold tabular-nums mt-1 text-slate-900 dark:text-slate-100">
-                {k.value}
+              <p className="!mb-0 text-base font-semibold leading-tight text-slate-800 dark:text-slate-100">
+                {k.label}
               </p>
+              <span className="inline-flex min-w-11 items-center justify-center rounded-md border border-emerald-200 bg-emerald-100/80 px-2.5 py-1 text-sm font-semibold leading-none tabular-nums text-emerald-800 shadow-sm dark:border-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">
+                {k.value}
+              </span>
             </div>
           ))}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-4">
             <SearchBar
+              dense
               value={q}
               onChange={setQ}
               placeholder="Search name here…"
@@ -206,39 +209,39 @@ export default function TargetTeamPage() {
           {isLoading ? (
             <p className="text-sm text-slate-500 py-6">Loading…</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] text-sm border-collapse">
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+              <table className="w-full min-w-[800px] border-collapse text-sm [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
                 <thead>
                   <tr className="bg-slate-100 text-left text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <th className="px-3 py-2">User</th>
-                    <th className="px-3 py-2">Period</th>
-                    <th className="px-3 py-2">Target Type</th>
-                    <th className="px-3 py-2 text-right">Target Amt</th>
-                    <th className="px-3 py-2 text-right">Achieved</th>
-                    <th className="px-3 py-2 w-36">% Achieved</th>
-                    <th className="px-3 py-2 text-right">Incentive</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2 text-center">View Report</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">User</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Period</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Target Type</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right dark:border-slate-700">Target Amt</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right dark:border-slate-700">Achieved</th>
+                    <th className="border border-slate-200 px-3 py-2 w-36 dark:border-slate-700">% Achieved</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right dark:border-slate-700">Incentive</th>
+                    <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Status</th>
+                    <th className="border border-slate-200 px-3 py-2 text-center dark:border-slate-700">View Report</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((r) => (
                     <tr
                       key={r.id}
-                      className="border-t border-slate-100 hover:bg-slate-50/80 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                     >
-                      <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-100">
+                      <td className="border border-slate-200 px-3 py-2 font-medium text-slate-800 dark:border-slate-700 dark:text-slate-100">
                         {r.user}
                       </td>
-                      <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.period}</td>
-                      <td className="px-3 py-2">{r.targetType}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.targetAmt}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.achieved}</td>
-                      <td className="px-3 py-2">
+                      <td className="border border-slate-200 px-3 py-2 text-slate-600 dark:border-slate-700 dark:text-slate-300">{r.period}</td>
+                      <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">{r.targetType}</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">{r.targetAmt}</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">{r.achieved}</td>
+                      <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">
                         <PctBar pct={r.pctAchieved} />
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.incentive}</td>
-                      <td className="px-3 py-2">
+                      <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">{r.incentive}</td>
+                      <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">
                         <span
                           className={
                             r.status === "Achieved"
@@ -249,7 +252,7 @@ export default function TargetTeamPage() {
                           {r.status}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-center">
+                      <td className="border border-slate-200 px-3 py-2 text-center dark:border-slate-700">
                         <button
                           type="button"
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:border-primary hover:text-primary dark:border-slate-600"
@@ -265,23 +268,23 @@ export default function TargetTeamPage() {
                 {filtered.length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-900 dark:border-slate-600 dark:bg-slate-800/95 dark:text-slate-100">
-                      <td className="px-3 py-2.5">Total</td>
-                      <td className="px-3 py-2.5" />
-                      <td className="px-3 py-2.5" />
-                      <td className="px-3 py-2.5 text-right tabular-nums">
+                      <td className="border-0 px-3 py-2.5">Total</td>
+                      <td className="border-0 px-3 py-2.5" />
+                      <td className="border-0 px-3 py-2.5" />
+                      <td className="border-0 px-3 py-2.5 text-right tabular-nums">
                         {fmtInr(teamFooterTotals.target)}
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">
+                      <td className="border-0 px-3 py-2.5 text-right tabular-nums">
                         {fmtInr(teamFooterTotals.achieved)}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="border-0 px-3 py-2.5">
                         <PctBar pct={teamFooterTotals.pctOverall} />
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">
+                      <td className="border-0 px-3 py-2.5 text-right tabular-nums">
                         {fmtInr(teamFooterTotals.incentive)}
                       </td>
-                      <td className="px-3 py-2.5" />
-                      <td className="px-3 py-2.5" />
+                      <td className="border-0 px-3 py-2.5" />
+                      <td className="border-0 px-3 py-2.5" />
                     </tr>
                   </tfoot>
                 )}

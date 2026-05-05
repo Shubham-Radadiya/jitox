@@ -9,6 +9,7 @@ import dayjs from "dayjs";
  */
 const AddSchemeModal = ({ open, onClose, scheme, mode = "add", onSuccess }) => {
   const isView = mode === "view";
+  const formId = "add-scheme-form";
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -62,35 +63,79 @@ const AddSchemeModal = ({ open, onClose, scheme, mode = "add", onSuccess }) => {
       open={open} 
       onClose={onClose} 
       title={mode === "add" ? "Add Scheme" : isView ? "View Scheme" : "Edit Scheme"} 
-      width="1000px"
+      width="min(92vw, 520px)"
+      className="max-h-[88vh] sm:max-h-[90vh]"
+      headerClassName="!px-2.5 !py-2 sm:!px-4 sm:!py-2.5"
+      titleClassName="!text-xs sm:!text-base"
+      bodyClassName="!px-2.5 !pt-1.5 !pb-3 sm:!px-4 sm:!pt-3 sm:!pb-6"
+      footerClassName="!px-2.5 !py-2 sm:!px-4 sm:!py-2.5"
+      footer={
+        isView ? (
+          <Button 
+            label="Close" 
+            variant="outline" 
+            size="sm"
+            onClick={onClose} 
+            className="min-h-8! rounded-md px-3.5! py-2! text-sm! font-semibold whitespace-nowrap sm:min-h-9! sm:px-4! sm:py-2! sm:text-sm!"
+          />
+        ) : ([
+          <Button 
+            key="cancel"
+            label="Cancel" 
+            variant="outline" 
+            size="sm"
+            onClick={onClose} 
+            className="min-h-8! rounded-md px-3.5! py-2! text-sm! font-semibold whitespace-nowrap sm:min-h-9! sm:px-4! sm:py-2! sm:text-sm!"
+          />,
+          <Button 
+            key="submit"
+            label={mode === "add" ? "Add Scheme" : "Save Changes"} 
+            variant="primary" 
+            size="sm"
+            type="submit"
+            form={formId}
+            className="min-h-8! rounded-md px-3.5! py-2! text-sm! font-semibold whitespace-nowrap sm:min-h-9! sm:px-4! sm:py-2! sm:text-sm!"
+          />,
+        ])
+      }
     >
-      <form onSubmit={handleSubmit} className="ds-modal-body-stack">
+      <form id={formId} onSubmit={handleSubmit} className="flex min-w-0 flex-col gap-2 sm:gap-3">
         
         {/* Section 1: Description */}
-        <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-bold text-dark mb-1">Description</h3>
-          <div className="ds-form-grid-2">
+        <div className="flex flex-col gap-1.5 sm:gap-2">
+          <h3 className="text-[11px] font-bold text-dark sm:text-sm">Description</h3>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-2">
             <InputField 
               label="Scheme Name" 
               placeholder="Monsoon Cashback" 
               value={form.name}
               onChange={(e) => setForm({...form, name: e.target.value})}
+              title={form.name || "Scheme Name"}
               readOnly={isView}
+              dense
+              className="gap-0!"
+              inputClassName="text-[11px]! placeholder:text-[11px]!"
+              labelClassName="!mb-0.5"
             />
             <InputField 
               label="Scheme Description" 
               placeholder="Enter scheme details..." 
               value={form.description}
               onChange={(e) => setForm({...form, description: e.target.value})}
+              title={form.description || "Scheme Description"}
               readOnly={isView}
+              dense
+              className="gap-0!"
+              inputClassName="text-[11px]! placeholder:text-[11px]!"
+              labelClassName="!mb-0.5"
             />
           </div>
         </div>
 
         {/* Section 2: Scheme Details */}
-        <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-bold text-dark mb-1">Scheme Details</h3>
-          <div className={`grid grid-cols-2 gap-x-6 gap-y-4 ${isView ? "pointer-events-none opacity-90" : ""}`}>
+        <div className="flex flex-col gap-1.5 sm:gap-2">
+          <h3 className="text-[11px] font-bold text-dark sm:text-sm">Scheme Details</h3>
+          <div className={`grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2 sm:gap-x-4 sm:gap-y-2.5 ${isView ? "pointer-events-none opacity-90" : ""}`}>
             <CommonDropdown 
               label="Scheme Type"
               addNavigateTo="/dashboard/scheme-master"
@@ -98,6 +143,8 @@ const AddSchemeModal = ({ open, onClose, scheme, mode = "add", onSuccess }) => {
               options={[{ label: "Cashback", value: "cashback" }]}
               value={form.type}
               onChange={(v) => setForm({...form, type: v})}
+              formCompact
+              compactValue
             />
             <CommonDropdown 
                label="Target audience"
@@ -106,6 +153,8 @@ const AddSchemeModal = ({ open, onClose, scheme, mode = "add", onSuccess }) => {
                options={[{ label: "Farmer", value: "farmer" }]}
                value={form.targetAudience}
                onChange={(v) => setForm({...form, targetAudience: v})}
+               formCompact
+               compactValue
             />
             <CommonDropdown 
                label="Applicable"
@@ -114,6 +163,8 @@ const AddSchemeModal = ({ open, onClose, scheme, mode = "add", onSuccess }) => {
                options={[{ label: "All Products", value: "all" }]}
                value={form.applicable}
                onChange={(v) => setForm({...form, applicable: v})}
+               formCompact
+               compactValue
             />
             <CommonDropdown 
                label="Offer Details"
@@ -122,30 +173,32 @@ const AddSchemeModal = ({ open, onClose, scheme, mode = "add", onSuccess }) => {
                options={[{ label: "Buy 2 Get 1 Free", value: "b2g1" }]}
                value={form.offerDetails}
                onChange={(v) => setForm({...form, offerDetails: v})}
+               formCompact
+               compactValue
             />
           </div>
         </div>
 
         {/* Section 3: Scheme Date */}
-        <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-bold text-dark mb-1">Scheme Date</h3>
-          <div className="ds-form-grid-2">
-            <div className="flex flex-col gap-2">
-               <label className="text-xs font-bold text-gray-500 uppercase tracking-tight">Start Date</label>
+        <div className="flex flex-col gap-1.5 sm:gap-2">
+          <h3 className="text-[11px] font-bold text-dark sm:text-sm">Scheme Date</h3>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-2">
+            <div className="flex flex-col gap-1">
+               <label className="text-[10px] font-bold uppercase tracking-tight text-gray-500 dark:text-slate-400 sm:text-[11px]">Start Date</label>
                <DatePicker 
                   placeholder="01 July, 2025"
-                  className="h-11 rounded-xl border-gray-100 hover:border-primary focus:border-primary"
+                  className="h-9! rounded-md border-gray-100 px-2.5 py-0 text-[11px] hover:border-primary focus:border-primary sm:h-9! sm:rounded-md sm:text-[11px] [&_.ant-picker-input>input]:h-full [&_.ant-picker-input>input]:text-[11px] [&_.ant-picker-input>input]:leading-snug"
                   value={form.startDate}
                   onChange={(d) => setForm({...form, startDate: d})}
                   format="DD MMMM, YYYY"
                   disabled={isView}
                />
             </div>
-            <div className="flex flex-col gap-2">
-               <label className="text-xs font-bold text-gray-500 uppercase tracking-tight">End Date</label>
+            <div className="flex flex-col gap-1">
+               <label className="text-[10px] font-bold uppercase tracking-tight text-gray-500 dark:text-slate-400 sm:text-[11px]">End Date</label>
                <DatePicker 
                   placeholder="31 July, 2025"
-                  className="h-11 rounded-xl border-gray-100 hover:border-primary focus:border-primary"
+                  className="h-9! rounded-md border-gray-100 px-2.5 py-0 text-[11px] hover:border-primary focus:border-primary sm:h-9! sm:rounded-md sm:text-[11px] [&_.ant-picker-input>input]:h-full [&_.ant-picker-input>input]:text-[11px] [&_.ant-picker-input>input]:leading-snug"
                   value={form.endDate}
                   onChange={(d) => setForm({...form, endDate: d})}
                   format="DD MMMM, YYYY"
@@ -155,32 +208,6 @@ const AddSchemeModal = ({ open, onClose, scheme, mode = "add", onSuccess }) => {
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-3 mt-4">
-          {isView ? (
-            <Button 
-              label="Close" 
-              variant="outline" 
-              onClick={onClose} 
-              className="w-40 py-3 rounded-xl border border-gray-100 font-bold"
-            />
-          ) : (
-            <>
-              <Button 
-                label="Cancel" 
-                variant="outline" 
-                onClick={onClose} 
-                className="w-40 py-3 rounded-xl border border-gray-100 font-bold"
-              />
-              <Button 
-                label={mode === "add" ? "Add Scheme" : "Save Changes"} 
-                variant="primary" 
-                type="submit"
-                className="w-48 py-3 rounded-xl font-bold"
-              />
-            </>
-          )}
-        </div>
       </form>
     </CommonModal>
   );

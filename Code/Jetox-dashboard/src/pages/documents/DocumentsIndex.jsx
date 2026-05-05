@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import useOutsideClick from "../../hooks/useOutsideClick";
 import { DatePicker } from "antd";
+import { CommonModal } from "../../components/ui/CommanUI";
 import AddCategoryModal from "./AddCategoryModal";
 import AddDocumentModal from "./AddDocumentModal";
 import { dashboardUiService } from "../../services/dashboardUi.service";
@@ -134,6 +135,7 @@ const DocumentsIndex = () => {
   );
   const [documentModalCategoryId, setDocumentModalCategoryId] = useState("");
   const [editingDocument, setEditingDocument] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
@@ -292,11 +294,16 @@ const DocumentsIndex = () => {
       toast.error("This item is offline demo data. Load documents from the server to delete.");
       return;
     }
-    const ok = window.confirm(`Delete “${doc.name}”? This cannot be undone.`);
-    if (!ok) return;
+    setDeleteTarget(doc);
+  };
+
+  const confirmDeleteDocument = async () => {
+    const doc = deleteTarget;
+    if (!doc?.id) return;
     try {
       await dashboardUiService.deleteDocumentEntry(doc.id);
       toast.success("Document removed");
+      setDeleteTarget(null);
       await loadDocuments();
     } catch (e) {
       toast.error(getApiErrorMessage(e, "Could not delete document"));
@@ -316,28 +323,63 @@ const DocumentsIndex = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex min-h-[calc(100dvh-4rem)] w-full max-w-full bg-[#F8F9FE] dark:bg-slate-950">
-        <div className="w-64 shrink-0 bg-white border-r border-gray-100 flex flex-col pt-6 dark:bg-slate-900 dark:border-slate-700">
-          <div className="px-5 mb-6 flex items-center justify-between">
-            <h2 className="text-base font-bold text-dark">Category</h2>
+      <div className="flex h-[calc(100dvh-3.5rem)] w-full max-w-full flex-col overflow-hidden bg-[#F8F9FE] dark:bg-slate-950 lg:flex-row">
+        <div className="w-full shrink-0 border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900 lg:h-full lg:w-64 lg:overflow-y-auto lg:border-r lg:border-b-0 lg:pt-3">
+          <div className="mb-2 flex items-center justify-between px-3 pt-2 lg:mb-3 lg:px-4 lg:pt-0">
+            <h2 className="text-sm font-bold text-dark lg:text-base">Category</h2>
             <button
               type="button"
               onClick={() => setIsCategoryModalOpen(true)}
-              className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline lg:text-xs"
             >
               <Plus size={12} strokeWidth={3} /> Add
             </button>
           </div>
 
-          <div className="flex flex-col">
+          {/* Mobile/tablet: horizontal category chips */}
+          <div className="px-2.5 pb-1.5 lg:hidden">
+            <div className="flex gap-1 overflow-x-auto whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => setActiveCategory("All")}
+                className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  activeCategory === "All"
+                    ? "border-primary/40 bg-blue-50/70 text-primary dark:bg-primary/15"
+                    : "border-slate-200 text-slate-600 hover:text-dark dark:border-slate-600 dark:text-slate-300"
+                }`}
+              >
+                All
+              </button>
+              {sidebarCategories.map((cat) => (
+                <button
+                  type="button"
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.name)}
+                  className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                    activeCategory === cat.name
+                      ? "border-primary/40 bg-blue-50/70 text-primary dark:bg-primary/15"
+                      : "border-slate-200 text-slate-600 hover:text-dark dark:border-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop: vertical category list */}
+          <div className="hidden flex-col lg:flex">
             <button
               type="button"
               onClick={() => setActiveCategory("All")}
-              className={`px-5 py-3.5 text-sm font-bold text-left transition-all relative
-                  ${activeCategory === "All" ? "text-primary bg-blue-50/50 dark:bg-primary/15" : "text-gray-500 hover:text-dark dark:text-slate-400 dark:hover:text-slate-100"}`}
+              className={`relative border-b border-gray-50 px-4 py-2.5 text-left text-xs font-semibold transition-all dark:border-slate-700 ${
+                activeCategory === "All"
+                  ? "bg-blue-50/50 text-primary dark:bg-primary/15"
+                  : "text-gray-500 hover:text-dark dark:text-slate-400 dark:hover:text-slate-100"
+              }`}
             >
               {activeCategory === "All" && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                <div className="absolute bottom-0 left-0 top-0 w-1 rounded-r bg-primary" />
               )}
               All
             </button>
@@ -346,11 +388,14 @@ const DocumentsIndex = () => {
                 type="button"
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.name)}
-                className={`px-5 py-4 text-sm font-bold text-left transition-all relative border-b border-gray-50 last:border-0 dark:border-slate-700
-                    ${activeCategory === cat.name ? "text-primary bg-blue-50/50 dark:bg-primary/15" : "text-gray-500 hover:text-dark dark:text-slate-400 dark:hover:text-slate-100"}`}
+                className={`relative border-b border-gray-50 px-4 py-2.5 text-left text-xs font-semibold transition-all last:border-0 dark:border-slate-700 ${
+                  activeCategory === cat.name
+                    ? "bg-blue-50/50 text-primary dark:bg-primary/15"
+                    : "text-gray-500 hover:text-dark dark:text-slate-400 dark:hover:text-slate-100"
+                }`}
               >
                 {activeCategory === cat.name && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                  <div className="absolute bottom-0 left-0 top-0 w-1 rounded-r bg-primary" />
                 )}
                 {cat.name}
               </button>
@@ -358,24 +403,24 @@ const DocumentsIndex = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-xl font-bold text-dark">All Documents</h1>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-xl jitox-panel jitox-panel--shadow px-3 py-2 flex items-center gap-2 w-72 max-w-full">
-                <Search size={18} className="text-gray-400 shrink-0 dark:text-slate-500" />
+        <div className="flex h-full flex-1 flex-col gap-3 overflow-y-auto p-3 sm:gap-4 sm:p-4">
+          <div className="flex flex-col gap-2 py-1 xl:flex-row xl:items-center xl:justify-between">
+            <h1 className="text-base font-bold text-dark sm:text-xl">All Documents</h1>
+            <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap">
+              <div className="flex h-9 min-w-56 flex-1 items-center gap-2 rounded-lg jitox-panel jitox-panel--shadow px-2.5 py-1 xl:w-68 xl:flex-none">
+                <Search size={16} className="text-gray-400 shrink-0 dark:text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search Document"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="bg-transparent border-none outline-none text-sm w-full font-medium text-dark placeholder:text-gray-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className="w-full bg-transparent border-none text-sm font-medium text-dark outline-none placeholder:text-gray-400 dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
               </div>
-              <div className="rounded-xl jitox-panel jitox-panel--shadow px-3 py-2 flex items-center gap-2">
-                <Calendar size={18} className="text-gray-400 shrink-0 dark:text-slate-500" />
+              <div className="flex h-9 min-w-56 flex-1 items-center gap-2 rounded-lg jitox-panel jitox-panel--shadow px-2.5 py-1 xl:w-68 xl:flex-none">
+                <Calendar size={16} className="text-gray-400 shrink-0 dark:text-slate-500" />
                 <RangePicker
-                  className="border-none shadow-none p-0 text-sm font-medium [&_.ant-picker-input]:placeholder:text-gray-400 dark:[&_.ant-picker-input]:placeholder:text-slate-500"
+                  className="w-full border-0! bg-transparent! p-0! text-xs font-medium shadow-none! ring-0! [&_.ant-picker-input]:h-full [&_.ant-picker-input]:leading-none [&_.ant-picker-input>input]:h-full [&_.ant-picker-input>input]:text-xs [&_.ant-picker-input>input]:leading-none [&_.ant-picker-separator]:mx-1 [&_.ant-picker-separator]:flex [&_.ant-picker-separator]:items-center [&_.ant-picker-separator]:justify-center [&_.ant-picker-suffix]:ml-1 [&_.ant-picker-input]:placeholder:text-gray-400 dark:[&_.ant-picker-input]:placeholder:text-slate-500"
                   placeholder={["Date: From", "To"]}
                   suffixIcon={null}
                   value={dateRange}
@@ -389,17 +434,21 @@ const DocumentsIndex = () => {
             {visibleSections.map((cat) => (
               <div
                 key={cat.id}
-                className="rounded-2xl jitox-panel jitox-panel--shadow p-4 flex flex-col gap-4"
+                className="flex flex-col gap-3 rounded-2xl jitox-panel jitox-panel--shadow p-3 sm:gap-4 sm:p-4"
               >
-                <div className="flex items-center gap-3">
-                  <div className="text-xl">{cat.icon}</div>
-                  <h3 className="text-base font-bold text-dark">{cat.name}</h3>
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                  <div className="flex h-5 w-5 items-center justify-center text-base leading-none sm:text-lg">
+                    {cat.icon}
+                  </div>
+                  <span className="truncate text-sm font-bold leading-none text-dark sm:text-base">
+                    {cat.name}
+                  </span>
                   <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded leading-none">
                     {cat.count}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-4">
                   {cat.documents?.map((doc) => (
                     <DocumentCard
                       key={doc.id}
@@ -442,6 +491,42 @@ const DocumentsIndex = () => {
           editingDoc={editingDocument}
           onSaved={loadDocuments}
         />
+        <CommonModal
+          open={Boolean(deleteTarget)}
+          onClose={() => setDeleteTarget(null)}
+          title="Delete document?"
+          width="min(92vw, 420px)"
+          headerClassName="!px-4 !py-3"
+          bodyClassName="!px-4 !pt-3 !pb-4"
+          footerClassName="!px-4 !py-3"
+          footer={[
+            <button
+              key="cancel"
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              className="h-9 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>,
+            <button
+              key="delete"
+              type="button"
+              onClick={confirmDeleteDocument}
+              className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90"
+            >
+              Yes, delete
+            </button>,
+          ]}
+        >
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {deleteTarget?.name || "Selected document"}
+            </p>
+            <p className="text-xs leading-snug text-slate-600 dark:text-slate-300">
+              This action cannot be undone. The document entry will be permanently removed.
+            </p>
+          </div>
+        </CommonModal>
       </div>
     </DashboardLayout>
   );
@@ -515,20 +600,20 @@ function DocumentShareMenu({ doc, apiBase }) {
   };
 
   const itemClass =
-    "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800";
+    "flex w-full items-center gap-1 px-2.5 py-1 text-left !text-[14px] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800";
 
   return (
-    <div className="relative" ref={wrapRef}>
+    <div className={`relative ${open ? "z-1200" : "z-10"}`} ref={wrapRef}>
       <DocAction
         icon={<Share2 size={14} />}
         label="Share document"
-        className={open ? "!border-primary !text-primary" : ""}
+        className={open ? "border-primary! text-primary!" : ""}
         onClick={() => setOpen((v) => !v)}
       />
       {open && (
         <div
           role="menu"
-          className="absolute bottom-full left-1/2 z-30 mb-1 min-w-[12.5rem] -translate-x-1/2 rounded-xl border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5 dark:border-slate-600 dark:bg-slate-900 dark:ring-white/10"
+          className="absolute bottom-full left-0 z-1250 mb-1 min-w-50 rounded-xl border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5 dark:border-slate-600 dark:bg-slate-900 dark:ring-white/10"
         >
           <button type="button" role="menuitem" className={itemClass} onClick={copyLink}>
             <Copy size={14} className="shrink-0 text-slate-500" />
@@ -577,7 +662,7 @@ const DocumentCard = ({ doc, apiBase, onView, onDownload, onEdit, onDelete }) =>
   };
 
   return (
-    <div className="rounded-2xl jitox-panel jitox-panel--shadow flex flex-col hover:shadow-md transition-shadow duration-300 overflow-visible dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]">
+    <div className="overflow-visible rounded-2xl jitox-panel jitox-panel--shadow flex flex-col transition-shadow duration-300 hover:shadow-md dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]">
       <div className="p-4 flex items-center gap-3 border-b border-gray-50 dark:border-slate-700">
         <div
           className={`w-10 h-10 rounded-xl flex items-center justify-center ${
@@ -600,7 +685,7 @@ const DocumentCard = ({ doc, apiBase, onView, onDownload, onEdit, onDelete }) =>
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter truncate dark:text-slate-400">{doc.admin}</span>
         </div>
       </div>
-      <div className="mt-auto relative z-10 flex flex-wrap items-center justify-center gap-2 px-3 py-2.5 bg-gray-100 border-t border-gray-100 dark:bg-slate-800/80 dark:border-slate-700">
+      <div className="relative z-10 mt-auto flex flex-nowrap items-center justify-center gap-1.5 rounded-b-2xl border-t border-gray-100 bg-gray-100 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/80">
         <DocumentShareMenu doc={doc} apiBase={apiBase} />
         <DocAction
           icon={<Eye size={14} />}
@@ -615,7 +700,7 @@ const DocumentCard = ({ doc, apiBase, onView, onDownload, onEdit, onDelete }) =>
         <DocAction
           icon={<Trash2 size={14} />}
           label="Delete"
-          className="!text-red-400 hover:!text-red-500"
+          className="text-red-400! hover:text-red-500!"
           onClick={onDelete}
         />
         <DocAction

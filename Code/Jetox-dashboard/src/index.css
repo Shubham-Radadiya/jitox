@@ -101,8 +101,6 @@ button.text-blue {
   border-radius: 8px !important;
   border: 1px solid #e5e7eb !important;
   padding: 8px 12px !important;
-  /* Match SearchBar / toolbar controls (min-h-11 = 2.75rem) */
-  min-height: 44px !important;
   box-sizing: border-box !important;
   font-size: 13px !important;
 }
@@ -198,7 +196,8 @@ button.text-blue {
 /* Focus ring same as InputField */
 .ant-picker-focused,
 .ant-picker:hover {
-  border: 2px solid #0a9242 !important; /* your primary color */
+  border: 1px solid #0a9242 !important; /* keep size stable */
+  box-shadow: 0 0 0 2px rgba(10, 146, 66, 0.2) !important;
 }
 
 /* Ant Design pickers — dark mode (dashboard filters, forms) */

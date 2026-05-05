@@ -187,21 +187,30 @@ const UserMasterIndex = () => {
   const renderRowCell = (key, value, row) => {
     if (key === "Employee ID") {
       return (
-        <td key={key} className={tableTdClasses("Employee ID")}>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden relative border border-gray-100">
-              {row.image ? (
-                <img
-                  src={row.image}
-                  alt={`Profile photo — ${row["User Name"] || "team member"}`}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-400">
-                  {row["User Name"]?.charAt(0) || "U"}
-                </div>
-              )}
-              <div className="absolute right-0 bottom-0 w-2 h-2 rounded-full border border-white bg-primary" />
+        <td
+          key={key}
+          className={`${tableTdClasses("Employee ID")} overflow-visible`}
+        >
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="relative z-1 h-8 w-8 shrink-0 overflow-visible">
+              <div className="h-full w-full overflow-hidden rounded-full border border-gray-100 bg-gray-200 dark:border-slate-600 dark:bg-slate-700">
+                {row.image ? (
+                  <img
+                    src={row.image}
+                    alt={`Profile photo — ${row["User Name"] || "team member"}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-gray-400 dark:text-slate-400">
+                    {row["User Name"]?.charAt(0) || "U"}
+                  </div>
+                )}
+              </div>
+              <span
+                className="pointer-events-none absolute -bottom-px -right-px z-2 box-border size-2.5 rounded-full border-2 border-white bg-primary shadow-sm ring-1 ring-primary/15 dark:border-slate-900 dark:ring-primary/25"
+                aria-hidden
+                title="Active"
+              />
             </div>
             <span className="text-light">{value}</span>
           </div>
@@ -357,7 +366,7 @@ const UserMasterIndex = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-4 relative min-h-[80vh]">
+      <div className="relative flex min-h-0 w-full min-w-0 flex-col gap-2 sm:gap-3">
         {users.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="rounded-2xl jitox-panel jitox-panel--shadow p-6 flex flex-col items-center max-w-sm w-full">
@@ -386,48 +395,52 @@ const UserMasterIndex = () => {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-dark">Total Users</h1>
-                <span className="bg-blue/10 text-blue text-xs font-bold px-2 py-0.5 rounded-full">
-                  {users.length}
-                </span>
-              </div>
-              <div className="jitox-header-pill">
-                <span>20 Jan, 2:30 PM</span>
-                <Calendar size={16} />
+            <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2 sm:gap-3">
+              <h1 className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-semibold tracking-tight text-dark sm:text-lg sm:font-bold">
+                Total Users
+              </h1>
+              <div className="jitox-header-pill shrink-0 gap-1.5 whitespace-nowrap px-2 py-1 text-[11px] leading-none sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm sm:leading-normal">
+                <span className="shrink-0">20 Jan, 2:30 PM</span>
+                <Calendar className="h-3.5 w-3.5 shrink-0 opacity-80 sm:h-4 sm:w-4" aria-hidden />
               </div>
             </div>
 
-            <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col gap-4">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-semibold text-dark">User List</h2>
-                <div className="flex items-center gap-3">
-                  <Button
-                    type="button"
-                    label="Add users"
-                    {...mergePageAddButton()}
-                    onClick={() => setIsAddModalOpen(true)}
-                  />
-                </div>
+            <div className="flex min-w-0 flex-col gap-2 rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4">
+              <div className="flex min-w-0 flex-row items-center justify-between gap-2">
+                <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-dark sm:text-lg">
+                  User List
+                </h2>
+                <Button
+                  type="button"
+                  label="Add users"
+                  {...mergePageAddButton({
+                    size: "sm",
+                    className:
+                      "min-h-8! shrink-0 px-2.5! py-1.5! text-[11px]! gap-1 sm:min-h-10! sm:px-5! sm:py-2! sm:text-[14px]! sm:gap-1.5",
+                  })}
+                  onClick={() => setIsAddModalOpen(true)}
+                />
               </div>
 
-              <DataTable
-                columns={columns}
-                data={users}
-                renderRowCell={renderRowCell}
-                renderAction={renderAction}
-                tableClassName="text-center"
-                maxHeight="calc(100vh - 21rem)"
-              />
+              <div className="min-w-0">
+                <DataTable
+                  columns={columns}
+                  data={users}
+                  renderRowCell={renderRowCell}
+                  renderAction={renderAction}
+                  tableClassName="text-center"
+                  maxHeight="min(72vh, calc(100dvh - 14rem))"
+                  className="shadow-none! sm:shadow-sm!"
+                />
+              </div>
 
-              <div className="flex items-center justify-between mt-4 px-2">
+              <div className="flex min-w-0 flex-col items-center gap-2 border-t border-slate-100 px-1 pt-2 text-center sm:flex-row sm:items-center sm:justify-between sm:px-2 sm:text-left dark:border-slate-700/80">
                 <div className="text-xs text-light">
                   Showing 1 - {users.length} of {users.length} results
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
                   <span className="text-xs text-light">Results per page:</span>
-                  <div className="px-2 py-1 border border-gray-200 rounded text-xs dark:border-slate-600 dark:text-slate-300">
+                  <div className="rounded border border-gray-200 px-2 py-1 text-xs dark:border-slate-600 dark:text-slate-300">
                     10
                   </div>
                 </div>

@@ -80,10 +80,10 @@ export function getCellTextAlign(columnKey) {
 }
 
 const TABLE_FOOTER_TD_BASE_DEFAULT =
-  `px-2.5 py-2 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-gray-900 dark:bg-slate-800/80 dark:text-slate-100`;
+  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-gray-900 dark:bg-slate-800/80 dark:text-slate-100`;
 
 const TABLE_FOOTER_TD_BASE_HEAD =
-  `px-2.5 py-2 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-dark dark:bg-slate-800/80 dark:text-slate-100`;
+  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-dark dark:bg-slate-800/80 dark:text-slate-100`;
 
 /**
  * Consistent `<tfoot>` cell styling; alignment follows {@link getTableCellAlignClass}.
@@ -142,16 +142,16 @@ export const REPORT_ORDER_TABLE_COL = {
   "Order ID": { th: "w-[10%] min-w-[6.75rem]", td: "min-w-[6.75rem]" },
   "Client Name": { th: "w-[16%] min-w-[8rem]", td: "min-w-[8rem]" },
   Date: {
-    th: "w-[9%] min-w-[5.25rem] hidden sm:table-cell",
-    td: "hidden min-w-[5.25rem] sm:table-cell",
+    th: "w-[9%] min-w-[5.25rem]",
+    td: "min-w-[5.25rem]",
   },
   Products: {
-    th: "w-[18%] min-w-[11rem] hidden md:table-cell",
-    td: "hidden min-w-[11rem] md:table-cell",
+    th: "w-[18%] min-w-[11rem]",
+    td: "min-w-[11rem]",
   },
   "Manager Name": {
-    th: "w-[11%] min-w-[7rem] hidden lg:table-cell",
-    td: "hidden min-w-[7rem] lg:table-cell",
+    th: "w-[11%] min-w-[7rem]",
+    td: "min-w-[7rem]",
   },
   Paid: { th: "w-[8%] min-w-[4.5rem]", td: "min-w-[4.5rem]" },
   Due: { th: "w-[8%] min-w-[4.5rem]", td: "min-w-[4.5rem]" },
@@ -178,12 +178,12 @@ function denseOrderThBase(columnKey) {
   const shrink =
     columnKey === "Actions" || columnKey === "Action" ? "" : "min-w-0";
   return [
-    "px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
+    "px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
     TABLE_CELL_BORDER,
     "bg-slate-100 dark:bg-slate-800/90",
     "sticky top-0 z-20",
     getTableCellAlignClass(columnKey),
-    "whitespace-normal align-middle leading-snug break-words",
+    "whitespace-nowrap align-middle leading-snug",
     shrink,
   ]
     .filter(Boolean)
@@ -192,18 +192,15 @@ function denseOrderThBase(columnKey) {
 
 /** Order body cell */
 function denseOrderTdBase(columnKey) {
-  const nowrap =
-    columnKey === "Actions" || columnKey === "Action" ? " whitespace-nowrap" : "";
   const clip =
     columnKey === "Actions" || columnKey === "Action"
       ? ""
       : "min-w-0 overflow-hidden";
   return [
-    "px-2 py-2 text-sm leading-snug align-middle text-slate-800 dark:text-slate-100",
+    "whitespace-nowrap px-2 py-1.5 text-sm leading-snug align-middle text-slate-800 dark:text-slate-100",
     TABLE_CELL_BORDER,
     "transition-colors duration-150",
     getTableCellAlignClass(columnKey),
-    nowrap,
     clip,
   ]
     .filter(Boolean)
@@ -237,7 +234,7 @@ export function reportOrderTdClasses(columnKey) {
 /** <th> classes: hierarchy + alignment */
 export function tableThClasses(columnKey) {
   return [
-    "px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
+    "px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
     TABLE_CELL_BORDER,
     "bg-slate-100 dark:bg-slate-800/90",
     getTableCellAlignClass(columnKey),
@@ -247,18 +244,15 @@ export function tableThClasses(columnKey) {
 
 /** Default <td> for data cells (non-badge) */
 export function tableTdClasses(columnKey, { dense = false } = {}) {
-  const py = dense ? "py-1.5" : "py-2";
-  const nowrap =
-    columnKey === "Actions" || columnKey === "Action" ? " whitespace-nowrap" : "";
+  const py = dense ? "py-1" : "py-1.5";
   const clip =
     columnKey === "Actions" || columnKey === "Action" ? "" : "min-w-0";
   return [
-    "px-2.5 text-sm align-middle text-slate-800 leading-snug dark:text-slate-100",
+    "whitespace-nowrap px-2 text-sm align-middle text-slate-800 leading-snug dark:text-slate-100",
     py,
     TABLE_CELL_BORDER,
     "transition-colors duration-150",
     getTableCellAlignClass(columnKey),
-    nowrap,
     clip,
   ]
     .filter(Boolean)

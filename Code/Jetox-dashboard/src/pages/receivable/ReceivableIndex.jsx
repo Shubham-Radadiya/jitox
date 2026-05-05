@@ -167,19 +167,21 @@ const ReceivableIndex = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Receivable Summary</h1>
-          <div className="jitox-header-pill">
-            <span>{headerTime}</span>
-            <Calendar size={16} className="shrink-0 text-current" />
+      <div className="flex flex-col gap-2 sm:gap-4">
+        <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2 sm:gap-3">
+          <h1 className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-xl sm:font-bold sm:tracking-normal">
+            Receivable Summary
+          </h1>
+          <div className="jitox-header-pill shrink-0 gap-1.5 whitespace-nowrap px-2 py-1 text-[11px] leading-none sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm sm:leading-normal">
+            <span className="shrink-0">{headerTime}</span>
+            <Calendar className="h-3.5 w-3.5 shrink-0 text-current opacity-80 sm:h-4 sm:w-4" aria-hidden />
           </div>
         </div>
 
-        <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Receivables</h2>
-          </div>
+        <div className="flex flex-col gap-1 rounded-xl jitox-panel jitox-panel--shadow p-3 sm:gap-2 sm:p-4">
+          <h2 className="text-base font-semibold leading-tight text-slate-900 dark:text-slate-100 sm:text-lg">
+            Receivables
+          </h2>
 
           <DataTable
             columns={columns}

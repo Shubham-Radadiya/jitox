@@ -44,7 +44,7 @@ export const TableContent = ({
           >
             {enableSelect && (
               <td
-                className={`px-2.5 py-2 align-middle text-center w-12 ${TABLE_CELL_BORDER}`}
+                className={`px-2 py-1.5 align-middle text-center w-12 ${TABLE_CELL_BORDER}`}
               >
                 <input
                   type="checkbox"

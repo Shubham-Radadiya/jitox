@@ -74,15 +74,15 @@ function DashboardLayout({ children }) {
 
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-40 flex lg:hidden">
+          <div className="flex h-full max-h-[100dvh] w-[15rem] max-w-full flex-col overflow-hidden border-r border-gray-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <Sidebar />
+          </div>
           <button
             type="button"
             className="flex-1 bg-black/40"
             aria-label="Close sidebar"
             onClick={closeMobileSidebar}
           />
-          <div className="flex h-full max-h-[100dvh] w-[15rem] max-w-full flex-col overflow-hidden border-l border-gray-200 shadow-xl dark:border-slate-700">
-            <Sidebar />
-          </div>
         </div>
       )}
     </div>

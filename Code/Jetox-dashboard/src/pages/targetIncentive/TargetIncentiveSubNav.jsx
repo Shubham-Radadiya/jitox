@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 
 const linkClass = ({ isActive }) =>
   [
-    "rounded-lg px-3 py-1.5 text-sm font-medium transition",
+    "shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition",
     isActive
       ? "bg-primary text-white shadow-sm"
       : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
@@ -18,14 +18,16 @@ const items = [
 export default function TargetIncentiveSubNav() {
   return (
     <nav
-      className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 mb-4 dark:border-slate-700"
+      className="mb-4 overflow-x-auto border-b border-slate-200 pb-3 dark:border-slate-700"
       aria-label="Target and incentive sections"
     >
-      {items.map(({ to, end, label }) => (
-        <NavLink key={to} to={to} end={end} className={linkClass}>
-          {label}
-        </NavLink>
-      ))}
+      <div className="flex w-max gap-2 pr-1">
+        {items.map(({ to, end, label }) => (
+          <NavLink key={to} to={to} end={end} className={linkClass}>
+            {label}
+          </NavLink>
+        ))}
+      </div>
     </nav>
   );
 }

@@ -245,11 +245,11 @@ const DataTable = ({
       style={limitHeight ? { maxHeight } : undefined}
     >
       <table className={`${TABLE_ELEMENT_CLASS} ${tableClassName}`}>
-        <thead className="sticky top-0 z-[2]">
+        <thead className="sticky top-0 z-2">
           <tr>
             {enableSelect && (
               <th
-                className={`px-2.5 py-2 text-center w-12 align-middle ${TABLE_CELL_BORDER} bg-slate-100 dark:bg-slate-800/90`}
+                className={`px-2 py-1.5 text-center w-12 align-middle ${TABLE_CELL_BORDER} bg-slate-100 dark:bg-slate-800/90`}
               >
                 <input
                   type="checkbox"

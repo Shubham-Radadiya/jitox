@@ -191,16 +191,17 @@ const StockIndex = () => {
     );
   }, [productColumns]);
 
+  /** Light: original solid pills. Dark: ghost outline + subtle tint. */
   const getStatusStyle = (status) => {
     switch (status) {
       case "Sufficient":
-        return "bg-[#E6FFFA] text-[#2C8C7E]";
+        return "border border-transparent bg-[#E6FFFA] text-[#2C8C7E] dark:border-emerald-400/55 dark:bg-emerald-500/10 dark:text-emerald-300";
       case "Shortage":
-        return "bg-[#FFF7E6] text-[#F7951D]";
+        return "border border-transparent bg-[#FFF7E6] text-[#F7951D] dark:border-amber-400/50 dark:bg-amber-500/10 dark:text-amber-300";
       case "Out of Stock":
-        return "bg-[#FFE8E5] text-[#E5463E]";
+        return "border border-transparent bg-[#FFE8E5] text-[#E5463E] dark:border-red-400/55 dark:bg-red-500/10 dark:text-red-300";
       default:
-        return "bg-gray-100 text-gray-600";
+        return "border border-transparent bg-gray-100 text-gray-600 dark:border-slate-500/55 dark:bg-slate-400/10 dark:text-slate-300";
     }
   };
 
@@ -252,38 +253,75 @@ const StockIndex = () => {
     else loadGroups();
   };
 
+  /** Pairs metrics for the 2×3 layout: col1 = totals / risk, col2 = availability / value */
+  const summaryColLeft = summaryCards.filter((_, i) => i % 2 === 0);
+  const summaryColRight = summaryCards.filter((_, i) => i % 2 === 1);
+
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-3 sm:gap-4 min-w-0 max-w-full">
-        <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+      <div className="flex flex-col gap-2 sm:gap-4 min-w-0 max-w-full">
+        <div className="rounded-xl jitox-panel jitox-panel--shadow p-2.5 sm:p-3 lg:p-4">
+          {/* Below lg: stacked pillars on xs; side-by-side from sm. Every stat = label | count on one row. */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:hidden min-w-0">
+            {[summaryColLeft, summaryColRight].map((col, pillarIdx) => (
+              <div
+                key={pillarIdx}
+                className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200/90 bg-slate-50/90 dark:border-slate-600/60 dark:bg-slate-950/40"
+              >
+                {col.map((card, rowIdx) => (
+                  <div
+                    key={card.label}
+                    className={`flex min-h-10 w-full min-w-0 flex-row items-center justify-between gap-2 px-2 py-2 sm:min-h-11 sm:px-2.5 sm:py-2 ${
+                      rowIdx !== col.length - 1
+                        ? "border-b border-slate-200/80 dark:border-slate-600/55"
+                        : ""
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 text-left text-xs font-medium leading-snug text-light sm:text-sm sm:leading-snug">
+                      {card.label}
+                    </span>
+                    <span className="max-w-[50%] shrink-0 text-right text-sm font-bold tabular-nums tracking-tight text-dark sm:text-base">
+                      {card.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* lg+: original desktop strip — bold value centered above label */}
+          <div className="hidden min-w-0 lg:grid lg:grid-cols-6 lg:gap-0">
             {summaryCards.map((card, idx) => (
               <div
                 key={card.label}
-                className={`flex flex-col items-center gap-1 ${
+                className={`flex flex-col items-center gap-1 px-2 py-1 ${
                   idx !== summaryCards.length - 1
-                    ? "lg:border-r border-gray-200"
+                    ? "border-gray-200 lg:border-r dark:border-slate-600/50"
                     : ""
                 }`}
               >
-                <div className="text-base sm:text-lg font-bold text-dark">{card.value}</div>
-                <div className="text-[10px] sm:text-xs text-light text-center leading-tight px-0.5">{card.label}</div>
+                <div className="text-center text-base font-bold tabular-nums text-dark md:text-lg">
+                  {card.value}
+                </div>
+                <div className="px-0.5 text-center text-[10px] leading-snug text-light sm:text-xs">
+                  {card.label}
+                </div>
               </div>
             ))}
           </div>
         </div>
 
         {viewMode === "product" ? (
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-base sm:text-lg font-semibold text-dark">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-2.5 sm:p-3 md:p-4 flex flex-col gap-2 sm:gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+              <h2 className="text-sm font-semibold leading-snug text-dark sm:text-base md:text-lg">
                 Stock Management — Product Wise
               </h2>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <CommonDropdown
                   placeholder="Product Wise"
                   addNavigateTo="/dashboard/product"
-                  className="w-[10rem]"
+                  className="min-w-0 flex-1 sm:w-40 sm:flex-none"
                   value={viewMode}
                   onChange={(v) => setViewMode(v)}
                   options={[
@@ -293,7 +331,11 @@ const StockIndex = () => {
                 />
                 <Button
                   label="Add"
-                  {...mergePageAddButton()}
+                  {...mergePageAddButton({
+                    size: "sm",
+                    className:
+                      "!min-h-8 shrink-0 px-3 text-xs sm:!min-h-10 sm:px-5 sm:text-[14px]",
+                  })}
                   onClick={() => setAddOpen(true)}
                 />
               </div>
@@ -314,16 +356,16 @@ const StockIndex = () => {
             )}
           </div>
         ) : (
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-base sm:text-lg font-semibold text-dark">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-2.5 sm:p-3 md:p-4 flex flex-col gap-2 sm:gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+              <h2 className="text-sm font-semibold leading-snug text-dark sm:text-base md:text-lg">
                 Stock Management — Group Wise
               </h2>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <CommonDropdown
                   placeholder="Group Wise"
                   addNavigateTo="/dashboard/product"
-                  className="w-[10rem]"
+                  className="min-w-0 flex-1 sm:w-40 sm:flex-none"
                   value={viewMode}
                   onChange={(v) => setViewMode(v)}
                   options={[
@@ -333,19 +375,23 @@ const StockIndex = () => {
                 />
                 <Button
                   label="Add"
-                  {...mergePageAddButton()}
+                  {...mergePageAddButton({
+                    size: "sm",
+                    className:
+                      "!min-h-8 shrink-0 px-3 text-xs sm:!min-h-10 sm:px-5 sm:text-[14px]",
+                  })}
                   onClick={() => setAddOpen(true)}
                 />
               </div>
             </div>
 
-            <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
-              <table className="w-full border-collapse text-sm text-center">
+            <div className="max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200 dark:border-slate-600">
+              <table className="min-w-max w-full border-collapse text-sm text-center whitespace-nowrap">
                 <thead className="bg-headBg">
                   <tr>
                     <th className={`px-3 py-3 w-10 ${TABLE_CELL_BORDER}`} />
                     <th
-                      className={`px-3 py-3 text-left ${TABLE_CELL_BORDER} text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200`}
+                      className={`min-w-48 max-w-none px-3 py-3 text-left ${TABLE_CELL_BORDER} text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200`}
                     >
                       Group Name
                     </th>
@@ -378,7 +424,7 @@ const StockIndex = () => {
                     return (
                       <React.Fragment key={g.id}>
                         <tr className="bg-white hover:bg-gray-50 dark:bg-slate-900 dark:hover:bg-slate-800/80">
-                          <td className={`px-3 py-3 ${TABLE_CELL_BORDER}`}>
+                          <td className={`px-3 py-3 align-middle ${TABLE_CELL_BORDER}`}>
                             <button
                               type="button"
                               onClick={() => toggleGroup(g.id)}
@@ -391,10 +437,10 @@ const StockIndex = () => {
                               )}
                             </button>
                           </td>
-                          <td className={`px-3 py-3 text-left ${TABLE_CELL_BORDER}`}>
-                            <span className="font-medium text-dark inline-flex items-center gap-2 flex-wrap">
+                          <td className={`max-w-none px-3 py-3 text-left align-middle ${TABLE_CELL_BORDER}`}>
+                            <span className="inline-flex items-center gap-2 whitespace-nowrap font-medium text-dark">
                               {g.groupName}
-                              <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 rounded leading-none">
+                              <span className="shrink-0 text-[10px] font-bold leading-none rounded bg-primary px-1.5 py-0.5 text-white">
                                 {nCat}
                               </span>
                             </span>
@@ -435,12 +481,12 @@ const StockIndex = () => {
                                 <React.Fragment key={c.id}>
                                   <tr className="bg-rowBg/80">
                                     <td className={TABLE_CELL_BORDER} />
-                                    <td className={`px-3 py-2 text-left pl-8 ${TABLE_CELL_BORDER}`}>
+                                    <td className={`max-w-none px-3 py-2 pl-8 text-left align-middle ${TABLE_CELL_BORDER}`}>
                                       {hasProducts ? (
                                         <button
                                           type="button"
                                           onClick={() => toggleCategory(ckey)}
-                                          className="inline-flex items-center gap-1.5 text-dark font-medium hover:text-primary"
+                                          className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-dark hover:text-primary"
                                         >
                                           {catOpen ? (
                                             <ChevronDown size={16} />
@@ -450,7 +496,7 @@ const StockIndex = () => {
                                           {c.name}
                                         </button>
                                       ) : (
-                                        <span className="pl-6 text-light font-medium">
+                                        <span className="whitespace-nowrap pl-6 font-medium text-light">
                                           {c.name}
                                         </span>
                                       )}
@@ -478,9 +524,11 @@ const StockIndex = () => {
                                         >
                                           <td className={TABLE_CELL_BORDER} />
                                           <td
-                                            className={`px-3 py-2 text-left pl-14 text-xs text-dark ${TABLE_CELL_BORDER}`}
+                                            className={`max-w-none px-3 py-2 pl-14 text-left text-xs align-middle text-dark ${TABLE_CELL_BORDER}`}
                                           >
-                                            {p.productName}
+                                            <span className="inline-block whitespace-nowrap">
+                                              {p.productName}
+                                            </span>
                                           </td>
                                           <td className={`text-xs ${TABLE_CELL_BORDER}`}>
                                             {p.closingQty}

@@ -12,6 +12,7 @@ import {
   paymentStatusBadgeClasses,
   reportOrderThClasses,
   reportOrderTdClasses,
+  reportOrderColClass,
   getCellTextAlign,
   STATUS_CELL_INNER_DENSE,
   tableFooterTdClasses,
@@ -34,7 +35,7 @@ function PeriodToggle({ value, onChange }) {
           onClick={() => onChange(p.toLowerCase())}
           className={`px-4 py-2 rounded-md ${
             value === p.toLowerCase()
-              ? "bg-white text-dark shadow-sm font-medium dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+              ? "bg-primary text-white shadow-sm font-medium"
               : "text-light dark:text-slate-400"
           }`}
         >
@@ -233,6 +234,11 @@ function ReportsIndex() {
     </th>
   );
 
+  const reportFooterTd = (col, extra = "") =>
+    [tableFooterTdClasses(col), reportOrderColClass(col, "td"), extra]
+      .filter(Boolean)
+      .join(" ");
+
   const att = data.attendance;
   const ps = data.productSales;
   const st = data.salesTrend;
@@ -243,15 +249,15 @@ function ReportsIndex() {
   return (
     <DashboardLayout>
       <div className="ds-stack-page min-w-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col min-h-[200px]">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <span className="text-sm font-semibold text-dark">
+        <div className="grid grid-cols-1 gap-3 auto-rows-fr sm:grid-cols-2 sm:gap-4">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 flex flex-col min-h-[180px] sm:min-h-[200px]">
+            <div className="mb-3 flex items-start justify-between gap-3 sm:mb-4 sm:gap-4">
+              <span className="text-xs sm:text-sm font-semibold text-dark">
                 Attendance Report
               </span>
               <PeriodToggle value={period} onChange={setPeriod} />
             </div>
-            <div className="flex flex-1 flex-wrap items-center gap-4">
+            <div className="flex flex-1 flex-wrap items-center gap-3 sm:gap-4">
               <div className="relative flex items-center justify-center">
                 <DonutRing pct={72} color="#22c55e" size={88} stroke={10} />
                 <span className="absolute text-[10px] font-semibold text-center text-dark max-w-[4rem] leading-tight">
@@ -279,16 +285,16 @@ function ReportsIndex() {
             </button>
           </div>
 
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col min-h-[200px]">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <span className="text-sm font-semibold text-dark">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 flex flex-col min-h-[180px] sm:min-h-[200px]">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4 sm:gap-4">
+              <span className="text-xs sm:text-sm font-semibold text-dark">
                 Product Sales Report
               </span>
               <select className="text-xs border border-light-border rounded-lg px-3 py-2 bg-white min-h-9 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">
                 <option>All products</option>
               </select>
             </div>
-            <div className="flex items-end justify-between gap-0.5 h-32 flex-1">
+            <div className="flex h-24 sm:h-32 flex-1 items-end justify-between gap-0.5">
               {(ps.months || []).map((m, i) => (
                 <div key={m} className="flex-1 flex flex-col items-center gap-1 min-w-0">
                   <div
@@ -304,9 +310,9 @@ function ReportsIndex() {
             </div>
           </div>
 
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col min-h-[200px]">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <span className="text-sm font-semibold text-dark">Sales Report</span>
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 flex flex-col min-h-[180px] sm:min-h-[200px]">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4 sm:gap-4">
+              <span className="text-xs sm:text-sm font-semibold text-dark">Sales Report</span>
               <PeriodToggle value={period} onChange={setPeriod} />
             </div>
             <div className="flex-1 min-h-[120px] flex items-end gap-0.5">
@@ -351,9 +357,9 @@ function ReportsIndex() {
             </div>
           </div>
 
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col min-h-[200px]">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <span className="text-sm font-semibold text-dark">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 flex flex-col min-h-[180px] sm:min-h-[200px]">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4 sm:gap-4">
+              <span className="text-xs sm:text-sm font-semibold text-dark">
                 Payment Analytics
               </span>
               <PeriodToggle value={period} onChange={setPeriod} />
@@ -395,9 +401,9 @@ function ReportsIndex() {
             </div>
           </div>
 
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 md:col-span-2 flex flex-col min-h-[180px]">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <span className="text-sm font-semibold text-dark">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 md:col-span-2 flex flex-col min-h-[170px] sm:min-h-[180px]">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4 sm:gap-4">
+              <span className="text-xs sm:text-sm font-semibold text-dark">
                 Source Wise Lead Conversion
               </span>
               <PeriodToggle value={period} onChange={setPeriod} />
@@ -456,9 +462,9 @@ function ReportsIndex() {
             </div>
           </div>
 
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col min-h-[200px]">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <span className="text-sm font-semibold text-dark">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 flex flex-col min-h-[180px] sm:min-h-[200px]">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4 sm:gap-4">
+              <span className="text-xs sm:text-sm font-semibold text-dark">
                 Area Wise Sales
               </span>
               <select className="text-xs border border-light-border rounded-lg px-3 py-2 bg-white min-h-9 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">
@@ -483,8 +489,8 @@ function ReportsIndex() {
             </div>
           </div>
 
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col min-h-[200px]">
-            <div className="text-sm font-semibold text-dark mb-4 leading-snug">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 flex flex-col min-h-[180px] sm:min-h-[200px]">
+            <div className="mb-3 text-xs sm:text-sm font-semibold text-dark leading-snug sm:mb-4">
               Bank Statements
             </div>
             <div className="flex flex-1 items-center gap-4">
@@ -516,8 +522,8 @@ function ReportsIndex() {
             </div>
           </div>
 
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 md:col-span-2 flex flex-col min-h-[160px]">
-            <div className="text-sm font-semibold text-dark mb-4 leading-snug">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 md:col-span-2 flex flex-col min-h-[150px] sm:min-h-[160px]">
+            <div className="mb-3 text-xs sm:text-sm font-semibold text-dark leading-snug sm:mb-4">
               Target vs Achievement
             </div>
             <div className="space-y-4">
@@ -544,35 +550,39 @@ function ReportsIndex() {
           </div>
         </div>
 
-        <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 min-w-0">
-          <div className="text-sm font-semibold text-dark mb-4 leading-snug">
+        <div className="rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4 min-w-0">
+          <div className="mb-3 text-xs sm:text-sm font-semibold text-dark leading-snug sm:mb-4">
             All Orders
           </div>
-          <div className="flex flex-col lg:flex-row gap-4 mb-6 flex-wrap">
-            <div className="w-full lg:w-64 shrink-0">
+          <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="w-full">
               <DateRangePicker
-                label="Date range"
+                filterBar
                 value={dateRange}
                 onChange={setDateRange}
+                placeholder={["Start Date", "End Date"]}
               />
             </div>
             <SearchBar
+              dense
               value={qInput}
               onChange={setQInput}
               placeholder="Search order, client, manager"
-              className="w-full min-w-[12rem] lg:max-w-xs flex-1"
+              className="w-full"
             />
             <SearchBar
+              dense
               value={partyInput}
               onChange={setPartyInput}
               placeholder="Filter by party (client)"
-              className="w-full min-w-[12rem] lg:max-w-xs flex-1"
+              className="w-full"
             />
             <SearchBar
+              dense
               value={productInput}
               onChange={setProductInput}
               placeholder="Filter by product"
-              className="w-full min-w-[12rem] lg:max-w-xs flex-1"
+              className="w-full"
             />
           </div>
           <div className="w-full min-w-0">
@@ -587,38 +597,38 @@ function ReportsIndex() {
                 renderRowCell={renderRowCell}
               />
               {!loading && (data.orders || []).length > 0 && (
-                <tfoot className="sticky bottom-0 z-[1] border-t-2 border-gray-200 bg-gray-50 dark:border-slate-600 dark:bg-slate-800/95">
+                <tfoot className="border-t-2 border-gray-200 bg-gray-50 lg:sticky lg:bottom-0 lg:z-1 dark:border-slate-600 dark:bg-slate-800/95">
                   <tr>
                     {orderColumns.map((col) => {
                       if (col === "Order ID") {
                         return (
-                          <td key={col} className={tableFooterTdClasses(col)}>
+                          <td key={col} className={reportFooterTd(col)}>
                             Total
                           </td>
                         );
                       }
                       if (col === "Paid") {
                         return (
-                          <td key={col} className={tableFooterTdClasses(col)}>
+                          <td key={col} className={reportFooterTd(col)}>
                             {fmtInr(orderFooterTotals.paid)}
                           </td>
                         );
                       }
                       if (col === "Due") {
                         return (
-                          <td key={col} className={tableFooterTdClasses(col)}>
+                          <td key={col} className={reportFooterTd(col)}>
                             {fmtInr(orderFooterTotals.due)}
                           </td>
                         );
                       }
                       if (col === "Total Amount") {
                         return (
-                          <td key={col} className={tableFooterTdClasses(col)}>
+                          <td key={col} className={reportFooterTd(col)}>
                             {fmtInr(orderFooterTotals.totalAmt)}
                           </td>
                         );
                       }
-                      return <td key={col} className={tableFooterTdClasses(col)} />;
+                      return <td key={col} className={reportFooterTd(col)} />;
                     })}
                   </tr>
                 </tfoot>

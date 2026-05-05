@@ -155,14 +155,19 @@ const AddDocumentModal = ({
       open={open}
       onClose={onClose}
       title={title}
-      width="650px"
+      width="min(92vw, 560px)"
+      headerClassName="!px-3 !py-2.5 sm:!px-4 sm:!py-3"
+      titleClassName="!text-sm sm:!text-base"
+      bodyClassName="!px-3 !pt-2 !pb-4 sm:!px-4 sm:!pt-3 sm:!pb-5"
+      footerClassName="!px-3 !py-2 sm:!px-4 sm:!py-2.5"
       footer={[
         <Button
           key="cancel"
           label="Cancel"
           variant="outline"
           onClick={onClose}
-          className="px-5"
+          size="sm"
+          className="min-h-8! px-3! py-1.5! text-xs!"
         />,
         <Button
           key="save"
@@ -170,36 +175,44 @@ const AddDocumentModal = ({
           variant="primary"
           onClick={handleSave}
           disabled={saving}
-          className="px-8"
+          size="sm"
+          className="min-h-8! px-4! py-1.5! text-xs!"
         />,
       ]}
     >
-      <div className="ds-modal-body-stack">
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-500 dark:text-slate-400">
-            Category
-          </label>
-          <CommonDropdown
-            placeholder="Select category"
-            options={dropdownOptions}
-            value={categoryId}
-            onChange={(v) => setCategoryId(v)}
-            className="w-full min-h-12 rounded-xl"
+      <div className="flex flex-col gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400">
+              Category
+            </label>
+            <CommonDropdown
+              placeholder="Select category"
+              options={dropdownOptions}
+              value={categoryId}
+              onChange={(v) => setCategoryId(v)}
+              formCompact
+              compactValue
+              className="w-full"
+            />
+          </div>
+
+          <InputField
+            label="Document name"
+            name="docName"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Fertilizer permit Q1"
+            dense
+            className="gap-0!"
+            labelClassName="!mb-0.5 text-xs!"
+            inputClassName="h-9! rounded-md text-[12px]! placeholder:text-[12px]!"
           />
         </div>
 
-        <InputField
-          label="Document name"
-          name="docName"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Fertilizer permit Q1"
-          className="rounded-xl"
-        />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-500 dark:text-slate-400">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400">
               File type
             </label>
             <CommonDropdown
@@ -207,43 +220,45 @@ const AddDocumentModal = ({
               options={TYPE_OPTIONS}
               value={docType}
               onChange={(v) => setDocType(v)}
-              className="w-full min-h-12 rounded-xl"
+              formCompact
+              compactValue
+              className="w-full"
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-500 dark:text-slate-400">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400">
               Document date
             </label>
             <DatePicker
-              className="w-full min-h-12 rounded-xl border border-light-border px-3 dark:border-slate-600"
+              className="h-9! w-full rounded-md border border-light-border px-2.5 py-0 text-[12px] dark:border-slate-600 [&_.ant-picker-input>input]:h-full [&_.ant-picker-input>input]:text-[12px]"
               value={docDate}
               onChange={(d) => setDocDate(d || dayjs())}
             />
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-500 dark:text-slate-400">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-gray-500 dark:text-slate-400">
             {editingDoc?.id
               ? "Replace file (optional)"
               : "File — required for new documents"}
           </label>
-          <label className="border-2 border-dashed border-blue-100 bg-blue-50/20 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-blue-50/40 transition-all dark:border-slate-600 dark:bg-slate-800/40">
+          <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-100 bg-blue-50/20 p-5 transition-all hover:bg-blue-50/40 dark:border-slate-600 dark:bg-slate-800/40 dark:hover:border-slate-500 dark:hover:bg-slate-800/65">
             <input
               type="file"
               className="sr-only"
               accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
               onChange={handlePickFile}
             />
-            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-500 border border-blue-100 dark:bg-slate-900 dark:border-slate-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-blue-100 bg-white text-blue-500 shadow-sm dark:border-slate-600 dark:bg-slate-900">
               <div className="relative">
-                <FileText size={28} />
-                <span className="absolute -bottom-0.5 -right-0.5 bg-blue-500 text-white rounded-full p-0.5 border-2 border-white">
-                  <UploadCloud size={11} />
+                <FileText size={22} />
+                <span className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white bg-blue-500 p-0.5 text-white">
+                  <UploadCloud size={9} />
                 </span>
               </div>
             </div>
-            <span className="text-sm text-center text-gray-600 dark:text-slate-300">
+            <span className="text-center text-xs text-gray-600 dark:text-slate-300">
               Click to choose PDF, Word, or image (max 20 MB). The eye button opens this file in a new tab.
             </span>
             {pickedFile && (

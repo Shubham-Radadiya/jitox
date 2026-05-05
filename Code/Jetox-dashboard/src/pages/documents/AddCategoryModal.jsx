@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { CommonModal, InputField, Button } from "../../components/ui/CommanUI";
 import { DatePicker } from "antd";
 import { Calendar } from "lucide-react";
-import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -35,51 +34,59 @@ const AddCategoryModal = ({ open, onClose, onSave }) => {
   };
 
   return (
-    <CommonModal open={open} onClose={onClose} width="600px" title="">
-      <div className="ds-modal-body-stack">
-        {/* Header with Title and Date Picker */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-dark">Add Category</h2>
-          <div className="flex items-center gap-2 border border-light-border rounded-lg px-3 py-1.5 focus-within:border-primary transition-colors">
-            <DatePicker 
-              placeholder="Default Date Picker"
-              className="border-none shadow-none p-0 text-sm font-medium w-40"
-              suffixIcon={<Calendar size={16} className="text-gray-400" />}
+    <CommonModal
+      open={open}
+      onClose={onClose}
+      title="Add Category"
+      width="min(94vw, 520px)"
+      headerClassName="!px-4 !py-3"
+      titleClassName="!text-sm sm:!text-base"
+      bodyClassName="!px-4 !pt-3 !pb-4"
+      footerClassName="!px-4 !py-3"
+      footer={[
+        <Button
+          key="cancel"
+          label="Cancel"
+          variant="outline"
+          onClick={onClose}
+          disabled={saving}
+          size="sm"
+          className="min-h-9! px-3.5! text-sm!"
+        />,
+        <Button
+          key="save"
+          label={saving ? "Saving…" : "Save"}
+          variant="primary"
+          onClick={handleSave}
+          disabled={saving}
+          size="sm"
+          className="min-h-9! px-4.5! text-sm!"
+        />,
+      ]}
+    >
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <InputField
+            label="Category Name"
+            placeholder="Agreements & Contracts"
+            value={categoryName}
+            onChange={(e) => setCategoryName(e.target.value)}
+            dense
+            labelClassName="text-sm!"
+            inputClassName="h-10! rounded-lg text-[13px]!"
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-500 dark:text-slate-400">
+              Date (optional)
+            </label>
+            <DatePicker
+              placeholder="Select date"
+              className="h-10! w-full rounded-lg border border-light-border px-3 py-0 text-[13px] dark:border-slate-600 [&_.ant-picker-input>input]:h-full [&_.ant-picker-input>input]:text-[13px]"
+              suffixIcon={<Calendar size={14} className="text-gray-400 dark:text-slate-500" />}
               value={date}
               onChange={(d) => setDate(d)}
             />
           </div>
-        </div>
-
-        <div className="h-[1px] bg-gray-100 w-full -mx-2"></div>
-
-        {/* Input Field */}
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-400">Category Name</label>
-          <InputField 
-            placeholder="Agreements & Contracts"
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-            className="h-14 rounded-2xl text-lg font-medium"
-          />
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-4 mt-2">
-          <Button 
-            label={saving ? "Saving…" : "Save"} 
-            variant="primary" 
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 py-4 rounded-2xl font-bold text-lg bg-green-600 hover:bg-green-700 decoration-none"
-          />
-          <Button 
-            label="Cancel" 
-            variant="outline" 
-            onClick={onClose}
-            disabled={saving}
-            className="flex-1 py-4 rounded-2xl font-bold text-lg text-gray-400 border border-gray-100 decoration-none shadow-none"
-          />
         </div>
       </div>
     </CommonModal>

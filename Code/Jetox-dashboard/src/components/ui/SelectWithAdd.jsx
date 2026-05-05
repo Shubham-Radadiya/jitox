@@ -282,7 +282,7 @@ export function SelectWithAdd({
             : ""
         }`}
       >
-        <span className={valueTextCls}>
+        <span className={valueTextCls} title={selectedLabel}>
           {selectedLabel}
         </span>
         <ChevronDown
@@ -382,7 +382,7 @@ export function SelectWithAdd({
           </div>
 
           {showAdd && (
-            <div className="shrink-0 border-t border-light-border bg-white px-1 py-1 dark:border-slate-600 dark:bg-slate-900 flex justify-end">
+            <div className="flex shrink-0 justify-end border-t border-light-border bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-900">
               <button
                 type="button"
                 role="option"
@@ -394,13 +394,13 @@ export function SelectWithAdd({
                   e.stopPropagation();
                   handleAdd();
                 }}
-                className={`flex w-auto min-h-9 items-center justify-end gap-1.5 rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-primary transition-colors hover:border-emerald-200 hover:bg-emerald-50/80 dark:hover:border-emerald-800/60 dark:hover:bg-emerald-950/50 ${
+                className={`flex min-h-7 w-auto items-center justify-end gap-1 rounded-md border border-transparent px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-emerald-200 hover:bg-emerald-50/80 dark:hover:border-emerald-800/60 dark:hover:bg-emerald-950/50 sm:min-h-8 sm:px-2.5 sm:py-1.5 sm:text-xs ${
                   activeIndex === filteredOptions.length
                     ? "border-emerald-200 bg-rowBg dark:border-emerald-800/60 dark:bg-slate-800"
                     : ""
                 }`}
               >
-                <span className="text-base leading-none" aria-hidden>
+                <span className="text-sm leading-none sm:text-[15px]" aria-hidden>
                   +
                 </span>
                 <span>{String(addLabel).replace(/^\+\s*/, "")}</span>

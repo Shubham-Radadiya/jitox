@@ -76,11 +76,17 @@ const UserSummaryIndex = () => {
         {/* User Stats Card */}
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl jitox-panel jitox-panel--shadow p-4 sm:p-5">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-primary/20">
-              <div className="flex h-full w-full items-center justify-center bg-slate-100 text-xl font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                {userData.name.charAt(0)}
+            <div className="relative h-14 w-14 shrink-0">
+              <div className="h-full w-full overflow-hidden rounded-full border-2 border-primary/20">
+                <div className="flex h-full w-full items-center justify-center bg-slate-100 text-xl font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  {userData.name.charAt(0)}
+                </div>
               </div>
-              <div className="absolute bottom-0 right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" />
+              <span
+                className="pointer-events-none absolute bottom-0 right-0 z-1 box-border h-3 w-3 rounded-full border-2 border-white bg-emerald-500 shadow-sm ring-1 ring-emerald-600/20 dark:border-slate-900"
+                aria-hidden
+                title="Active"
+              />
             </div>
             <div className="min-w-0 flex flex-col gap-0.5">
               <div className="truncate text-base font-bold text-slate-900 dark:text-slate-100">

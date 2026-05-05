@@ -32,7 +32,7 @@ export default function AutoSalaryPage() {
 
   return (
     <DashboardLayout>
-      <div className="ds-stack-major max-w-xl">
+      <div className="ds-stack-major w-full max-w-68 sm:max-w-xs md:max-w-sm">
         <button
           type="button"
           onClick={() => navigate("/dashboard/hrm")}
@@ -50,7 +50,7 @@ export default function AutoSalaryPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-light-border bg-white p-4 shadow-sm space-y-4">
+        <div className="w-full max-w-full rounded-2xl jitox-panel jitox-panel--shadow p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5">
           <InputField
             label="Payroll month"
             type="month"
@@ -66,8 +66,9 @@ export default function AutoSalaryPage() {
             variant="primary"
             onClick={() => genMutation.mutate()}
             disabled={genMutation.isPending || !year || !month}
+            className="w-full min-h-8 sm:min-h-9 md:min-h-10 text-[11px] sm:text-xs md:text-sm px-2.5 sm:px-1 leading-tight tracking-tight sm:leading-snug"
           />
-          <p className="text-xs text-light leading-relaxed">
+          <p className="text-xs text-slate-500 leading-relaxed dark:text-slate-400 border-t border-light-border pt-4 dark:border-slate-600/80">
             Scheduled monthly runs can be added on the server (e.g. cron calling
             the same API). This screen runs the job on demand.
           </p>

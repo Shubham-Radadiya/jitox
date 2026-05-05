@@ -54,11 +54,11 @@ function LineSpark({ labels, values, color }) {
     })
     .join(" ");
   return (
-    <div className="h-36 w-full">
+    <div className="w-full">
       <svg
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
-        className="h-full w-full overflow-visible"
+        className="h-30 w-full overflow-visible"
         aria-hidden
       >
         <polyline
@@ -69,9 +69,9 @@ function LineSpark({ labels, values, color }) {
           points={pts}
         />
       </svg>
-      <div className="flex justify-between text-[10px] text-slate-500 -mt-1 dark:text-slate-400">
+      <div className="mt-1 flex justify-between text-[10px] text-slate-500 dark:text-slate-400">
         {labels.map((l) => (
-          <span key={l} className="truncate max-w-[3rem] text-center">
+          <span key={l} className="max-w-16 truncate text-center">
             {l}
           </span>
         ))}
@@ -160,18 +160,36 @@ export default function TargetAchievementPage() {
       <TargetIncentiveSubNav />
 
       <div className="flex flex-col gap-4 min-w-0">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Target vs Achievement View
-          </h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-600">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center justify-between gap-2 md:block">
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Target vs Achievement View
+            </h1>
+            <div className="inline-flex h-10 shrink-0 items-center rounded-lg border border-slate-200 p-0.5 dark:border-slate-600 md:hidden">
               {["month", "year"].map((p) => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setPeriod(p)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md capitalize ${
+                  className={`h-8 rounded-md px-3 text-xs font-medium capitalize ${
+                    period === p
+                      ? "bg-primary text-white"
+                      : "text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
+            <div className="hidden h-10 shrink-0 items-center rounded-lg border border-slate-200 p-0.5 dark:border-slate-600 md:inline-flex">
+              {["month", "year"].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPeriod(p)}
+                  className={`h-8 rounded-md px-3 text-xs font-medium capitalize ${
                     period === p
                       ? "bg-primary text-white"
                       : "text-slate-600 dark:text-slate-300"
@@ -188,17 +206,18 @@ export default function TargetAchievementPage() {
               value={manager}
               onChange={setManager}
               placeholder="Manager"
-              className="w-40 sm:w-48"
+              className="min-w-0 flex-1 basis-56 md:flex-none md:w-44"
             />
             <DateRangePicker
               value={dateRange}
               onChange={setDateRange}
               placeholder={["From", "To"]}
-              className="w-48 sm:w-56"
+              className="min-w-0 flex-1 basis-56 md:flex-none md:w-48 lg:w-56"
             />
             <Button
               label="Set incentive"
               size="sm"
+              className="w-full whitespace-nowrap text-xs min-h-8 px-2.5 py-1 sm:w-auto sm:text-sm sm:min-h-9 sm:px-3 sm:py-1"
               onClick={() => navigate("/dashboard/target-incentive/assign")}
             />
           </div>
@@ -208,16 +227,18 @@ export default function TargetAchievementPage() {
           <p className="text-sm text-slate-500 py-8">Loading…</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {overviewKpis.map((k) => (
                 <div
                   key={k.key}
-                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                  className="flex min-h-14 items-center justify-between rounded-xl border border-emerald-200/80 bg-emerald-50/35 px-3.5 py-2.5 shadow-card dark:border-emerald-800/60 dark:bg-emerald-950/20 mb-0"
                 >
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{k.label}</p>
-                  <p className="text-xl font-semibold text-slate-900 tabular-nums mt-1 dark:text-slate-100">
-                    {k.value}
+                  <p className="mb-0 text-base font-semibold leading-tight text-slate-800 dark:text-slate-100">
+                    {k.label}
                   </p>
+                  <span className="inline-flex min-w-11 items-center justify-center rounded-md border border-emerald-200 bg-emerald-100/80 px-2.5 py-1 text-sm font-semibold leading-none tabular-nums text-emerald-800 shadow-sm dark:border-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">
+                    {k.value}
+                  </span>
                 </div>
               ))}
             </div>
@@ -262,13 +283,13 @@ export default function TargetAchievementPage() {
                 <table className="w-full min-w-[640px] text-sm border-collapse">
                   <thead>
                     <tr className="bg-slate-100 text-left text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      <th className="w-10 px-2 py-2" />
-                      <th className="px-3 py-2">Month</th>
-                      <th className="px-3 py-2 text-right tabular-nums">Sales Target</th>
-                      <th className="px-3 py-2 text-right tabular-nums">Sales Achieved</th>
-                      <th className="px-3 py-2 text-right tabular-nums">Coll. Plan</th>
-                      <th className="px-3 py-2 text-right tabular-nums">Achieved</th>
-                      <th className="px-3 py-2 w-36">%</th>
+                      <th className="w-10 border border-slate-200 px-2 py-2 dark:border-slate-700" />
+                      <th className="border border-slate-200 px-3 py-2 dark:border-slate-700">Month</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">Sales Target</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">Sales Achieved</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">Coll. Plan</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">Achieved</th>
+                      <th className="w-36 border border-slate-200 px-3 py-2 dark:border-slate-700">%</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -277,9 +298,9 @@ export default function TargetAchievementPage() {
                       return (
                         <Fragment key={row.id}>
                           <tr
-                            className="border-t border-slate-100 hover:bg-slate-50/80 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                            className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                           >
-                            <td className="px-2 py-2">
+                            <td className="border border-slate-200 px-2 py-2 dark:border-slate-700">
                               <button
                                 type="button"
                                 className="p-1 rounded text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
@@ -293,22 +314,22 @@ export default function TargetAchievementPage() {
                                 )}
                               </button>
                             </td>
-                            <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-100">
+                            <td className="border border-slate-200 px-3 py-2 font-medium text-slate-800 dark:border-slate-700 dark:text-slate-100">
                               {row.label}
                             </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
+                            <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">
                               {fmt(row.salesTarget)}
                             </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
+                            <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">
                               {fmt(row.salesAchieved)}
                             </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
+                            <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">
                               {fmt(row.collPlan)}
                             </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
+                            <td className="border border-slate-200 px-3 py-2 text-right tabular-nums dark:border-slate-700">
                               {fmt(row.collAchieved)}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="border border-slate-200 px-3 py-2 dark:border-slate-700">
                               <PctBar pct={row.pct} />
                             </td>
                           </tr>
@@ -445,21 +466,21 @@ export default function TargetAchievementPage() {
                   {months.length > 0 && (
                     <tfoot>
                       <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-900 dark:border-slate-600 dark:bg-slate-800/95 dark:text-slate-100">
-                        <td className="px-2 py-2.5" />
-                        <td className="px-3 py-2.5">Total</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">
+                        <td className="border border-slate-200 px-2 py-2.5 dark:border-slate-700" />
+                        <td className="border border-slate-200 px-3 py-2.5 dark:border-slate-700">Total</td>
+                        <td className="border border-slate-200 px-3 py-2.5 text-right tabular-nums dark:border-slate-700">
                           {fmt(monthColumnTotals.salesTarget)}
                         </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">
+                        <td className="border border-slate-200 px-3 py-2.5 text-right tabular-nums dark:border-slate-700">
                           {fmt(monthColumnTotals.salesAchieved)}
                         </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">
+                        <td className="border border-slate-200 px-3 py-2.5 text-right tabular-nums dark:border-slate-700">
                           {fmt(monthColumnTotals.collPlan)}
                         </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">
+                        <td className="border border-slate-200 px-3 py-2.5 text-right tabular-nums dark:border-slate-700">
                           {fmt(monthColumnTotals.collAchieved)}
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="border border-slate-200 px-3 py-2.5 dark:border-slate-700">
                           <PctBar pct={avgMonthPct} />
                         </td>
                       </tr>
