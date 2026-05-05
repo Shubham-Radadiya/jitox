@@ -11,7 +11,7 @@ import CommonDeleteModal from "../../components/ui/modals/CommonDeleteModal";
 import CommonDeleteSuccessModal from "../../components/ui/modals/CommonDeleteSuccessModal";
 import { dashboardUiService } from "../../services/dashboardUi.service";
 import toast from "react-hot-toast";
-import { TABLE_ACTION_ICON_BTN } from "../../utils/tableUi";
+import { TABLE_ACTION_ICON_BTN, tableTdClasses } from "../../utils/tableUi";
 import { mergePageAddButton } from "../../utils/pageAddButton";
 
 const SchemeIndex = () => {
@@ -82,7 +82,7 @@ const SchemeIndex = () => {
   };
 
   const renderAction = (row) => (
-    <td className="px-3 py-2.5 align-middle text-center border-b border-gray-200 dark:border-slate-700">
+    <td className={tableTdClasses("Actions")}>
       <div className="inline-flex flex-nowrap items-center justify-center gap-2">
         <button
           type="button"
@@ -124,7 +124,7 @@ const SchemeIndex = () => {
   const renderRowCell = (colKey, value) => (
     <td
       key={colKey}
-      className="px-4 py-3 text-xs text-gray-600 align-middle dark:text-slate-200"
+      className={`${tableTdClasses(colKey)} text-xs text-gray-600 dark:text-slate-200`}
     >
       {value ?? "-"}
     </td>
@@ -150,8 +150,8 @@ const SchemeIndex = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl jitox-panel jitox-panel--shadow flex flex-col">
-          <div className="p-4 flex flex-wrap justify-between items-center gap-3">
+        <div className="rounded-2xl jitox-panel jitox-panel--shadow flex flex-col overflow-hidden">
+          <div className="p-4 sm:p-5 flex flex-wrap justify-between items-center gap-3 border-b border-gray-100 dark:border-slate-700">
             <h2 className="text-base font-bold text-dark">Scheme List</h2>
             <div className="flex flex-wrap items-center gap-3">
               <Button
@@ -163,16 +163,17 @@ const SchemeIndex = () => {
             </div>
           </div>
 
-          <DataTable
-            columns={columns}
-            data={loading ? [] : schemes}
-            renderRowCell={renderRowCell}
-            renderAction={renderAction}
-            className="border-none shadow-none"
-            loading={loading}
-          />
+          <div className="px-4 py-3 sm:px-5 sm:py-4">
+            <DataTable
+              columns={columns}
+              data={loading ? [] : schemes}
+              renderRowCell={renderRowCell}
+              renderAction={renderAction}
+              loading={loading}
+            />
+          </div>
 
-          <div className="p-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 bg-white rounded-b-2xl dark:border-slate-700 dark:bg-slate-900">
+          <div className="px-4 py-3 sm:px-5 sm:py-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 bg-white dark:border-slate-700 dark:bg-slate-900">
             <div className="text-xs text-gray-400 font-medium dark:text-slate-400">
               Showing {showingFrom} - {showingTo} of {schemes.length} results
             </div>

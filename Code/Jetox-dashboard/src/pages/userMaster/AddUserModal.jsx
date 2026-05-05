@@ -18,6 +18,10 @@ const ROLE_OPTIONS = [
   { label: "User", value: "user" },
 ];
 
+const CARD =
+  "p-4 rounded-xl border border-light-border bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]";
+const CARD_TITLE = "text-sm font-semibold text-slate-900 dark:text-slate-100";
+
 function mapRoleToApi(value) {
   const v = (value || "user").toLowerCase();
   if (v === "admin") return "Admin";
@@ -186,23 +190,25 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
       open={open}
       onClose={onClose}
       title="Add User"
-      width="1000px"
+      width="min(680px, 94vw)"
+      footerClassName="!px-5 sm:!px-6"
       footer={[
         <Button
           key="cancel"
           label="Cancel"
           variant="outline"
+          size="sm"
           onClick={onClose}
-          className="px-10"
           disabled={saving}
         />,
         <Button
           key="save"
           label={saving ? "Saving…" : "Save"}
           variant="primary"
+          size="sm"
           onClick={handleSave}
-          className="px-14 bg-[#EEECEC] text-dark border-none hover:bg-primary hover:text-white"
           disabled={saving}
+          className="text-white! hover:text-white! disabled:border-transparent! disabled:bg-primary/85! disabled:text-white!"
         />,
       ]}
     >
@@ -215,23 +221,31 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
             className="hidden"
             accept="image/*"
           />
-          <div className="text-xs font-semibold text-dark">
-            Photos <span className="text-light font-normal">(optional)</span>
+          <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+            Photos <span className="font-normal text-light dark:text-slate-400">(optional)</span>
           </div>
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="w-20 h-20 rounded-full bg-gray-100 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors overflow-hidden"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-slate-300 bg-slate-100 transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700/80"
           >
             {imagePreview ? (
               <img
                 src={imagePreview}
                 alt="Profile photo preview"
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
               />
             ) : (
               <>
-                <Camera size={24} className="text-gray-400" />
-                <span className="text-[10px] text-gray-500 font-medium">
+                <Camera size={24} className="text-slate-400 dark:text-slate-500" />
+                <span className="text-[10px] font-medium text-slate-600 dark:text-slate-400">
                   Add Photo
                 </span>
               </>
@@ -239,10 +253,8 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
           </div>
         </div>
 
-        <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
-          <div className="text-sm font-semibold text-dark mb-4">
-            Basic Information
-          </div>
+        <div className={CARD}>
+          <div className={`${CARD_TITLE} mb-4`}>Basic Information</div>
           <div className="grid grid-cols-3 gap-4">
             <div className="flex flex-col gap-1">
               <InputField
@@ -291,12 +303,13 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
               options={ROLE_OPTIONS}
             />
             <div className="flex flex-col">
-              <label className="mb-1 text-xs font-medium text-dark">
+              <label className="mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200">
                 Joining Date
               </label>
               <DatePicker
-                className="w-full"
+                className="w-full jitox-picker-form text-[13px]!"
                 placeholder="DD/MM/YY"
+                value={form.joiningDate}
                 onChange={(d) => setForm({ ...form, joiningDate: d })}
               />
             </div>
@@ -324,8 +337,8 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
             />
           </div>
 
-          <div className="mt-6 pt-4 border-t border-light-border">
-            <div className="text-sm font-semibold text-dark mb-2">
+          <div className="mt-6 border-t border-light-border pt-4 dark:border-slate-600">
+            <div className={`${CARD_TITLE} mb-2`}>
               Address <span className="text-red-500">*</span>
             </div>
             <AddressForm
@@ -337,22 +350,20 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
         </div>
 
         {!isAdminRole && (
-          <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
-            <div className="text-sm font-semibold text-dark mb-2">
-              Module access
-            </div>
-            <p className="text-xs text-gray-500 mb-3">
+          <div className={CARD}>
+            <div className={`${CARD_TITLE} mb-2`}>Module access</div>
+            <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
               Admin assigns which sidebar sections this Manager or User can open.
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+            <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
               {MODULE_ACCESS_OPTIONS.map(({ key, label }) => (
                 <label
                   key={key}
-                  className="flex items-center gap-2 text-xs text-dark cursor-pointer"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80"
                 >
                   <input
                     type="checkbox"
-                    className="accent-primary rounded"
+                    className="h-3.5 w-3.5 shrink-0 rounded border-slate-400 text-primary focus:ring-2 focus:ring-primary/30 dark:border-slate-500 dark:bg-slate-900"
                     checked={selectedPerms.has(key)}
                     onChange={() => togglePerm(key)}
                   />
@@ -364,13 +375,13 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
         )}
 
         {isAdminRole && (
-          <p className="text-xs text-gray-600 px-1">
+          <p className="px-1 text-xs text-slate-600 dark:text-slate-400">
             Admins have full access to all modules automatically.
           </p>
         )}
 
-        <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
-          <div className="text-sm font-semibold text-dark mb-4">Security</div>
+        <div className={CARD}>
+          <div className={`${CARD_TITLE} mb-4`}>Security</div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
               <InputField

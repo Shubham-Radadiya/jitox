@@ -82,6 +82,8 @@ const DataTable = ({
   renderFooter,
   /** When false, data is shown as-is (e.g. row selection tables). */
   enableExcelColumnFilters = !enableSelect,
+  /** When true, Excel-style headers use left alignment and a leading layout (custom cells should add `!text-left` if they override `tableTdClasses`). */
+  allCellsLeft = false,
 }) => {
   const { tableHeader, renderRowCell: baseRenderRowCell, tableAction } =
     useTableData();
@@ -169,19 +171,26 @@ const DataTable = ({
     const labelText =
       typeof col === "string" ? col : col.label ?? col.key ?? key;
     const align = getTableCellAlignClass(key);
-    const justify = align.includes("text-right")
-      ? "justify-end"
-      : align.includes("text-center")
-        ? "justify-center"
-        : "justify-between";
+    const justify = allCellsLeft
+      ? "justify-start"
+      : align.includes("text-right")
+        ? "justify-end"
+        : align.includes("text-center")
+          ? "justify-center"
+          : "justify-between";
     const applied = excelFilters[key];
     const appliedArr =
       applied && applied.size > 0 ? Array.from(applied) : null;
     const sourceRows = Array.isArray(data) ? data : [];
 
     return (
-      <th key={key} className={tableThClasses(key)}>
-        <div className={`flex w-full min-w-0 items-center gap-1 ${justify}`}>
+      <th
+        key={key}
+        className={
+          allCellsLeft ? `${tableThClasses(key)} text-left!` : tableThClasses(key)
+        }
+      >
+        <div className={`flex w-full min-w-0 items-center gap-2 ${justify}`}>
           <span className="min-w-0 truncate font-medium text-gray-700 dark:text-slate-200">
             {labelText}
           </span>
@@ -240,7 +249,7 @@ const DataTable = ({
           <tr>
             {enableSelect && (
               <th
-                className={`px-3 py-2.5 text-center w-12 align-middle ${TABLE_CELL_BORDER} bg-slate-100 dark:bg-slate-800/90`}
+                className={`px-2.5 py-2 text-center w-12 align-middle ${TABLE_CELL_BORDER} bg-slate-100 dark:bg-slate-800/90`}
               >
                 <input
                   type="checkbox"

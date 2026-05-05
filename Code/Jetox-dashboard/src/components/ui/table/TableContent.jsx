@@ -38,13 +38,13 @@ export const TableContent = ({
             key={rowIndex}
             className={`group align-middle transition-colors duration-150 ${
               rowIndex % 2 === 0
-                ? "bg-white dark:bg-slate-900"
-                : "bg-slate-50/80 dark:bg-slate-800/35"
-            } hover:bg-slate-50 dark:hover:bg-slate-800/70`}
+                ? "bg-white dark:bg-slate-950"
+                : "bg-slate-50/80 dark:bg-slate-900/90"
+            } hover:bg-slate-50 dark:hover:bg-slate-800/80`}
           >
             {enableSelect && (
               <td
-                className={`px-3 py-2.5 align-middle text-center w-12 ${TABLE_CELL_BORDER}`}
+                className={`px-2.5 py-2 align-middle text-center w-12 ${TABLE_CELL_BORDER}`}
               >
                 <input
                   type="checkbox"

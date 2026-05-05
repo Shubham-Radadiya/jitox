@@ -103,7 +103,7 @@ export const useTableData = () => {
     if (isValidElement(labelOrNode)) {
       return (
         <th
-          className={`min-w-0 px-3 py-2.5 text-center align-middle ${TABLE_CELL_BORDER} bg-slate-100 dark:bg-slate-800/90`}
+          className={`min-w-0 px-2.5 py-2 text-center align-middle ${TABLE_CELL_BORDER} bg-slate-100 dark:bg-slate-800/90`}
         >
           {labelOrNode}
         </th>

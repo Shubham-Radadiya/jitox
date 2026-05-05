@@ -18,7 +18,9 @@ import toast from "react-hot-toast";
  * Props:
  * - `options`, `value`, `onChange`, `placeholder`, `label`, `className` — same as legacy CommonDropdown
  * - `hideAdd` — set `true` on list/filter toolbars where "+ Add" is not wanted (default: row is shown)
- * - `compactValue` — smaller font for the closed trigger label only (height unchanged)
+ * - `filterBar` — toolbar row: h-9 trigger, compact label
+ * - `formCompact` — dense forms (invoice): h-9 trigger, 10px muted label, 12px value, stronger chevron
+ * - `compactValue` — smaller font for the closed trigger label only (height unchanged unless with formCompact)
  * - `searchable` — filter options; list scrolls, "+ Add" stays fixed at bottom
  * - `searchPlaceholder` — defaults to "Search…"
  * - `onAddClick` — called when "+ Add" is clicked; combine with `renderAddModal` for modal flows
@@ -59,6 +61,8 @@ export function SelectWithAdd({
   disabled = false,
   /** Toolbar filters: h-9, text-sm, rounded-md */
   filterBar = false,
+  /** Dense invoice-style fields: h-9, small muted label, 12px value */
+  formCompact = false,
   /** Smaller selected-value font on the trigger; keeps `h-10` / `h-9` sizing */
   compactValue = false,
 }) {
@@ -214,19 +218,30 @@ export function SelectWithAdd({
 
   const triggerTextCls = filterBar
     ? "text-sm"
-    : compactValue
-      ? "text-[12px]"
-      : "text-[13px]";
+    : formCompact
+      ? "text-[13px]"
+      : compactValue
+        ? "text-[12px]"
+        : "text-[13px]";
 
-  const triggerCls = filterBar
-    ? `flex h-9 min-h-9 max-h-9 w-full items-center justify-between rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-left ${triggerTextCls} shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] hover:border-slate-400 hover:bg-white focus:outline-none focus-visible:border-primary focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus-visible:bg-slate-950 dark:focus-visible:ring-primary/30`
-    : `flex h-10 min-h-10 max-h-10 w-full items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-left ${triggerTextCls} shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] hover:border-slate-400 hover:bg-white focus:outline-none focus-visible:border-primary focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus-visible:bg-slate-950 dark:focus-visible:ring-primary/30`;
+  const triggerCls =
+    filterBar || formCompact
+      ? `flex h-9 min-h-9 max-h-9 w-full items-center justify-between rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-left ${triggerTextCls} shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] hover:border-slate-400 hover:bg-white focus:outline-none focus-visible:border-primary focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus-visible:bg-slate-950 dark:focus-visible:ring-primary/30`
+      : `flex h-10 min-h-10 max-h-10 w-full items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-left ${triggerTextCls} shadow-sm ring-1 ring-slate-900/[0.04] transition-[border-color,box-shadow,background-color] hover:border-slate-400 hover:bg-white focus:outline-none focus-visible:border-primary focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:ring-white/[0.06] dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:focus-visible:bg-slate-950 dark:focus-visible:ring-primary/30`;
 
   const labelCls = filterBar
     ? "mb-1 text-left text-[11px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200"
-    : "mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200";
+    : formCompact
+      ? "mb-1 text-left text-xs font-medium leading-tight tracking-wide text-slate-600 dark:text-slate-400"
+      : "mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200";
 
-  const valueSizeCls = filterBar ? "text-sm" : compactValue ? "text-[12px]" : "text-[13px]";
+  const valueSizeCls = filterBar
+    ? "text-sm"
+    : formCompact
+      ? "text-[13px]"
+      : compactValue
+        ? "text-[12px]"
+        : "text-[13px]";
 
   const valueTextCls = filterBar
     ? `text-sm leading-snug truncate ${
@@ -235,7 +250,13 @@ export function SelectWithAdd({
           : "text-gray-900 dark:text-slate-100"
       }`
     : `${valueSizeCls} leading-snug truncate ${
-        selectedLabel === placeholder ? "text-light" : "text-dark"
+        selectedLabel === placeholder
+          ? formCompact
+            ? "text-slate-400 dark:text-slate-500"
+            : "text-light"
+          : formCompact
+            ? "text-slate-800 dark:text-slate-100"
+            : "text-slate-900 dark:text-slate-100"
       }`;
 
   return (
@@ -266,7 +287,11 @@ export function SelectWithAdd({
         </span>
         <ChevronDown
           size={16}
-          className={`shrink-0 text-light transition-transform dark:text-slate-400 ${open ? "rotate-180" : ""}`}
+          className={`shrink-0 transition-transform ${
+            formCompact
+              ? "text-slate-500 dark:text-slate-400"
+              : "text-light dark:text-slate-400"
+          } ${open ? "rotate-180" : ""}`}
           aria-hidden
         />
       </button>
@@ -300,7 +325,7 @@ export function SelectWithAdd({
                 }}
                 placeholder={searchPlaceholder}
                 className={`w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 shadow-sm ring-1 ring-slate-900/[0.04] placeholder:text-slate-500 transition-[border-color,box-shadow,background-color] focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.06] dark:placeholder:text-slate-400 dark:focus:bg-slate-950 dark:focus:text-slate-100 dark:focus:ring-primary/30 ${
-                  compactValue ? "text-[12px]" : "text-sm"
+                  formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm"
                 }`}
                 aria-label={searchPlaceholder}
                 autoFocus
@@ -311,7 +336,9 @@ export function SelectWithAdd({
           <div className="flex-1 min-h-0 overflow-y-auto py-1">
             {filteredOptions.length === 0 ? (
               <div
-                className={`px-4 py-3 text-light dark:text-slate-400 ${compactValue ? "text-[12px]" : "text-sm"}`}
+                className={`px-4 py-3 text-light dark:text-slate-400 ${
+                  formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm"
+                }`}
               >
                 No matches
               </div>
@@ -319,7 +346,7 @@ export function SelectWithAdd({
               filteredOptions.map((opt, idx) => {
                 const selected = opt.value === value;
                 const active = idx === activeIndex;
-                const rowText = compactValue ? "text-[12px]" : "text-sm";
+                const rowText = formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm";
                 return (
                   <div
                     key={String(opt.value)}
@@ -335,7 +362,7 @@ export function SelectWithAdd({
                         : active
                           ? "bg-rowBg dark:bg-slate-800"
                           : "hover:bg-lightblue dark:hover:bg-slate-800/80"
-                    } ${selected ? "text-primary font-medium" : "text-dark dark:text-slate-200"}`}
+                    } ${selected ? "text-primary font-medium" : "text-slate-800 dark:text-slate-200"}`}
                   >
                     <span
                       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${

@@ -9,7 +9,11 @@ import dayjs from "dayjs";
 import { receiptVouchersApi } from "../../services/api";
 import toast from "react-hot-toast";
 import { getApiErrorMessage, isEmptyListNotFound } from "../../utils/apiError";
-import { TABLE_ACTION_ICON_BTN, tableFooterTdClasses } from "../../utils/tableUi";
+import {
+  TABLE_ACTION_ICON_BTN,
+  tableFooterTdClasses,
+  tableTdClasses,
+} from "../../utils/tableUi";
 
 function mapReceiptRow(v) {
   const id = v._id || v.id;
@@ -83,13 +87,22 @@ const ReceivableIndex = () => {
       const val = Number(String(item["Amount (₹)"]).replace(/,/g, ""));
       return sum + (Number.isFinite(val) ? val : 0);
     }, 0);
+    /** Thicker top edge; matches table cell borders (slate-200 / slate-600). */
+    const footerTop =
+      "border-t-2 border-t-slate-200 dark:border-t-slate-600";
     return (
-      <tfoot className="sticky bottom-0 z-20 border-t border-light-border bg-headBg dark:border-slate-700 dark:bg-slate-800">
+      <tfoot className="sticky bottom-0 z-20 bg-headBg dark:bg-slate-800">
         <tr>
           {columns.map((col) => {
             if (col === "Voucher No") {
               return (
-                <td key={col} className={tableFooterTdClasses(col, { variant: "head" })}>
+                <td
+                  key={col}
+                  className={tableFooterTdClasses(col, {
+                    variant: "head",
+                    extra: footerTop,
+                  })}
+                >
                   Total
                 </td>
               );
@@ -101,6 +114,7 @@ const ReceivableIndex = () => {
                   className={tableFooterTdClasses(col, {
                     variant: "head",
                     alignClass: "text-right font-normal",
+                    extra: footerTop,
                   })}
                 >
                   Total Receipts (₹)
@@ -113,14 +127,22 @@ const ReceivableIndex = () => {
                   key={col}
                   className={tableFooterTdClasses(col, {
                     variant: "head",
-                    extra: "font-bold",
+                    extra: `${footerTop} font-bold`,
                   })}
                 >
                   ₹{totalAmount.toLocaleString("en-IN")}
                 </td>
               );
             }
-            return <td key={col} className={tableFooterTdClasses(col, { variant: "head" })} />;
+            return (
+              <td
+                key={col}
+                className={tableFooterTdClasses(col, {
+                  variant: "head",
+                  extra: footerTop,
+                })}
+              />
+            );
           })}
         </tr>
       </tfoot>
@@ -128,7 +150,7 @@ const ReceivableIndex = () => {
   };
 
   const renderReceivableAction = (row) => (
-    <td className="px-3 py-2.5 align-middle text-center border-b border-gray-200 dark:border-slate-700">
+    <td className={tableTdClasses("Actions")}>
       <button
         type="button"
         title="View voucher"
@@ -179,7 +201,7 @@ const ReceivableIndex = () => {
           width="min(480px, 96vw)"
         >
           {viewRow && (
-            <dl className="space-y-2 text-sm">
+            <dl className="mb-0 space-y-2 text-sm">
               {columns
                 .filter((c) => c !== "Actions")
                 .map((col) => (

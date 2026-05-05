@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import nodataImg from "../../assets/nodata.png";
@@ -20,7 +21,7 @@ import { getStoredUser, canAccessModule } from "../../utils/authSession";
 import { MODULE_ACCESS_OPTIONS } from "../../constants/accessModules";
 import { AddressTableCell } from "../../components/address/AddressDisplay";
 import { addressFromUser, buildTableSummary } from "../../utils/addressFormat";
-import { TABLE_ACTION_ICON_BTN } from "../../utils/tableUi";
+import { TABLE_ACTION_ICON_BTN, tableTdClasses } from "../../utils/tableUi";
 import { mergePageAddButton } from "../../utils/pageAddButton";
 
 function mapApiUserToRow(u) {
@@ -186,7 +187,7 @@ const UserMasterIndex = () => {
   const renderRowCell = (key, value, row) => {
     if (key === "Employee ID") {
       return (
-        <td key={key} className="px-4 py-3">
+        <td key={key} className={tableTdClasses("Employee ID")}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden relative border border-gray-100">
               {row.image ? (
@@ -209,14 +210,14 @@ const UserMasterIndex = () => {
     }
     if (key === "Role") {
       return (
-        <td key={key} className="px-4 py-3 text-light">
+        <td key={key} className={`${tableTdClasses("Role")} text-light`}>
           <span>{value}</span>
         </td>
       );
     }
     if (key === "Address") {
       return (
-        <td key={key} className="px-4 py-3 text-left">
+        <td key={key} className={tableTdClasses("Address")}>
           <AddressTableCell
             value={{
               streetAddress: row.streetAddress,
@@ -233,27 +234,40 @@ const UserMasterIndex = () => {
       );
     }
     return (
-      <td key={key} className="px-4 py-3 text-light">
+      <td key={key} className={`${tableTdClasses(key)} text-light`}>
         {value ?? "-"}
       </td>
     );
   };
 
-  const [activeDropdownRow, setActiveDropdownRow] = useState(null);
-  const dropdownRef = useRef(null);
+  /** Fixed menu in a portal so it is not clipped by the DataTable overflow stack. */
+  const [userActionsMenu, setUserActionsMenu] = useState(null);
+  const userActionsMenuRef = useRef(null);
+  const userActionsMenuTriggerRef = useRef(null);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setActiveDropdownRow(null);
-      }
+    const handlePointerDown = (event) => {
+      const t = event.target;
+      if (userActionsMenuRef.current?.contains(t)) return;
+      if (userActionsMenuTriggerRef.current?.contains(t)) return;
+      setUserActionsMenu(null);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
+  useEffect(() => {
+    if (!userActionsMenu) {
+      userActionsMenuTriggerRef.current = null;
+      return undefined;
+    }
+    const closeOnScroll = () => setUserActionsMenu(null);
+    window.addEventListener("scroll", closeOnScroll, true);
+    return () => window.removeEventListener("scroll", closeOnScroll, true);
+  }, [userActionsMenu]);
+
   const renderAction = (row, rowIndex) => (
-    <td className="px-3 py-2.5 relative align-middle border-b border-gray-200 dark:border-slate-700">
+    <td className={`${tableTdClasses("Actions")} relative`}>
       <div className="flex items-center justify-center gap-1.5">
         <button
           type="button"
@@ -295,44 +309,27 @@ const UserMasterIndex = () => {
           <button
             type="button"
             title="More"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50 hover:text-emerald-600"
+            className={TABLE_ACTION_ICON_BTN}
             onClick={(e) => {
               e.stopPropagation();
-              setActiveDropdownRow(
-                activeDropdownRow === rowIndex ? null : rowIndex
-              );
+              const rect = e.currentTarget.getBoundingClientRect();
+              userActionsMenuTriggerRef.current = e.currentTarget;
+              setUserActionsMenu((prev) => {
+                if (prev?.rowIndex === rowIndex) {
+                  userActionsMenuTriggerRef.current = null;
+                  return null;
+                }
+                return {
+                  rowIndex,
+                  row,
+                  top: rect.bottom + 8,
+                  right: window.innerWidth - rect.right,
+                };
+              });
             }}
           >
             <HiOutlineDotsVertical size={18} />
           </button>
-          {activeDropdownRow === rowIndex && (
-            <div
-              ref={dropdownRef}
-              className="absolute right-0 mt-2 w-40 bg-white border border-light-border rounded-xl shadow-xl z-[100] py-2 dark:bg-slate-900 dark:border-slate-600"
-            >
-              {[
-                "Visit Log",
-                "Order Placed",
-                "Expenses",
-                "Attendance",
-                "Report",
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="px-4 py-2 text-sm text-dark hover:bg-gray-50 cursor-pointer text-right dark:hover:bg-slate-800"
-                  onClick={() => {
-                    setActiveDropdownRow(null);
-                    const tabSlug = item.toLowerCase().replace(/\s+/g, "-");
-                    navigate(
-                      `/dashboard/user-master/summary/${row._id}/${tabSlug}`
-                    );
-                  }}
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </td>
@@ -438,6 +435,45 @@ const UserMasterIndex = () => {
             </div>
           </>
         )}
+
+        {userActionsMenu &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <div
+              ref={userActionsMenuRef}
+              role="menu"
+              className="fixed z-200 w-40 rounded-xl border border-light-border bg-white py-2 shadow-xl dark:border-slate-600 dark:bg-slate-900"
+              style={{
+                top: userActionsMenu.top,
+                right: userActionsMenu.right,
+              }}
+            >
+              {[
+                "Visit Log",
+                "Order Placed",
+                "Expenses",
+                "Attendance",
+                "Report",
+              ].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  role="menuitem"
+                  className="block w-full px-4 py-2 text-right text-sm text-dark hover:bg-gray-50 cursor-pointer dark:hover:bg-slate-800"
+                  onClick={() => {
+                    setUserActionsMenu(null);
+                    const tabSlug = item.toLowerCase().replace(/\s+/g, "-");
+                    navigate(
+                      `/dashboard/user-master/summary/${userActionsMenu.row._id}/${tabSlug}`
+                    );
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>,
+            document.body
+          )}
 
         {isColumnPickerOpen && (
           <div

@@ -61,14 +61,8 @@ const VisitLogTab = () => {
   ], []);
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={data}
-        tableClassName="bg-white"
-        className="border-none shadow-sm"
-      />
+    <div className="flex min-w-0 flex-col gap-2">
+      <DataTable columns={columns} data={data} />
     </div>
   );
 };

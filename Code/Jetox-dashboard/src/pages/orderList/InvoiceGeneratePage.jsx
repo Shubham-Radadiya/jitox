@@ -5,10 +5,32 @@ import DashboardLayout from "../../layouts/DashboardLayout";
 import { Button, InputField, CommonDropdown } from "../../components/ui/CommanUI";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
-import { downloadHtmlFile, escapeHtml } from "../../utils/printAndExport";
+import { downloadHtmlDocumentAsPdf, escapeHtml } from "../../utils/printAndExport";
 import { mergePageAddOutlineButton } from "../../utils/pageAddButton";
 
 const INVOICE_DRAFT_KEY = "jitox_invoice_draft_v1";
+
+/** Avoid Ant Design / preview showing "Invalid Date" when API format varies. */
+function parseSafeInvoiceDate(raw) {
+  if (raw == null || raw === "") return dayjs();
+  const loose = dayjs(raw);
+  if (loose.isValid()) return loose;
+  const strict = dayjs(raw, ["DD MMM, YYYY", "DD MMM YYYY", "YYYY-MM-DD"], true);
+  return strict.isValid() ? strict : dayjs();
+}
+
+function formatInvoiceDate(d) {
+  if (d && typeof d.isValid === "function" && d.isValid()) return d.format("DD MMM YYYY");
+  return "—";
+}
+
+/** Muted labels, slightly larger than micro type for readability */
+const INVOICE_LABEL_FIELD =
+  "!mb-1 !text-xs !font-medium !leading-tight !tracking-wide text-slate-600 dark:!text-slate-400";
+const INVOICE_LABEL_STATIC =
+  "mb-1 text-left text-xs font-medium leading-tight tracking-wide text-slate-600 dark:text-slate-400";
+const INVOICE_INPUT_TEXT =
+  "!text-[13px] placeholder:!text-[12px] dark:!text-slate-100 dark:placeholder:!text-slate-500";
 
 const defaultLines = () => [
   { name: "Organic Fertilizer", qty: 50, rate: 400, subtotal: 20000 },
@@ -28,7 +50,7 @@ export default function InvoiceGeneratePage() {
     if (inv?.lines?.length) {
       return {
         invoiceNo: inv.invoiceNo || "#AB2324-01",
-        issueDate: inv.invoiceDate ? dayjs(inv.invoiceDate, "DD MMM, YYYY") : dayjs(),
+        issueDate: parseSafeInvoiceDate(inv.invoiceDate),
         client: inv.billedTo?.name || "Mr. Ramesh Mehta",
         paymentMode: inv.paymentMode || "UPI",
         reference: inv.reference || "INV-057",
@@ -72,6 +94,7 @@ export default function InvoiceGeneratePage() {
   const [description, setDescription] = useState(initial.description);
   const [vatYes, setVatYes] = useState(initial.vatYes);
   const [lines, setLines] = useState(initial.lines);
+  const [dueDate, setDueDate] = useState(() => dayjs().add(15, "day"));
   const [extraClients, setExtraClients] = useState([]);
   const previewRef = useRef(null);
 
@@ -105,25 +128,36 @@ export default function InvoiceGeneratePage() {
       )
       .join("");
     return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${escapeHtml(invoiceNo)}</title>
-<style>body{font-family:system-ui,sans-serif;padding:24px;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:8px;font-size:13px;}</style></head><body>
-<h1 style="color:#0f766e">Jitox Agro</h1>
-<p style="color:#666;font-size:12px">Sample address — Surat, Gujarat</p>
-<div style="display:flex;justify-content:space-between;margin:16px 0;border-bottom:1px solid #eee;padding-bottom:12px">
+<style>html,body{margin:0;background:#fff;color:#111;height:auto;min-height:0;}body{font-family:system-ui,sans-serif;padding:10px 12px;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:6px 8px;font-size:13px;}</style></head><body>
+<h1 style="color:#0f766e;margin:0 0 4px;font-size:22px">Jitox Agro</h1>
+<p style="color:#666;font-size:11px;margin:0 0 8px">Sample address — Surat, Gujarat</p>
+<div style="display:flex;justify-content:space-between;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px">
 <div><div style="font-size:11px;color:#666">Invoice No</div><div style="font-weight:600">${escapeHtml(invoiceNo)}</div></div>
-<div style="text-align:right"><div style="font-size:11px;color:#666">Date</div><div>${escapeHtml(issueDate?.format?.("DD MMM YYYY") || "")}</div></div>
+<div style="text-align:right"><div style="font-size:11px;color:#666">Date</div><div>${escapeHtml(formatInvoiceDate(issueDate))}</div></div>
 </div>
 <p><strong>Billed to:</strong> ${escapeHtml(client)}</p>
 <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rowHtml}</tbody></table>
-<p style="margin-top:16px;text-align:right"><strong>Final Payable:</strong> ₹${escapeHtml(String(finalPayable.toLocaleString("en-IN")))}</p>
+<p style="margin:10px 0 0;text-align:right"><strong>Final Payable:</strong> ₹${escapeHtml(String(finalPayable.toLocaleString("en-IN")))}</p>
 </body></html>`;
   };
 
+  /* 13px picker text (default .jitox-picker-form), not value-sm */
+  const datePickerClass = "w-full min-w-0 jitox-picker-form";
+
+  /** Preview hidden: one parent grid — row2 cells line up under row1 (4× lg). Preview on: 2-col classic layout */
+  const formFieldGridClass = previewHidden
+    ? "grid min-w-0 grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2 sm:items-end lg:grid-cols-4 lg:items-end"
+    : "grid min-w-0 grid-cols-1 gap-x-2.5 gap-y-2 sm:grid-cols-2 sm:items-end";
+  const formClientAddRowClass =
+    "sm:col-span-2 grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto]";
+  const formDescriptionRowClass = previewHidden ? "sm:col-span-2 lg:col-span-4" : "sm:col-span-2";
+
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold text-dark">Create Invoice</h1>
-          <div className="flex gap-2">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-lg font-semibold text-dark dark:text-slate-100 sm:text-xl">Create Invoice</h1>
+          <div className="flex shrink-0 gap-2">
             <Button
               label={previewHidden ? "Show Preview" : "Hide Preview"}
               variant="outline"
@@ -132,6 +166,7 @@ export default function InvoiceGeneratePage() {
             <Button
               label="Review Invoice"
               variant="primary"
+              className="text-white! hover:text-white!"
               onClick={() => {
                 setPreviewHidden(false);
                 requestAnimationFrame(() => {
@@ -146,43 +181,35 @@ export default function InvoiceGeneratePage() {
           </div>
         </div>
 
-        <div className={`grid gap-4 ${previewHidden ? "grid-cols-1" : "lg:grid-cols-2"}`}>
-          <div className="bg-white border border-light-border rounded-xl p-5 shadow-sm space-y-5">
-            <div className="grid sm:grid-cols-2 gap-4">
+        <div
+          className={`grid min-w-0 gap-3 ${previewHidden ? "grid-cols-1" : "lg:grid-cols-2 lg:items-start lg:gap-4"}`}
+        >
+          <div
+            className={`jitox-invoice-form min-w-0 space-y-2.5 rounded-lg border border-light-border bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)] ${
+              previewHidden ? "px-4 py-3 sm:px-5" : "p-3"
+            }`}
+          >
+            <div className={formFieldGridClass}>
               <InputField
+                dense
                 label="Invoice Number"
+                labelClassName={INVOICE_LABEL_FIELD}
+                inputClassName={INVOICE_INPUT_TEXT}
                 value={invoiceNo}
                 onChange={(e) => setInvoiceNo(e.target.value)}
               />
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-dark">Issue Date</label>
-                <DatePicker className="w-full" value={issueDate} onChange={setIssueDate} />
-              </div>
-              <div className="sm:col-span-2 flex flex-wrap gap-2 items-end">
-                <div className="flex-1 min-w-[12rem]">
-                  <CommonDropdown
-                    label="Client Name"
-                    addNavigateTo="/dashboard/account"
-                    placeholder="Select client"
-                    value={client}
-                    onChange={setClient}
-                    options={clientOptions}
-                  />
-                </div>
-                <Button
-                  label="Add customer"
-                  {...mergePageAddOutlineButton({ className: "mb-0.5" })}
-                  onClick={() => {
-                    const name = window.prompt("Customer name");
-                    if (!name?.trim()) return;
-                    const t = name.trim();
-                    setExtraClients((prev) => [...prev, { value: t, label: t }]);
-                    setClient(t);
-                    toast.success("Customer added");
-                  }}
+              <div className="flex min-w-0 flex-col">
+                <label className={INVOICE_LABEL_STATIC}>Issue Date</label>
+                <DatePicker
+                  className={datePickerClass}
+                  format="DD MMM YYYY"
+                  allowClear={false}
+                  value={issueDate?.isValid?.() ? issueDate : dayjs()}
+                  onChange={(d) => setIssueDate(d && d.isValid() ? d : dayjs())}
                 />
               </div>
               <CommonDropdown
+                formCompact
                 label="Payment Mode"
                 addNavigateTo="/dashboard/account"
                 value={paymentMode}
@@ -193,141 +220,276 @@ export default function InvoiceGeneratePage() {
                   { value: "Cash", label: "Cash" },
                 ]}
               />
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-dark">Due Date</label>
-                <DatePicker className="w-full" />
+              <div className="flex min-w-0 flex-col">
+                <label className={INVOICE_LABEL_STATIC}>Due Date</label>
+                <DatePicker
+                  className={datePickerClass}
+                  format="DD MMM YYYY"
+                  allowClear={false}
+                  value={dueDate?.isValid?.() ? dueDate : dayjs()}
+                  onChange={(d) => setDueDate(d && d.isValid() ? d : dayjs())}
+                />
               </div>
+              {previewHidden ? (
+                <>
+                  <div className="min-w-0">
+                    <CommonDropdown
+                      formCompact
+                      label="Client Name"
+                      addNavigateTo="/dashboard/account"
+                      placeholder="Select client"
+                      value={client}
+                      onChange={setClient}
+                      options={clientOptions}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col justify-end">
+                    <Button
+                      label="Add customer"
+                      {...mergePageAddOutlineButton({
+                        className:
+                          "w-full justify-center lg:w-auto lg:shrink-0 !h-9 !min-h-9 !max-h-9 !px-3 !py-0 !text-sm !gap-1.5 [&_svg]:!h-4 [&_svg]:!w-4",
+                      })}
+                      onClick={() => {
+                        const name = window.prompt("Customer name");
+                        if (!name?.trim()) return;
+                        const t = name.trim();
+                        setExtraClients((prev) => [...prev, { value: t, label: t }]);
+                        setClient(t);
+                        toast.success("Customer added");
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <InputField
+                      dense
+                      label="Reference of the Invoice"
+                      labelClassName={INVOICE_LABEL_FIELD}
+                      inputClassName={INVOICE_INPUT_TEXT}
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col">
+                    <label className={INVOICE_LABEL_STATIC}>Payment Status</label>
+                    <div className="flex h-9 min-h-9 max-h-9 items-center rounded-md border border-light-border bg-slate-100 px-2.5 text-[13px] leading-snug text-slate-700 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200">
+                      Pending
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className={formClientAddRowClass}>
+                    <div className="min-w-0">
+                      <CommonDropdown
+                        formCompact
+                        label="Client Name"
+                        addNavigateTo="/dashboard/account"
+                        placeholder="Select client"
+                        value={client}
+                        onChange={setClient}
+                        options={clientOptions}
+                      />
+                    </div>
+                    <Button
+                      label="Add customer"
+                      {...mergePageAddOutlineButton({
+                        className:
+                          "w-full justify-center sm:w-auto !h-9 !min-h-9 !max-h-9 !px-3 !py-0 !text-sm !gap-1.5 [&_svg]:!h-4 [&_svg]:!w-4",
+                      })}
+                      onClick={() => {
+                        const name = window.prompt("Customer name");
+                        if (!name?.trim()) return;
+                        const t = name.trim();
+                        setExtraClients((prev) => [...prev, { value: t, label: t }]);
+                        setClient(t);
+                        toast.success("Customer added");
+                      }}
+                    />
+                  </div>
+                  <InputField
+                    dense
+                    label="Reference of the Invoice"
+                    labelClassName={INVOICE_LABEL_FIELD}
+                    inputClassName={INVOICE_INPUT_TEXT}
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                  />
+                  <div className="flex min-w-0 flex-col">
+                    <label className={INVOICE_LABEL_STATIC}>Payment Status</label>
+                    <div className="flex h-9 min-h-9 max-h-9 items-center rounded-md border border-light-border bg-slate-100 px-2.5 text-[13px] leading-snug text-slate-700 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200">
+                      Pending
+                    </div>
+                  </div>
+                </>
+              )}
               <InputField
-                label="Reference of the Invoice"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-              />
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-dark">Payment Status</label>
-                <div className="px-3 py-2 rounded-lg border border-light-border bg-gray-100 text-sm text-light">
-                  Pending
-                </div>
-              </div>
-              <InputField
+                dense
                 label="Description"
+                labelClassName={INVOICE_LABEL_FIELD}
                 multiline
-                rows={3}
+                rows={2}
+                inputClassName={`min-h-[4.25rem] resize-y ${INVOICE_INPUT_TEXT}`}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="sm:col-span-2"
+                className={formDescriptionRowClass}
               />
             </div>
 
-            <div>
-              <div className="text-sm font-medium text-dark mb-2">VAT Application</div>
-              <div className="flex gap-4">
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={vatYes}
-                    onChange={() => setVatYes(true)}
-                    className="accent-primary"
+            <div className="overflow-hidden rounded-lg border border-light-border bg-white dark:border-slate-600 dark:bg-slate-950/40">
+              <div className="flex min-w-0 flex-col gap-2 border-b border-light-border bg-slate-50 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-800/50 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
+                <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <span className="shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    VAT application
+                  </span>
+                  <div className="flex shrink-0 items-center gap-4 sm:gap-5">
+                    <label className="inline-flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={vatYes}
+                        onChange={() => setVatYes(true)}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100">Yes</span>
+                    </label>
+                    <label className="inline-flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={!vatYes}
+                        onChange={() => setVatYes(false)}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100">No</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="flex w-full shrink-0 justify-end sm:ml-auto sm:w-auto sm:pl-2">
+                  <Button
+                    label="Add product line"
+                    {...mergePageAddOutlineButton({
+                      className:
+                        "w-full justify-center sm:w-auto sm:justify-center !h-9 !min-h-9 !max-h-9 !px-3 !py-0 !text-sm !font-semibold !gap-1.5 [&_svg]:!h-4 [&_svg]:!w-4",
+                    })}
+                    onClick={() =>
+                      setLines([...lines, { name: "", qty: 0, rate: 0, subtotal: 0 }])
+                    }
                   />
-                  <span className="text-sm">Yes</span>
-                </label>
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={!vatYes}
-                    onChange={() => setVatYes(false)}
-                    className="accent-primary"
-                  />
-                  <span className="text-sm">No</span>
-                </label>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <Button
-                label="Add product line"
-                {...mergePageAddOutlineButton({ className: "mb-3" })}
-                onClick={() =>
-                  setLines([...lines, { name: "", qty: 0, rate: 0, subtotal: 0 }])
-                }
-              />
-              <div className="border border-light-border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-headBg">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Product Name</th>
-                      <th className="px-3 py-2">QTY</th>
-                      <th className="px-3 py-2">Rate (₹)</th>
-                      <th className="px-3 py-2">Subtotal (₹)</th>
+              <div className="overflow-x-auto dark:bg-slate-950/30">
+              <table className="w-full min-w-[560px] table-fixed border-collapse text-sm">
+                <colgroup>
+                  <col style={{ width: "46%", minWidth: "12rem" }} />
+                  <col style={{ width: "12%", minWidth: "3.25rem" }} />
+                  <col style={{ width: "22%", minWidth: "7rem" }} />
+                  <col style={{ width: "20%", minWidth: "6.5rem" }} />
+                </colgroup>
+                <thead className="bg-headBg">
+                  <tr className="border-b border-light-border dark:border-slate-600">
+                    <th className="px-3 py-2.5 text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      Product name
+                    </th>
+                    <th className="px-2 py-2.5 text-center text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      Qty
+                    </th>
+                    <th className="px-2 py-2.5 text-center text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      Rate (₹)
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      Subtotal (₹)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((row, idx) => (
+                    <tr key={idx} className="border-t border-light-border dark:border-slate-600">
+                      <td className="px-3 py-2 align-middle">
+                        <input
+                          className="w-full min-w-0 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-900 shadow-sm outline-none ring-0 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-500 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-primary"
+                          placeholder="Product description"
+                          value={row.name}
+                          onChange={(e) => recalcLine({ ...row, name: e.target.value }, idx)}
+                        />
+                      </td>
+                      <td className="px-2 py-2 align-middle">
+                        <input
+                          type="number"
+                          className="invoice-num-input w-full min-w-0 rounded-md border border-slate-200 bg-white px-1.5 py-2 text-center text-sm tabular-nums text-slate-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-500 dark:bg-slate-900 dark:text-slate-100"
+                          value={row.qty}
+                          onChange={(e) => recalcLine({ ...row, qty: e.target.value }, idx)}
+                        />
+                      </td>
+                      <td className="px-2 py-2 align-middle">
+                        <input
+                          type="number"
+                          className="invoice-num-input w-full min-w-0 rounded-md border border-slate-200 bg-white px-1.5 py-2 text-center text-sm tabular-nums text-slate-900 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-500 dark:bg-slate-900 dark:text-slate-100"
+                          value={row.rate}
+                          onChange={(e) => recalcLine({ ...row, rate: e.target.value }, idx)}
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right align-middle text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                        ₹{(row.subtotal || 0).toLocaleString("en-IN")}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {lines.map((row, idx) => (
-                      <tr key={idx} className="border-t border-light-border">
-                        <td className="px-2 py-2">
-                          <input
-                            className="w-full border border-light-border rounded px-2 py-1 text-sm"
-                            value={row.name}
-                            onChange={(e) => recalcLine({ ...row, name: e.target.value }, idx)}
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          <input
-                            type="number"
-                            className="w-full border border-light-border rounded px-2 py-1 text-sm text-center"
-                            value={row.qty}
-                            onChange={(e) => recalcLine({ ...row, qty: e.target.value }, idx)}
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          <input
-                            type="number"
-                            className="w-full border border-light-border rounded px-2 py-1 text-sm text-center"
-                            value={row.rate}
-                            onChange={(e) => recalcLine({ ...row, rate: e.target.value }, idx)}
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium">
-                          ₹{(row.subtotal || 0).toLocaleString("en-IN")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  ))}
+                </tbody>
+              </table>
               </div>
-              <div className="flex justify-end mt-3 text-sm space-y-1">
-                <div className="w-56 space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-light">Subtotal</span>
-                    <span>₹{subtotal.toLocaleString("en-IN")}</span>
+
+              <div className="border-t-2 border-light-border bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-900/80">
+                <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Amount summary
+                </p>
+                <div className="w-full space-y-2 text-sm tabular-nums">
+                  <div className="flex items-center justify-between gap-6 border-b border-slate-200/90 pb-2 dark:border-slate-600/90">
+                    <span className="text-slate-600 dark:text-slate-300">Subtotal</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      ₹{subtotal.toLocaleString("en-IN")}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-light">Tax ({taxPct}%)</span>
-                    <span>₹{tax.toLocaleString("en-IN")}</span>
+                  <div className="flex items-center justify-between gap-6 border-b border-slate-200/90 pb-2 dark:border-slate-600/90">
+                    <span className="text-slate-600 dark:text-slate-300">Tax ({taxPct}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      ₹{tax.toLocaleString("en-IN")}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-light">Discount</span>
-                    <span>₹{discount.toLocaleString("en-IN")}</span>
+                  <div className="flex items-center justify-between gap-6 border-b border-slate-200/90 pb-2 dark:border-slate-600/90">
+                    <span className="text-slate-600 dark:text-slate-300">Discount</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      ₹{discount.toLocaleString("en-IN")}
+                    </span>
                   </div>
-                  <div className="flex justify-between font-bold pt-1 border-t border-light-border">
-                    <span>Final Payable</span>
-                    <span>₹{finalPayable.toLocaleString("en-IN")}</span>
+                  <div className="flex items-center justify-between gap-6 pt-1">
+                    <span className="text-base font-bold text-slate-900 dark:text-slate-50">Final payable</span>
+                    <span className="text-base font-bold text-primary dark:text-emerald-300">
+                      ₹{finalPayable.toLocaleString("en-IN")}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button label="Cancel" variant="outline" onClick={() => navigate(-1)} />
+            <div className="flex flex-col gap-2 border-t border-light-border pt-3 dark:border-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
+              <Button
+                label="Cancel"
+                variant="outline"
+                className="min-h-11 w-full justify-center px-4 text-sm font-semibold sm:min-h-9 sm:w-auto sm:shrink-0"
+                onClick={() => navigate(-1)}
+              />
               <Button
                 label="Save as Draft"
                 variant="outline"
+                className="min-h-11 w-full justify-center px-4 text-sm font-semibold sm:min-h-9 sm:w-auto sm:shrink-0"
                 onClick={() => {
                   try {
                     localStorage.setItem(
                       INVOICE_DRAFT_KEY,
                       JSON.stringify({
                         invoiceNo,
-                        issueDate: issueDate?.format?.("YYYY-MM-DD"),
+                        issueDate:
+                          issueDate?.isValid?.() ? issueDate.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
+                        dueDate: dueDate?.isValid?.() ? dueDate.format("YYYY-MM-DD") : "",
                         client,
                         paymentMode,
                         reference,
@@ -345,14 +507,16 @@ export default function InvoiceGeneratePage() {
               <Button
                 label="Download"
                 variant="primary"
-                onClick={() => {
-                  downloadHtmlFile(
-                    `invoice-${String(invoiceNo).replace(/#/g, "")}.html`,
-                    buildInvoiceDownloadHtml()
-                  );
-                  toast.success(
-                    "Invoice downloaded (.html). Open the file and use Print → Save as PDF for a PDF copy."
-                  );
+                className="min-h-11 w-full justify-center px-5 text-sm font-semibold text-white! hover:text-white! sm:min-h-9 sm:w-auto sm:shrink-0"
+                onClick={async () => {
+                  const base = `invoice-${String(invoiceNo).replace(/#/g, "")}`;
+                  try {
+                    await downloadHtmlDocumentAsPdf(buildInvoiceDownloadHtml(), `${base}.pdf`);
+                    toast.success("Invoice downloaded as PDF.");
+                  } catch (err) {
+                    console.error(err);
+                    toast.error("Could not generate PDF. Run npm install in Jetox-dashboard, then try again.");
+                  }
                 }}
               />
             </div>
@@ -361,66 +525,86 @@ export default function InvoiceGeneratePage() {
           {!previewHidden && (
             <div
               ref={previewRef}
-              className="bg-white border border-light-border rounded-xl p-4 shadow-sm text-sm"
+              className="min-w-0 rounded-xl border border-light-border bg-white p-3 text-sm text-slate-800 shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)] sm:p-4"
             >
-              <div className="font-bold text-lg text-primary mb-1">Jitox Agro</div>
-              <p className="text-light text-xs mb-4">Sample address — Surat, Gujarat</p>
-              <div className="flex justify-between border-b border-light-border pb-3 mb-3">
-                <div>
-                  <div className="text-xs text-light">Invoice No</div>
-                  <div className="font-semibold">{invoiceNo}</div>
+              <div className="mb-0.5 text-base font-bold text-primary sm:text-lg dark:text-emerald-400">
+                Jitox Agro
+              </div>
+              <p className="mb-2 text-xs text-light dark:text-slate-400">Sample address — Surat, Gujarat</p>
+              <div className="mb-2 flex justify-between gap-3 border-b border-light-border pb-2 dark:border-slate-600">
+                <div className="min-w-0">
+                  <div className="text-[11px] text-light dark:text-slate-400">Invoice No</div>
+                  <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{invoiceNo}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs text-light">Date</div>
-                  <div>{issueDate?.format?.("DD MMM YYYY")}</div>
+                <div className="shrink-0 text-right">
+                  <div className="text-[11px] text-light dark:text-slate-400">Date</div>
+                  <div className="text-sm tabular-nums text-slate-900 dark:text-slate-100">
+                    {formatInvoiceDate(issueDate)}
+                  </div>
                 </div>
               </div>
-              <div className="mb-4">
-                <div className="text-xs font-semibold text-light uppercase mb-1">Billed to</div>
-                <div className="font-medium">{client}</div>
-                <div className="text-light text-xs mt-1">Surat, Gujarat · +91-9876543210</div>
+              <div className="mb-2">
+                <div className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-light dark:text-slate-400">
+                  Billed to
+                </div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{client}</div>
+                <div className="mt-0.5 text-[11px] text-light dark:text-slate-400">
+                  Surat, Gujarat · +91-9876543210
+                </div>
               </div>
-              <table className="w-full text-xs mb-4">
+              <table className="mb-2 w-full text-[11px] text-slate-800 sm:text-xs dark:text-slate-200">
                 <thead>
-                  <tr className="border-b border-light-border text-left">
-                    <th className="py-2">Item</th>
-                    <th className="py-2 text-center">Qty</th>
-                    <th className="py-2 text-right">Rate</th>
-                    <th className="py-2 text-right">Amount</th>
+                  <tr className="border-b border-light-border text-left dark:border-slate-600">
+                    <th className="py-1.5 text-slate-600 dark:text-slate-400">Item</th>
+                    <th className="py-1.5 text-center text-slate-600 dark:text-slate-400">Qty</th>
+                    <th className="py-1.5 text-right text-slate-600 dark:text-slate-400">Rate</th>
+                    <th className="py-1.5 text-right text-slate-600 dark:text-slate-400">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {lines.map((l, i) => (
-                    <tr key={i} className="border-b border-light-border/60">
-                      <td className="py-2">{l.name || "—"}</td>
-                      <td className="py-2 text-center">{l.qty}</td>
-                      <td className="py-2 text-right">₹{l.rate}</td>
-                      <td className="py-2 text-right">₹{(l.subtotal || 0).toLocaleString("en-IN")}</td>
+                    <tr key={i} className="border-b border-light-border/60 dark:border-slate-600/80">
+                      <td className="py-1.5">{l.name || "—"}</td>
+                      <td className="py-1.5 text-center tabular-nums">{l.qty}</td>
+                      <td className="py-1.5 text-right tabular-nums">₹{l.rate}</td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        ₹{(l.subtotal || 0).toLocaleString("en-IN")}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <div className="text-right space-y-1 text-xs">
-                <div className="flex justify-end gap-4">
-                  <span className="text-light">Subtotal</span>
-                  <span>₹{subtotal.toLocaleString("en-IN")}</span>
+              <div className="space-y-0.5 text-right text-[11px] text-slate-800 sm:text-xs dark:text-slate-200">
+                <div className="flex justify-end gap-3">
+                  <span className="text-light dark:text-slate-400">Subtotal</span>
+                  <span className="w-20 tabular-nums text-slate-900 dark:text-slate-100">
+                    ₹{subtotal.toLocaleString("en-IN")}
+                  </span>
                 </div>
-                <div className="flex justify-end gap-4">
-                  <span className="text-light">Tax</span>
-                  <span>₹{tax.toLocaleString("en-IN")}</span>
+                <div className="flex justify-end gap-3">
+                  <span className="text-light dark:text-slate-400">Tax</span>
+                  <span className="w-20 tabular-nums text-slate-900 dark:text-slate-100">
+                    ₹{tax.toLocaleString("en-IN")}
+                  </span>
                 </div>
-                <div className="flex justify-end gap-4">
-                  <span className="text-light">Discount</span>
-                  <span>₹{discount.toLocaleString("en-IN")}</span>
+                <div className="flex justify-end gap-3">
+                  <span className="text-light dark:text-slate-400">Discount</span>
+                  <span className="w-20 tabular-nums text-slate-900 dark:text-slate-100">
+                    ₹{discount.toLocaleString("en-IN")}
+                  </span>
                 </div>
-                <div className="flex justify-end gap-4 font-bold pt-1">
+                <div className="flex justify-end gap-3 pt-0.5 font-bold text-slate-900 dark:text-slate-50">
                   <span>Final Payable</span>
-                  <span>₹{finalPayable.toLocaleString("en-IN")}</span>
+                  <span className="w-20 tabular-nums text-primary dark:text-emerald-400">
+                    ₹{finalPayable.toLocaleString("en-IN")}
+                  </span>
                 </div>
               </div>
-              <p className="text-[11px] text-light mt-6">
-                Please pay within 15 days of receiving this invoice.
-              </p>
+              <footer className="mt-4 border-t border-light-border pt-3 dark:border-slate-600">
+                <p className="mx-auto max-w-md text-center text-xs italic leading-relaxed text-slate-600 dark:text-slate-400">
+                  Please pay within 15 days of receiving this invoice.
+                </p>
+              </footer>
             </div>
           )}
         </div>

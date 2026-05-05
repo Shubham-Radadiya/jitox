@@ -70,7 +70,7 @@ export default defineConfig(({ mode }) => {
       seoFilesPlugin(siteUrl),
     ],
     optimizeDeps: {
-      include: ["redux-thunk"],
+      include: ["redux-thunk", "html2canvas", "jspdf"],
     },
     build: {
       rollupOptions: {

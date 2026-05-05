@@ -19,6 +19,11 @@ const ROLE_OPTIONS = [
   { label: "User", value: "user" },
 ];
 
+/** In `.dark`, `text-dark` resolves to a light color meant for page chrome — illegible on white cards. */
+const CARD =
+  "p-4 rounded-xl border border-light-border bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]";
+const CARD_TITLE = "text-sm font-semibold text-slate-900 dark:text-slate-100";
+
 function mapRoleToApi(value) {
   const v = (value || "user").toLowerCase();
   if (v === "admin") return "Admin";
@@ -202,7 +207,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
   };
 
   return (
-    <CommonModal open={open} onClose={onClose} title="Edit Details" width="1000px">
+    <CommonModal open={open} onClose={onClose} title="Edit Details" width="min(720px, 94vw)">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col items-center">
           <input
@@ -221,7 +226,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-gray-400">
+                <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-slate-400 dark:text-slate-500">
                   {form.name?.charAt(0) || "U"}
                 </div>
               )}
@@ -229,17 +234,16 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-1 right-1 bg-primary p-1.5 rounded-full text-white border-2 border-white hover:bg-primary/90 shadow-md"
+              className="absolute bottom-0.5 right-0.5 bg-primary p-1 rounded-full text-white border-2 border-white hover:bg-primary/90 shadow-md"
+              title="Change photo"
             >
-              <Edit2 size={12} />
+              <Edit2 size={11} strokeWidth={2.25} />
             </button>
           </div>
         </div>
 
-        <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
-          <div className="text-sm font-semibold text-dark mb-4">
-            Basic Information
-          </div>
+        <div className={CARD}>
+          <div className={`${CARD_TITLE} mb-4`}>Basic Information</div>
           <div className="grid grid-cols-3 gap-4">
             <div className="flex flex-col gap-1">
               <InputField
@@ -280,11 +284,11 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
               options={ROLE_OPTIONS}
             />
             <div className="flex flex-col">
-              <label className="mb-1 text-xs font-medium text-dark">
+              <label className="mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200">
                 Joining Date
               </label>
               <DatePicker
-                className="w-full px-3 py-2 border border-light-border rounded-lg text-sm"
+                className="w-full jitox-picker-form text-[13px]!"
                 value={form.joiningDate}
                 onChange={(d) => setForm({ ...form, joiningDate: d })}
               />
@@ -311,8 +315,8 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
             />
           </div>
 
-          <div className="mt-6 pt-4 border-t border-light-border">
-            <div className="text-sm font-semibold text-dark mb-2">Address</div>
+          <div className="mt-6 border-t border-light-border pt-4 dark:border-slate-600">
+            <div className={`${CARD_TITLE} mb-2`}>Address</div>
             <AddressForm
               value={address}
               onChange={(patch) => setAddress((p) => ({ ...p, ...patch }))}
@@ -322,19 +326,17 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
         </div>
 
         {!isAdminRole && (
-          <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
-            <div className="text-sm font-semibold text-dark mb-2">
-              Module access
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+          <div className={CARD}>
+            <div className={`${CARD_TITLE} mb-2`}>Module access</div>
+            <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
               {MODULE_ACCESS_OPTIONS.map(({ key, label }) => (
                 <label
                   key={key}
-                  className="flex items-center gap-2 text-xs text-dark cursor-pointer"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80"
                 >
                   <input
                     type="checkbox"
-                    className="accent-primary rounded"
+                    className="h-3.5 w-3.5 shrink-0 rounded border-slate-400 text-primary focus:ring-2 focus:ring-primary/30 dark:border-slate-500 dark:bg-slate-900"
                     checked={selectedPerms.has(key)}
                     onChange={() => togglePerm(key)}
                   />
@@ -345,10 +347,8 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
           </div>
         )}
 
-        <div className="p-4 rounded-xl border border-light-border bg-white shadow-sm">
-          <div className="text-sm font-semibold text-dark mb-2">
-            New password (optional)
-          </div>
+        <div className={CARD}>
+          <div className={`${CARD_TITLE} mb-2`}>New password (optional)</div>
           <div className="grid grid-cols-2 gap-4">
             <InputField
               label="Password"
@@ -373,20 +373,21 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
           )}
         </div>
 
-        <div className="flex justify-end gap-3 mt-4">
+        <div className="flex justify-end gap-2 mt-3">
           <Button
             label="Cancel"
             variant="outline"
+            size="sm"
             onClick={onClose}
-            className="px-12 py-3 rounded-xl"
             disabled={saving}
           />
           <Button
             label={saving ? "Saving…" : "Save"}
             variant="primary"
+            size="sm"
             onClick={handleSave}
-            className="px-16 py-3 rounded-xl"
             disabled={saving}
+            className="text-white! hover:text-white! disabled:border-transparent! disabled:bg-primary/85! disabled:text-white!"
           />
         </div>
       </div>

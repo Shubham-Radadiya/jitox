@@ -251,7 +251,7 @@ const LedgerTable = () => {
           width="520px"
         >
           {viewRow && (
-            <dl className="space-y-2 text-sm">
+            <dl className="mb-0 space-y-2 text-sm">
               {Object.entries(viewRow).map(([k, v]) => (
                 <div
                   key={k}

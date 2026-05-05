@@ -451,7 +451,7 @@ const AccountIndex = () => {
           ]}
         >
           {accountDetailRow ? (
-            <dl className="space-y-2 text-sm">
+            <dl className="mb-0 space-y-2 text-sm">
               {[
                 "Party Name",
                 "Contact Person",

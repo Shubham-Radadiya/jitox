@@ -205,6 +205,8 @@ export const DateRangePicker = ({
   value,
   onChange,
   className = "",
+  /** Merged onto the Ant `RangePicker` root (e.g. `jitox-picker-range-dense`) */
+  pickerClassName = "",
   placeholder = ["Start Date", "End Date"],
   /** Match filter toolbar height (h-9) */
   filterBar = false,
@@ -232,7 +234,7 @@ export const DateRangePicker = ({
         }
       }}
       placeholder={placeholder}
-      className={`w-full ${filterBar ? "jitox-picker-compact" : ""}`}
+      className={["w-full", filterBar ? "jitox-picker-compact" : "", pickerClassName].filter(Boolean).join(" ")}
     />
   </div>
 );

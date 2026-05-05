@@ -59,19 +59,24 @@ function safeDownloadBasename(title) {
 
 /**
  * Full standalone HTML document (print-friendly). Same shell for download + print window.
+ * @param {{ bodyFontSizePx?: number, h1FontSizePx?: number, bodyPaddingPx?: number, tableCellPaddingPx?: number }} [opts]
  */
-export function buildStandalonePrintableHtml(title, bodyInnerHtml) {
+export function buildStandalonePrintableHtml(title, bodyInnerHtml, opts = {}) {
+  const bodyPx = opts.bodyFontSizePx ?? 14;
+  const h1Px = opts.h1FontSizePx ?? 18;
+  const padPx = opts.bodyPaddingPx ?? 20;
+  const cellPadPx = opts.tableCellPaddingPx ?? 8;
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title>
 <style>
   @media print {
     body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   }
-  body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:20px;color:#111;font-size:14px;line-height:1.45;}
+  body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:${padPx}px;color:#111;font-size:${bodyPx}px;line-height:1.45;}
   table{border-collapse:collapse;width:100%;margin-top:12px;}
-  th,td{border:1px solid #ddd;padding:8px;text-align:left;vertical-align:top;}
+  th,td{border:1px solid #ddd;padding:${cellPadPx}px;text-align:left;vertical-align:top;}
   th{background:#f8fafc;font-weight:600;}
-  h1{font-size:18px;margin:0 0 12px;color:#0f766e;}
+  h1{font-size:${h1Px}px;margin:0 0 12px;color:#0f766e;}
 </style></head><body>
 <h1>${escapeHtml(title)}</h1>
 ${bodyInnerHtml}
@@ -92,6 +97,113 @@ export function downloadHtmlFile(filename, fullHtmlDocument) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Render a full HTML document string to a PDF and trigger download (client-side).
+ * Uses html2canvas + jsPDF (avoids html2pdf.js v0.10 bundler / interop issues under Vite).
+ *
+ * @param {string} fullHtmlDocument complete <!DOCTYPE html>… document
+ * @param {string} filename e.g. "invoice-AB01.pdf"
+ * @returns {Promise<void>}
+ */
+export async function downloadHtmlDocumentAsPdf(fullHtmlDocument, filename = "document.pdf") {
+  const safeName = (filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`).replace(
+    /[/\\?%*:|"<>]/g,
+    "-"
+  );
+
+  const [html2canvasModule, jspdfModule] = await Promise.all([
+    import("html2canvas"),
+    import("jspdf"),
+  ]);
+  const html2canvas = html2canvasModule.default ?? html2canvasModule;
+  const JsPDF = jspdfModule.jsPDF ?? jspdfModule.default?.jsPDF ?? jspdfModule.default;
+  if (typeof html2canvas !== "function" || typeof JsPDF !== "function") {
+    throw new Error("PDF dependencies failed to load (html2canvas or jsPDF).");
+  }
+
+  /**
+   * Render inside a real iframe document so <head> styles apply to <body> (moving nodes
+   * into a div breaks `body { … }` rules and near-zero opacity often yields a blank canvas).
+   */
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.title = "pdf-export";
+  iframe.style.cssText =
+    "position:absolute;left:-9999px;top:0;width:800px;height:400px;border:0;margin:0;padding:0;opacity:1;pointer-events:none;overflow:hidden;";
+  document.body.appendChild(iframe);
+
+  const frameDoc = iframe.contentDocument;
+  if (!frameDoc) {
+    iframe.remove();
+    throw new Error("PDF export iframe has no document (browser blocked?).");
+  }
+
+  frameDoc.open();
+  frameDoc.write(fullHtmlDocument);
+  frameDoc.close();
+
+  const captureRoot = frameDoc.body;
+  if (!captureRoot || !captureRoot.textContent?.trim()) {
+    iframe.remove();
+    throw new Error("Invoice HTML is empty or could not be parsed for PDF.");
+  }
+
+  try {
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+    await new Promise((r) => setTimeout(r, 80));
+
+    const docEl = frameDoc.documentElement;
+    if (docEl) {
+      docEl.style.height = "auto";
+      docEl.style.minHeight = "0";
+    }
+    captureRoot.style.minHeight = "0";
+
+    const contentH = Math.max(captureRoot.scrollHeight, captureRoot.getBoundingClientRect().height);
+    iframe.style.height = `${Math.ceil(contentH + 2)}px`;
+
+    await new Promise((r) => requestAnimationFrame(r));
+
+    const canvas = await html2canvas(captureRoot, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      foreignObjectRendering: false,
+    });
+
+    if (!canvas.width || !canvas.height) {
+      throw new Error("PDF capture produced an empty image (0×0).");
+    }
+
+    const imgData = canvas.toDataURL("image/jpeg", 0.92);
+    const pdf = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    /** Tight PDF margins (mm) */
+    const margin = 5;
+    const innerH = pageH - 2 * margin;
+    const imgW = pageW - 2 * margin;
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    /** Only add extra pages when content truly exceeds one page (avoids blank trailing pages from rounding / extra canvas pixels). */
+    const pageMmEps = 0.75;
+    const pagesNeeded = Math.max(1, Math.ceil((imgH - pageMmEps) / innerH));
+
+    for (let i = 0; i < pagesNeeded; i++) {
+      if (i > 0) pdf.addPage();
+      const y = margin - i * innerH;
+      pdf.addImage(imgData, "JPEG", margin, y, imgW, imgH);
+    }
+
+    pdf.save(safeName);
+  } finally {
+    iframe.remove();
+  }
 }
 
 /**

@@ -80,10 +80,10 @@ export function getCellTextAlign(columnKey) {
 }
 
 const TABLE_FOOTER_TD_BASE_DEFAULT =
-  `px-3 py-2.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-gray-900 dark:bg-slate-800/80 dark:text-slate-100`;
+  `px-2.5 py-2 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-gray-900 dark:bg-slate-800/80 dark:text-slate-100`;
 
 const TABLE_FOOTER_TD_BASE_HEAD =
-  `px-3 py-2.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-dark dark:bg-slate-800/80 dark:text-slate-100`;
+  `px-2.5 py-2 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-dark dark:bg-slate-800/80 dark:text-slate-100`;
 
 /**
  * Consistent `<tfoot>` cell styling; alignment follows {@link getTableCellAlignClass}.
@@ -178,7 +178,7 @@ function denseOrderThBase(columnKey) {
   const shrink =
     columnKey === "Actions" || columnKey === "Action" ? "" : "min-w-0";
   return [
-    "px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
+    "px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
     TABLE_CELL_BORDER,
     "bg-slate-100 dark:bg-slate-800/90",
     "sticky top-0 z-20",
@@ -199,7 +199,7 @@ function denseOrderTdBase(columnKey) {
       ? ""
       : "min-w-0 overflow-hidden";
   return [
-    "px-2 py-2.5 text-sm leading-snug align-middle text-slate-800 dark:text-slate-100",
+    "px-2 py-2 text-sm leading-snug align-middle text-slate-800 dark:text-slate-100",
     TABLE_CELL_BORDER,
     "transition-colors duration-150",
     getTableCellAlignClass(columnKey),
@@ -237,7 +237,7 @@ export function reportOrderTdClasses(columnKey) {
 /** <th> classes: hierarchy + alignment */
 export function tableThClasses(columnKey) {
   return [
-    "px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
+    "px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
     TABLE_CELL_BORDER,
     "bg-slate-100 dark:bg-slate-800/90",
     getTableCellAlignClass(columnKey),
@@ -247,13 +247,13 @@ export function tableThClasses(columnKey) {
 
 /** Default <td> for data cells (non-badge) */
 export function tableTdClasses(columnKey, { dense = false } = {}) {
-  const py = dense ? "py-2" : "py-2.5";
+  const py = dense ? "py-1.5" : "py-2";
   const nowrap =
     columnKey === "Actions" || columnKey === "Action" ? " whitespace-nowrap" : "";
   const clip =
     columnKey === "Actions" || columnKey === "Action" ? "" : "min-w-0";
   return [
-    "px-3 text-sm align-middle text-slate-800 leading-snug dark:text-slate-100",
+    "px-2.5 text-sm align-middle text-slate-800 leading-snug dark:text-slate-100",
     py,
     TABLE_CELL_BORDER,
     "transition-colors duration-150",
@@ -334,15 +334,15 @@ export const STATUS_CELL_INNER_DENSE =
 
 /** Horizontal cluster for order / voucher action icons (never stack vertically). */
 export const TABLE_ACTIONS_ROW =
-  "inline-flex flex-nowrap items-center justify-center gap-2";
+  "inline-flex max-w-full flex-nowrap items-center justify-center gap-1.5 sm:gap-2";
 
 export const TABLE_ACTIONS_ROW_DENSE =
-  "inline-flex max-w-full flex-nowrap items-center justify-center gap-1.5";
+  "inline-flex max-w-full flex-nowrap items-center justify-center gap-1 sm:gap-1.5";
 
-/** Icon button in Actions column (32px) */
+/** Icon button in Actions column — compact on xs so a full row stays on one line. */
 export const TABLE_ACTION_ICON_BTN =
-  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-500/60 bg-transparent text-slate-700 text-sm transition-colors duration-150 hover:border-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-500/70 dark:bg-transparent dark:text-slate-200 dark:hover:border-emerald-400/70 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300 [&_svg]:opacity-100";
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-500/60 bg-transparent text-slate-700 text-sm transition-colors duration-150 hover:border-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-500/70 dark:bg-transparent dark:text-slate-200 dark:hover:border-emerald-400/70 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300 sm:h-8 sm:w-8 [&_svg]:opacity-100 [&_svg]:max-h-[16px] [&_svg]:max-w-[16px] sm:[&_svg]:max-h-[18px] sm:[&_svg]:max-w-[18px]";
 
-/** Order table action icons (28px; fits four + gaps inside fixed Actions column). */
+/** Order table action icons — tighter on small screens for fixed Actions column. */
 export const TABLE_ACTION_ICON_BTN_DENSE =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-500/60 bg-transparent text-slate-700 text-sm transition-colors duration-150 hover:border-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-500/70 dark:bg-transparent dark:text-slate-200 dark:hover:border-emerald-400/70 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300 [&_svg]:opacity-100";
+  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-500/60 bg-transparent text-slate-700 text-sm transition-colors duration-150 hover:border-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-500/70 dark:bg-transparent dark:text-slate-200 dark:hover:border-emerald-400/70 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300 sm:h-7 sm:w-7 [&_svg]:opacity-100 [&_svg]:max-h-[14px] [&_svg]:max-w-[14px] sm:[&_svg]:max-h-[16px] sm:[&_svg]:max-w-[16px]";

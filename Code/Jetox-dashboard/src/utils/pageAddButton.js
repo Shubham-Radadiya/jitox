@@ -11,8 +11,13 @@ const SIZE_CLASS =
 const PRIMARY_EXTRA =
   "!text-white shadow-sm ring-1 ring-white/20 hover:brightness-110 active:brightness-95 dark:!text-white dark:ring-white/15 dark:hover:brightness-110";
 
+/**
+ * Do not set `hover:bg-*` / `hover:text-*` here — Tailwind layer order can let them beat `Button`
+ * `outline`’s `hover:bg-primary hover:!text-white`, which produced **white label on pale grey**.
+ * Only tweak default (non-hover) colors; hover stays the shared outline = green fill + white text.
+ */
 const OUTLINE_EXTRA =
-  "border-light-border text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800/80";
+  "text-slate-800 dark:border-slate-600 dark:text-slate-100";
 
 /**
  * Primary green Add (list / master toolbars).

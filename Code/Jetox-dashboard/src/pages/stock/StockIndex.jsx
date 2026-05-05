@@ -1,7 +1,11 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import DataTable from "../../components/ui/table/DataTable";
-import { tableFooterTdClasses } from "../../utils/tableUi";
+import {
+  TABLE_CELL_BORDER,
+  tableFooterTdClasses,
+  tableTdClasses,
+} from "../../utils/tableUi";
 import { mergePageAddButton } from "../../utils/pageAddButton";
 import { CommonDropdown, Button } from "../../components/ui/CommanUI";
 import { ChevronDown, ChevronRight, Eye } from "lucide-react";
@@ -120,6 +124,9 @@ const StockIndex = () => {
     return groups.reduce((sum, g) => sum + parseInrLike(g.value), 0);
   }, [groups]);
 
+  const stockTableFooterTop =
+    "border-t-2 border-t-slate-200 dark:border-t-slate-600";
+
   const renderProductTableFooter = useCallback((displayedRows = []) => {
     if (!displayedRows.length) return null;
     const fmt = (n) =>
@@ -131,33 +138,53 @@ const StockIndex = () => {
       value += parseInrLike(r.Value);
     });
     return (
-      <tfoot className="sticky bottom-0 z-[1] border-t-2 border-gray-200 bg-gray-50 dark:border-slate-600 dark:bg-slate-800/95">
+      <tfoot className="sticky bottom-0 z-[1] bg-gray-50 dark:bg-slate-800/95">
         <tr>
           {productColumns.map((col) => {
-            const fc = (extra = "") =>
-              `${tableFooterTdClasses(col, { alignClass: "text-center tabular-nums" })} ${extra}`.trim();
             if (col === "Product") {
               return (
-                <td key={col} className={fc()}>
+                <td
+                  key={col}
+                  className={tableFooterTdClasses(col, {
+                    extra: stockTableFooterTop,
+                  })}
+                >
                   Total
                 </td>
               );
             }
             if (col === "Qty") {
               return (
-                <td key={col} className={fc()}>
+                <td
+                  key={col}
+                  className={tableFooterTdClasses(col, {
+                    extra: `${stockTableFooterTop} font-bold`,
+                  })}
+                >
                   {qty.toLocaleString("en-IN")}
                 </td>
               );
             }
             if (col === "Value") {
               return (
-                <td key={col} className={fc()}>
+                <td
+                  key={col}
+                  className={tableFooterTdClasses(col, {
+                    extra: `${stockTableFooterTop} font-bold`,
+                  })}
+                >
                   {fmt(value)}
                 </td>
               );
             }
-            return <td key={col} className={fc()} />;
+            return (
+              <td
+                key={col}
+                className={tableFooterTdClasses(col, {
+                  extra: stockTableFooterTop,
+                })}
+              />
+            );
           })}
         </tr>
       </tfoot>
@@ -180,7 +207,7 @@ const StockIndex = () => {
   const renderProductCell = (key, value) => {
     if (key === "Status") {
       return (
-        <td key={key} className="px-4 py-3 text-center">
+        <td key={key} className={tableTdClasses("Status")}>
           <span
             className={`px-3 py-1 rounded-lg text-sm font-medium ${getStatusStyle(
               value
@@ -192,7 +219,10 @@ const StockIndex = () => {
       );
     }
     return (
-      <td key={key} className="px-4 py-3 text-light">
+      <td
+        key={key}
+        className={`${tableTdClasses(key)} text-light dark:text-slate-300`}
+      >
         {value}
       </td>
     );
@@ -309,16 +339,36 @@ const StockIndex = () => {
               </div>
             </div>
 
-            <div className="border border-light-border rounded-xl overflow-hidden">
-              <table className="w-full text-sm text-center">
+            <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
+              <table className="w-full border-collapse text-sm text-center">
                 <thead className="bg-headBg">
                   <tr>
-                    <th className="px-3 py-3 w-10" />
-                    <th className="px-3 py-3 text-left">Group Name</th>
-                    <th className="px-3 py-3">Qty</th>
-                    <th className="px-3 py-3">Rate</th>
-                    <th className="px-3 py-3">Value</th>
-                    <th className="px-3 py-3 w-24">Status</th>
+                    <th className={`px-3 py-3 w-10 ${TABLE_CELL_BORDER}`} />
+                    <th
+                      className={`px-3 py-3 text-left ${TABLE_CELL_BORDER} text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200`}
+                    >
+                      Group Name
+                    </th>
+                    <th
+                      className={`px-3 py-3 ${TABLE_CELL_BORDER} text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200`}
+                    >
+                      Qty
+                    </th>
+                    <th
+                      className={`px-3 py-3 ${TABLE_CELL_BORDER} text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200`}
+                    >
+                      Rate
+                    </th>
+                    <th
+                      className={`px-3 py-3 ${TABLE_CELL_BORDER} text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200`}
+                    >
+                      Value
+                    </th>
+                    <th
+                      className={`px-3 py-3 w-24 ${TABLE_CELL_BORDER} text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200`}
+                    >
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -327,8 +377,8 @@ const StockIndex = () => {
                     const nCat = cats.length;
                     return (
                       <React.Fragment key={g.id}>
-                        <tr className="border-t border-light-border bg-white hover:bg-gray-50 dark:bg-slate-900 dark:hover:bg-slate-800/80">
-                          <td className="px-3 py-3">
+                        <tr className="bg-white hover:bg-gray-50 dark:bg-slate-900 dark:hover:bg-slate-800/80">
+                          <td className={`px-3 py-3 ${TABLE_CELL_BORDER}`}>
                             <button
                               type="button"
                               onClick={() => toggleGroup(g.id)}
@@ -341,7 +391,7 @@ const StockIndex = () => {
                               )}
                             </button>
                           </td>
-                          <td className="px-3 py-3 text-left">
+                          <td className={`px-3 py-3 text-left ${TABLE_CELL_BORDER}`}>
                             <span className="font-medium text-dark inline-flex items-center gap-2 flex-wrap">
                               {g.groupName}
                               <span className="text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 rounded leading-none">
@@ -349,10 +399,12 @@ const StockIndex = () => {
                               </span>
                             </span>
                           </td>
-                          <td className="text-light">—</td>
-                          <td className="text-light">—</td>
-                          <td className="text-dark font-medium">{g.value}</td>
-                          <td>
+                          <td className={`text-light ${TABLE_CELL_BORDER}`}>—</td>
+                          <td className={`text-light ${TABLE_CELL_BORDER}`}>—</td>
+                          <td className={`text-dark font-medium ${TABLE_CELL_BORDER}`}>
+                            {g.value}
+                          </td>
+                          <td className={TABLE_CELL_BORDER}>
                             <button
                               type="button"
                               className="inline-flex text-blue-500 hover:text-blue-700"
@@ -365,11 +417,11 @@ const StockIndex = () => {
                         </tr>
                         {expanded.has(g.id) && (
                           <>
-                            <tr className="bg-[#f8fafc] border-t border-light-border/80 dark:bg-slate-800/50">
-                              <td />
+                            <tr className="bg-[#f8fafc] dark:bg-slate-800/50">
+                              <td className={TABLE_CELL_BORDER} />
                               <td
                                 colSpan={5}
-                                className="py-2 pl-6 text-left text-xs font-bold text-primary tracking-wide"
+                                className={`py-2 pl-6 text-left text-xs font-bold text-primary tracking-wide ${TABLE_CELL_BORDER}`}
                               >
                                 Category Wise ({nCat})
                               </td>
@@ -381,9 +433,9 @@ const StockIndex = () => {
                               const catOpen = expandedCats.has(ckey);
                               return (
                                 <React.Fragment key={c.id}>
-                                  <tr className="bg-rowBg/80 border-t border-light-border/60">
-                                    <td />
-                                    <td className="px-3 py-2 text-left pl-8">
+                                  <tr className="bg-rowBg/80">
+                                    <td className={TABLE_CELL_BORDER} />
+                                    <td className={`px-3 py-2 text-left pl-8 ${TABLE_CELL_BORDER}`}>
                                       {hasProducts ? (
                                         <button
                                           type="button"
@@ -403,18 +455,18 @@ const StockIndex = () => {
                                         </span>
                                       )}
                                     </td>
-                                    <td>{c.qty ?? "—"}</td>
-                                    <td>—</td>
-                                    <td>{c.value}</td>
-                                    <td />
+                                    <td className={TABLE_CELL_BORDER}>{c.qty ?? "—"}</td>
+                                    <td className={TABLE_CELL_BORDER}>—</td>
+                                    <td className={TABLE_CELL_BORDER}>{c.value}</td>
+                                    <td className={TABLE_CELL_BORDER} />
                                   </tr>
                                   {catOpen && hasProducts && (
                                     <>
                                       <tr className="bg-gray-50 dark:bg-slate-800/60">
-                                        <td />
+                                        <td className={TABLE_CELL_BORDER} />
                                         <td
                                           colSpan={5}
-                                          className="py-1.5 pl-12 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+                                          className={`py-1.5 pl-12 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide ${TABLE_CELL_BORDER}`}
                                         >
                                           Product List ({prods.length})
                                         </td>
@@ -422,16 +474,24 @@ const StockIndex = () => {
                                       {prods.map((p, i) => (
                                         <tr
                                           key={i}
-                                          className="bg-white border-t border-light-border/60 dark:bg-slate-900/90"
+                                          className="bg-white dark:bg-slate-900/90"
                                         >
-                                          <td />
-                                          <td className="px-3 py-2 text-left pl-14 text-xs text-dark">
+                                          <td className={TABLE_CELL_BORDER} />
+                                          <td
+                                            className={`px-3 py-2 text-left pl-14 text-xs text-dark ${TABLE_CELL_BORDER}`}
+                                          >
                                             {p.productName}
                                           </td>
-                                          <td className="text-xs">{p.closingQty}</td>
-                                          <td className="text-xs">{p.rate}</td>
-                                          <td className="text-xs">{p.value}</td>
-                                          <td>
+                                          <td className={`text-xs ${TABLE_CELL_BORDER}`}>
+                                            {p.closingQty}
+                                          </td>
+                                          <td className={`text-xs ${TABLE_CELL_BORDER}`}>
+                                            {p.rate}
+                                          </td>
+                                          <td className={`text-xs ${TABLE_CELL_BORDER}`}>
+                                            {p.value}
+                                          </td>
+                                          <td className={TABLE_CELL_BORDER}>
                                             <span
                                               className={`text-xs px-2 py-0.5 rounded-md inline-block ${getStatusStyle(
                                                 p.status
@@ -454,19 +514,31 @@ const StockIndex = () => {
                   })}
                 </tbody>
                 {!loading && groups.length > 0 && (
-                  <tfoot className="bg-gray-50 border-t-2 border-light-border dark:bg-slate-800/95 dark:border-slate-600">
+                  <tfoot className="bg-gray-50 dark:bg-slate-800/95">
                     <tr>
-                      <td />
-                      <td className="px-3 py-3 text-left text-sm font-semibold text-dark dark:text-slate-100">
+                      <td className={`${TABLE_CELL_BORDER} ${stockTableFooterTop}`} />
+                      <td
+                        className={`px-3 py-3 text-left text-sm font-semibold text-dark dark:text-slate-100 ${TABLE_CELL_BORDER} ${stockTableFooterTop}`}
+                      >
                         Grand total
                       </td>
-                      <td className="px-3 py-3 text-sm text-light">—</td>
-                      <td className="px-3 py-3 text-sm text-light">—</td>
-                      <td className="px-3 py-3 text-sm font-semibold text-dark tabular-nums dark:text-slate-100">
+                      <td
+                        className={`px-3 py-3 text-sm text-light ${TABLE_CELL_BORDER} ${stockTableFooterTop}`}
+                      >
+                        —
+                      </td>
+                      <td
+                        className={`px-3 py-3 text-sm text-light ${TABLE_CELL_BORDER} ${stockTableFooterTop}`}
+                      >
+                        —
+                      </td>
+                      <td
+                        className={`px-3 py-3 text-sm font-semibold text-dark tabular-nums dark:text-slate-100 ${TABLE_CELL_BORDER} ${stockTableFooterTop}`}
+                      >
                         ₹
                         {Math.round(stockGroupGrandTotal).toLocaleString("en-IN")}
                       </td>
-                      <td />
+                      <td className={`${TABLE_CELL_BORDER} ${stockTableFooterTop}`} />
                     </tr>
                   </tfoot>
                 )}

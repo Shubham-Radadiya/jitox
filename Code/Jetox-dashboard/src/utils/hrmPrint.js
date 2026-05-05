@@ -1,4 +1,8 @@
-import { escapeHtml } from "./printAndExport";
+import {
+  escapeHtml,
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
+} from "./printAndExport";
 
 export function formatInr(n) {
   const x = Number(n);
@@ -33,4 +37,16 @@ ${rows(slip.deductions)}
 <tr><td><strong>Net salary</strong></td><td style="text-align:right"><strong>${formatInr(slip.netSalary)}</strong></td></tr>
 </table>
 <p style="font-size:12px;color:#666">Period: ${escapeHtml(ym)}</p>`;
+}
+
+/**
+ * Build the slip HTML shell and download a client-side PDF (html2canvas + jsPDF).
+ * @param {object} slip slip row including `employeeId` when available
+ * @returns {Promise<void>}
+ */
+export async function downloadSalarySlipPdf(slip) {
+  const ym = slip?.yearMonth || "slip";
+  const title = `Salary-slip-${ym}`;
+  const full = buildStandalonePrintableHtml(title, buildSalarySlipBody(slip));
+  await downloadHtmlDocumentAsPdf(full, `${title}.pdf`);
 }

@@ -8,7 +8,11 @@ import { IoEyeOutline } from "react-icons/io5";
 import { CreditCard } from "lucide-react";
 import PayNowModal from "./PayNowModal";
 import { dashboardUiService } from "../../services/dashboardUi.service";
-import { TABLE_ACTION_ICON_BTN, tableFooterTdClasses } from "../../utils/tableUi";
+import {
+  TABLE_ACTION_ICON_BTN,
+  tableFooterTdClasses,
+  tableTdClasses,
+} from "../../utils/tableUi";
 import toast from "react-hot-toast";
 
 const PayableIndex = () => {
@@ -70,10 +74,7 @@ const PayableIndex = () => {
   const renderRowCell = (key, value, row) => {
     if (key === "Status") {
       return (
-        <td
-          key={key}
-          className="px-3 py-2.5 text-center align-middle border-b border-gray-200 dark:border-slate-700"
-        >
+        <td key={key} className={tableTdClasses("Status")}>
           <span
             className={`px-3 py-1 rounded-md text-xs font-medium inline-flex ${statusClass(
               value
@@ -88,8 +89,8 @@ const PayableIndex = () => {
     return (
       <td
         key={key}
-        className={`px-3 py-2.5 align-middle border-b border-gray-200 text-sm text-gray-800 dark:border-slate-700 dark:text-slate-200 ${
-          isAmount ? "text-right tabular-nums" : "text-left text-gray-600 dark:text-slate-300"
+        className={`${tableTdClasses(key)} ${
+          isAmount ? "" : "text-gray-600 dark:text-slate-300"
         }`}
       >
         {value ?? "—"}
@@ -100,13 +101,15 @@ const PayableIndex = () => {
   const renderAction = (row) => {
     if (row.Status === "Paid") {
       return (
-        <td className="px-3 py-2.5 text-center text-gray-400 border-b border-gray-200 align-middle dark:border-slate-700 dark:text-slate-500">
+        <td
+          className={`${tableTdClasses("Action")} text-gray-400 dark:text-slate-500`}
+        >
           —
         </td>
       );
     }
     return (
-      <td className="px-3 py-2.5 align-middle border-b border-gray-200 dark:border-slate-700">
+      <td className={tableTdClasses("Action")}>
         <div className="flex items-center justify-center gap-2">
           <button
             type="button"
@@ -140,13 +143,21 @@ const PayableIndex = () => {
       const n = Number(String(r["Amount (₹)"] ?? "").replace(/,/g, ""));
       return acc + (Number.isFinite(n) ? n : 0);
     }, 0);
+    const footerTop =
+      "border-t-2 border-t-slate-200 dark:border-t-slate-600";
     return (
-      <tfoot className="sticky bottom-0 z-20 border-t border-light-border bg-headBg dark:border-slate-700 dark:bg-slate-800">
+      <tfoot className="sticky bottom-0 z-20 bg-headBg dark:bg-slate-800">
         <tr>
           {columns.map((col) => {
             if (col === "Voucher No") {
               return (
-                <td key={col} className={tableFooterTdClasses(col, { variant: "head" })}>
+                <td
+                  key={col}
+                  className={tableFooterTdClasses(col, {
+                    variant: "head",
+                    extra: footerTop,
+                  })}
+                >
                   Total
                 </td>
               );
@@ -158,6 +169,7 @@ const PayableIndex = () => {
                   className={tableFooterTdClasses(col, {
                     variant: "head",
                     alignClass: "text-right font-normal",
+                    extra: footerTop,
                   })}
                 >
                   Total Payables (₹)
@@ -170,14 +182,22 @@ const PayableIndex = () => {
                   key={col}
                   className={tableFooterTdClasses(col, {
                     variant: "head",
-                    extra: "font-bold",
+                    extra: `${footerTop} font-bold`,
                   })}
                 >
                   ₹{sum.toLocaleString("en-IN")}
                 </td>
               );
             }
-            return <td key={col} className={tableFooterTdClasses(col, { variant: "head" })} />;
+            return (
+              <td
+                key={col}
+                className={tableFooterTdClasses(col, {
+                  variant: "head",
+                  extra: footerTop,
+                })}
+              />
+            );
           })}
         </tr>
       </tfoot>
@@ -225,7 +245,7 @@ const PayableIndex = () => {
           width="480px"
         >
           {viewRow && (
-            <dl className="space-y-2 text-sm">
+            <dl className="mb-0 space-y-2 text-sm">
               {columns
                 .filter((c) => c !== "Action")
                 .map((col) => (

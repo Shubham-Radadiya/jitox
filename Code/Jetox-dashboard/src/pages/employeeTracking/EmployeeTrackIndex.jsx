@@ -13,7 +13,12 @@ import { dashboardUiApi } from "../../services/api";
 import { EmployeeTrackingMap } from "../../components/employee/EmployeeTrackingMap";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { escapeHtml, printHtmlDocument } from "../../utils/printAndExport";
+import {
+  escapeHtml,
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
+} from "../../utils/printAndExport";
+import { TABLE_CELL_BORDER } from "../../utils/tableUi";
 
 function EmployeeListSidebar({ employees, selectedId, onSelect, search, onSearch }) {
   const filtered = useMemo(() => {
@@ -27,23 +32,23 @@ function EmployeeListSidebar({ employees, selectedId, onSelect, search, onSearch
   }, [employees, search]);
 
   return (
-    <div className="flex flex-col min-h-0 h-full max-h-[42vh] lg:max-h-none border-b lg:border-b-0 lg:border-r border-light-border bg-white dark:border-slate-700 dark:bg-slate-900 lg:w-[15.5rem] shrink-0">
-      <div className="shrink-0 border-b border-light-border px-3 py-3 dark:border-slate-700">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-          <div className="text-xs font-semibold text-dark sm:w-[7.25rem] shrink-0 leading-tight">
+    <div className="flex h-full max-h-[42vh] min-h-0 shrink-0 flex-col border-b border-slate-200/70 bg-white/85 backdrop-blur-md dark:border-slate-600/45 dark:bg-slate-900/50 lg:max-h-none lg:min-w-[16rem] lg:w-[min(100%,18rem)] lg:rounded-l-xl lg:border-b-0 lg:border-r lg:shadow-[inset_-1px_0_0_rgba(15,23,42,0.06)] dark:lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
+      <div className="shrink-0 border-b border-slate-200/60 bg-gradient-to-b from-slate-50/90 to-white/60 px-3 py-3 backdrop-blur-sm dark:border-slate-600/40 dark:from-slate-800/50 dark:to-slate-900/30">
+        <div className="flex flex-col gap-2">
+          <div className="text-sm font-semibold leading-tight tracking-tight text-slate-800 dark:text-slate-100">
             Employee List
           </div>
-          <div className="flex gap-2 items-center flex-1 min-w-0">
+          <div className="flex w-full min-w-0 items-center gap-2">
             <SearchBar
               placeholder="Search user"
-              className="flex-1 min-w-0"
+              className="min-w-0 flex-1"
               dense
               value={search}
               onChange={onSearch}
             />
             <button
               type="button"
-              className="shrink-0 h-9 w-9 bg-white border border-light-border rounded-lg flex items-center justify-center text-light hover:text-dark dark:bg-slate-800 dark:border-slate-600 dark:text-slate-400 dark:hover:text-slate-100"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200/80 bg-white/90 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-600/60 dark:bg-slate-800/80 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:bg-slate-700/80 dark:hover:text-slate-100"
               aria-label="Filter"
               onClick={() =>
                 toast.success("Use search to filter employees by name or department.")
@@ -54,16 +59,16 @@ function EmployeeListSidebar({ employees, selectedId, onSelect, search, onSearch
           </div>
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain divide-y divide-light-border dark:divide-slate-700">
+      <div className="min-h-0 flex-1 divide-y divide-slate-200/60 overflow-y-auto overscroll-contain dark:divide-slate-700/70">
         {filtered.map((emp) => (
           <button
             key={emp.id}
             type="button"
             onClick={() => onSelect(emp)}
-            className={`w-full text-left flex justify-between items-center gap-3 py-2 px-3 transition border-l-4 ${
+            className={`flex w-full items-center justify-between gap-3 border-l-[3px] px-3 py-2.5 text-left transition-colors ${
               selectedId === emp.id
-                ? "bg-primary/10 border-l-primary dark:bg-primary/20"
-                : "hover:bg-rowBg border-l-transparent dark:hover:bg-slate-800"
+                ? "border-l-primary bg-emerald-50/70 dark:border-l-emerald-400 dark:bg-emerald-950/35"
+                : "border-l-transparent hover:bg-slate-50/90 dark:hover:bg-slate-800/55"
             }`}
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -80,20 +85,20 @@ function EmployeeListSidebar({ employees, selectedId, onSelect, search, onSearch
                 height={32}
               />
               <div className="min-w-0 text-left">
-                <div className="text-dark text-xs font-semibold truncate">
+                <div className="truncate text-[11px] font-semibold text-slate-800 dark:text-slate-100">
                   {emp.name}
                 </div>
-                <div className="text-[11px] text-light truncate">{emp.department}</div>
+                <div className="truncate text-[10px] text-slate-500 dark:text-slate-400">{emp.department}</div>
               </div>
             </div>
-            <span className="flex items-center gap-0.5 text-[11px] text-light shrink-0">
+            <span className="flex shrink-0 items-center gap-0.5 text-[10px] text-slate-500 dark:text-slate-400">
               {emp.time}
               <MdNavigateNext className="opacity-50" size={16} />
             </span>
           </button>
         ))}
         {filtered.length === 0 && (
-          <div className="p-4 text-xs text-light text-center leading-relaxed">
+          <div className="p-4 text-center text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
             No matches
           </div>
         )}
@@ -113,23 +118,33 @@ function VisitTable({ visits }) {
     <span className="block min-w-0 whitespace-nowrap">{text ?? "—"}</span>
   );
   return (
-    <div className="w-full min-w-0 overflow-x-auto rounded-md border border-light-border bg-white dark:border-slate-700 dark:bg-slate-900">
-      <table className="w-full min-w-full table-auto border-collapse text-xs">
+    <div className="w-full min-w-0 overflow-x-auto rounded-lg border border-slate-200/70 bg-white/90 shadow-sm backdrop-blur-sm dark:border-slate-600/50 dark:bg-slate-900/60">
+      <table className="w-full min-w-full table-auto border-collapse text-[11px]">
         <thead>
-          <tr className="text-left text-light border-b border-light-border bg-headBg/80 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-            <th className="w-[11%] px-3 py-2.5 align-middle font-medium text-left">
+          <tr className="bg-slate-50/90 text-left text-slate-600 dark:bg-slate-800/80 dark:text-slate-300">
+            <th
+              className={`w-[11%] px-2 py-2 align-middle text-left font-medium ${TABLE_CELL_BORDER}`}
+            >
               Time
             </th>
-            <th className="w-[22%] px-3 py-2.5 align-middle font-medium text-left">
+            <th
+              className={`w-[22%] px-2 py-2 align-middle text-left font-medium ${TABLE_CELL_BORDER}`}
+            >
               Party / Visit Name
             </th>
-            <th className="w-[16%] px-3 py-2.5 align-middle font-medium text-left whitespace-nowrap">
+            <th
+              className={`w-[16%] whitespace-nowrap px-2 py-2 align-middle text-left font-medium ${TABLE_CELL_BORDER}`}
+            >
               From previous stop
             </th>
-            <th className="w-[12%] px-3 py-2.5 align-middle font-medium text-left">
+            <th
+              className={`w-[12%] px-2 py-2 align-middle text-left font-medium ${TABLE_CELL_BORDER}`}
+            >
               Duration
             </th>
-            <th className="w-[39%] px-3 py-2.5 align-middle font-medium text-left">
+            <th
+              className={`w-[39%] px-2 py-2 align-middle text-left font-medium ${TABLE_CELL_BORDER}`}
+            >
               Address
             </th>
           </tr>
@@ -138,15 +153,33 @@ function VisitTable({ visits }) {
           {visits.map((v, i) => (
             <tr
               key={i}
-              className="border-b border-light-border/50 transition-colors duration-200 last:border-0 hover:bg-emerald-50/40 dark:border-slate-700/60 dark:hover:bg-slate-800/80"
+              className="transition-colors duration-200 hover:bg-emerald-50/40 dark:hover:bg-slate-800/80"
             >
-              <td className="px-3 py-2.5 align-middle text-dark dark:text-slate-100">{cell(v.time)}</td>
-              <td className="px-3 py-2.5 align-middle text-dark dark:text-slate-100">{cell(v.partyName)}</td>
-              <td className="px-3 py-2.5 align-middle text-dark tabular-nums dark:text-slate-100">
+              <td
+                className={`px-2 py-2 align-middle text-dark dark:text-slate-100 ${TABLE_CELL_BORDER}`}
+              >
+                {cell(v.time)}
+              </td>
+              <td
+                className={`px-2 py-2 align-middle text-dark dark:text-slate-100 ${TABLE_CELL_BORDER}`}
+              >
+                {cell(v.partyName)}
+              </td>
+              <td
+                className={`px-2 py-2 align-middle text-dark tabular-nums dark:text-slate-100 ${TABLE_CELL_BORDER}`}
+              >
                 {cell(formatLegKm(v))}
               </td>
-              <td className="px-3 py-2.5 align-middle text-light dark:text-slate-400">{cell(v.duration)}</td>
-              <td className="px-3 py-2.5 align-middle text-light dark:text-slate-400">{cell(v.address)}</td>
+              <td
+                className={`px-2 py-2 align-middle text-light dark:text-slate-400 ${TABLE_CELL_BORDER}`}
+              >
+                {cell(v.duration)}
+              </td>
+              <td
+                className={`px-2 py-2 align-middle text-light dark:text-slate-400 ${TABLE_CELL_BORDER}`}
+              >
+                {cell(v.address)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -159,23 +192,23 @@ function DayDetailExpansion({ row }) {
   const visits = row._visits || [];
   const hasVisits = visits.length > 0;
   return (
-    <div className="border-l-4 border-primary bg-primary/[0.06] px-4 py-3 space-y-3 dark:border-emerald-500 dark:bg-emerald-950/20">
-      <div className="text-xs font-semibold text-dark dark:text-slate-100">
+    <div className="space-y-3 border-l-[3px] border-primary bg-gradient-to-r from-emerald-50/80 to-white/40 px-4 py-3 dark:border-emerald-500 dark:from-emerald-950/30 dark:to-slate-900/40">
+      <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-100">
         Day detail · {row.Date}
       </div>
       {hasVisits ? (
         <div className="space-y-1">
           <VisitTable visits={visits} />
-          <p className="text-[10px] text-light leading-snug">
+          <p className="text-[10px] leading-snug text-slate-500 dark:text-slate-400">
             From previous stop: straight-line distance (km) between consecutive visit GPS points.
           </p>
         </div>
       ) : (
-        <p className="text-xs text-light py-1">No stop-level visits for this day.</p>
+        <p className="py-1 text-[11px] text-slate-500 dark:text-slate-400">No stop-level visits for this day.</p>
       )}
       {hasVisits && row._mapTrack?.path?.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-light font-medium">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Live route tracking
           </div>
           <EmployeeTrackingMap mapTrack={row._mapTrack} />
@@ -203,10 +236,13 @@ function EmployeeDetailPanel({
     if (key === "arrow") {
       const open = expandedDate === row.dateIso;
       return (
-        <td key={key} className="px-3 py-2 text-light w-12 dark:text-slate-400">
+        <td
+          key={key}
+          className={`w-12 px-2.5 py-2 align-middle text-center text-slate-400 dark:text-slate-500 ${TABLE_CELL_BORDER}`}
+        >
           <button
             type="button"
-            className="p-2 rounded-md hover:bg-rowBg text-light hover:text-dark inline-flex items-center justify-center dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            className="inline-flex items-center justify-center rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-700/80 dark:hover:text-slate-100"
             aria-expanded={open}
             onClick={() => onToggleRow(row.dateIso)}
           >
@@ -219,24 +255,26 @@ function EmployeeDetailPanel({
   };
 
   return (
-    <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-white border border-light-border rounded-lg overflow-hidden shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-md">
-      <div className="shrink-0 flex items-center justify-between gap-4 border-b border-light-border px-4 py-3 min-h-12 dark:border-slate-700">
-        <div className="text-dark text-sm font-semibold truncate dark:text-slate-100">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/70 bg-white/85 shadow-sm backdrop-blur-md dark:border-slate-600/50 dark:bg-slate-900/55 dark:shadow-lg dark:shadow-black/15">
+      <div className="flex min-h-12 shrink-0 items-center justify-between gap-4 border-b border-slate-200/60 bg-gradient-to-r from-slate-50/95 via-white/80 to-slate-50/70 px-4 py-3 dark:border-slate-600/45 dark:from-slate-900/70 dark:via-slate-800/50 dark:to-slate-900/60">
+        <div className="truncate text-sm font-semibold tracking-tight text-slate-800 dark:text-slate-100">
           Employee Monthly Tracking
         </div>
-        <div className="flex gap-1.5 shrink-0">
+        <div className="flex shrink-0 gap-0.5 rounded-lg border border-slate-200/70 bg-white/90 p-0.5 shadow-sm dark:border-slate-600/55 dark:bg-slate-800/70">
           <button
             type="button"
-            className="h-8 w-8 flex items-center justify-center border border-light-border rounded-md text-red-600 hover:bg-rowBg dark:border-slate-600 dark:text-red-400 dark:hover:bg-slate-800"
-            aria-label="Export PDF"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+            aria-label="Download PDF"
+            title="Download PDF"
             onClick={onExportPdf}
           >
             <BsFillFileEarmarkPdfFill size={16} />
           </button>
           <button
             type="button"
-            className="h-8 w-8 flex items-center justify-center border border-light-border rounded-md text-light hover:bg-rowBg dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
-            aria-label="Export CSV"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700/80"
+            aria-label="Download CSV"
+            title="Download CSV"
             onClick={onExportCsv}
           >
             <FaFileCsv size={16} />
@@ -244,8 +282,8 @@ function EmployeeDetailPanel({
         </div>
       </div>
 
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 py-3 border-b border-light-border bg-rowBg/40 dark:border-slate-700 dark:bg-slate-800/50">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex shrink-0 flex-col gap-4 border-b border-slate-200/55 bg-slate-50/50 px-4 py-3 backdrop-blur-sm dark:border-slate-600/40 dark:bg-slate-800/35 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2.5">
           <img
             src={Avatar}
             alt={
@@ -253,37 +291,37 @@ function EmployeeDetailPanel({
                 ? `${selected.name} — selected employee`
                 : "Selected employee"
             }
-            className="w-8 h-8 rounded-full shrink-0"
-            width={32}
-            height={32}
+            className="h-9 w-9 shrink-0 rounded-full ring-2 ring-white shadow-sm dark:ring-slate-700"
+            width={36}
+            height={36}
           />
           <div className="min-w-0">
-            <div className="text-dark text-sm font-semibold truncate leading-tight">
+            <div className="truncate text-xs font-semibold leading-tight text-slate-800 dark:text-slate-100">
               {selected?.name}
             </div>
-            <div className="text-[11px] text-light truncate">{selected?.department}</div>
+            <div className="truncate text-[10px] text-slate-500 dark:text-slate-400">{selected?.department}</div>
           </div>
         </div>
-        <div className="flex flex-wrap items-end gap-2 sm:justify-end">
-          <span className="text-xs text-light shrink-0 leading-[2.25rem] sm:leading-none sm:pb-2">
-            Date
-          </span>
+        <div className="flex w-full min-w-0 flex-nowrap items-center justify-end gap-2 overflow-x-auto sm:w-auto sm:overflow-visible">
+          <span className="shrink-0 text-[11px] font-medium text-slate-500 dark:text-slate-400">Date</span>
           <DateRangePicker
+            filterBar
+            pickerClassName="jitox-picker-range-dense"
             placeholder={["From", "To"]}
-            className="w-full sm:w-[16.5rem] shrink-0 [&_.ant-picker]:py-1"
+            className="w-[11.75rem] shrink-0"
             value={dateRange}
             onChange={onDateRangeChange}
           />
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto overscroll-contain">
-        <table className="w-full min-w-full table-auto border-collapse text-sm">
-          <thead className="sticky top-0 z-[2]">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain">
+        <table className="w-full min-w-full table-auto border-collapse text-xs [&_td]:text-xs!">
+          <thead className="sticky top-0 z-2 bg-slate-100/95 shadow-[0_1px_0_rgba(15,23,42,0.06)] backdrop-blur-sm dark:bg-slate-800/95 dark:shadow-[0_1px_0_rgba(255,255,255,0.06)]">
             <tr>
               {dataColumns.map((col) =>
                 col === "arrow" ? (
-                  <th key={col} className="px-3 py-2 w-10" />
+                  <th key={col} className="w-10 px-2.5 py-2" />
                 ) : (
                   tableHeader(col)
                 )
@@ -297,17 +335,20 @@ function EmployeeDetailPanel({
                 return (
                   <React.Fragment key={row.dateIso || idx}>
                     <tr
-                      className={`text-center align-middle border-b border-light-border/60 transition-colors duration-200 dark:border-slate-700/60 ${
+                      className={`align-middle text-center transition-colors duration-200 ${
                         idx % 2 === 0
-                          ? "bg-white dark:bg-slate-900"
-                          : "bg-rowBg dark:bg-slate-800/50"
-                      } ${expanded ? "bg-primary/[0.07] dark:bg-emerald-950/25" : ""} hover:bg-gray-50/80 dark:hover:bg-slate-800/80`}
+                          ? "bg-white/90 dark:bg-slate-900/70"
+                          : "bg-slate-50/80 dark:bg-slate-800/45"
+                      } ${expanded ? "bg-emerald-50/70 dark:bg-emerald-950/30" : ""} hover:bg-slate-100/90 dark:hover:bg-slate-800/70`}
                     >
                       {dataColumns.map((col) => renderCell(col, row[col], row))}
                     </tr>
                     {expanded && (
-                      <tr className="bg-white dark:bg-slate-900">
-                        <td colSpan={dataColumns.length} className="p-0 border-b border-light-border dark:border-slate-700">
+                      <tr className="bg-slate-50/40 dark:bg-slate-900/50">
+                        <td
+                          colSpan={dataColumns.length}
+                          className="border-b border-slate-200/60 p-0 dark:border-slate-700/60"
+                        >
                           <DayDetailExpansion row={row} />
                         </td>
                       </tr>
@@ -318,12 +359,12 @@ function EmployeeDetailPanel({
           </tbody>
         </table>
         {!loading && rows.length === 0 && (
-          <div className="p-4 text-center text-light text-sm dark:text-slate-400">
+          <div className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
             No tracking rows for this range.
           </div>
         )}
         {loading && (
-          <div className="p-4 text-center text-light text-sm dark:text-slate-400">Loading…</div>
+          <div className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">Loading…</div>
         )}
       </div>
     </div>
@@ -446,7 +487,7 @@ const EmployeeTrackIndex = () => {
     toast.success("CSV downloaded");
   };
 
-  const exportTrackingPdf = () => {
+  const exportTrackingPdf = async () => {
     if (!selected || !rows?.length) {
       toast.error("No tracking rows to export");
       return;
@@ -461,20 +502,33 @@ const EmployeeTrackIndex = () => {
             .join("")}</tr>`
       )
       .join("");
-    printHtmlDocument(
-      `Tracking — ${selected.name}`,
-      `<p><strong>${escapeHtml(selected.name)}</strong> · ${escapeHtml(selected.department || "")}</p><table style="border-collapse:collapse;width:100%"><thead>${headerRow}</thead><tbody>${dataRows}</tbody></table>`
-    );
-    toast.success(
-      "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
-    );
+    const periodLine =
+      dateRange?.[0] && dateRange?.[1]
+        ? `<p style="color:#666;font-size:12px;margin:0 0 10px">Period: ${escapeHtml(dateRange[0])} → ${escapeHtml(dateRange[1])}</p>`
+        : "";
+    const bodyInner = `${periodLine}<p><strong>${escapeHtml(selected.name)}</strong> · ${escapeHtml(selected.department || "")}</p><table style="border-collapse:collapse;width:100%"><thead>${headerRow}</thead><tbody>${dataRows}</tbody></table>`;
+    const title = `Employee tracking — ${selected.name}`;
+    const fullHtml = buildStandalonePrintableHtml(title, bodyInner, {
+      bodyFontSizePx: 12,
+      h1FontSizePx: 15,
+      bodyPaddingPx: 14,
+      tableCellPaddingPx: 6,
+    });
+    const base = `employee-tracking-${String(selected.name || "export").replace(/\s+/g, "-")}`;
+    try {
+      await downloadHtmlDocumentAsPdf(fullHtml, `${base}.pdf`);
+      toast.success("PDF downloaded.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not generate PDF. Try again.");
+    }
   };
 
   return (
     <DashboardLayout>
       <div className="flex flex-col lg:flex-row min-h-0 lg:h-[calc(100dvh-4.5rem)] lg:max-h-[calc(100dvh-4.5rem)] gap-0">
         {loadingList ? (
-          <div className="p-4 text-xs text-light w-full lg:w-[15.5rem] border-b lg:border-b-0 lg:border-r border-light-border shrink-0 leading-relaxed dark:border-slate-700 dark:text-slate-400">
+          <div className="w-full shrink-0 border-b border-slate-200/60 p-4 text-xs leading-relaxed text-slate-500 dark:border-slate-600/45 dark:bg-slate-900/35 dark:text-slate-400 lg:min-w-[16rem] lg:w-[min(100%,18rem)] lg:rounded-l-xl lg:border-b-0 lg:border-r lg:backdrop-blur-sm">
             Loading employees…
           </div>
         ) : (
@@ -486,7 +540,7 @@ const EmployeeTrackIndex = () => {
             onSearch={setListSearch}
           />
         )}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col pt-4 pb-4 px-4 sm:px-6 lg:px-4">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-6 lg:px-4">
           {selected ? (
             <EmployeeDetailPanel
               selected={selected}
@@ -501,7 +555,7 @@ const EmployeeTrackIndex = () => {
               onExportCsv={exportTrackingCsv}
             />
           ) : (
-            <div className="flex-1 flex items-center justify-center text-light text-sm border border-dashed border-light-border rounded-lg dark:border-slate-600 dark:text-slate-400">
+            <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-300/80 bg-slate-50/40 px-4 py-12 text-sm text-slate-500 backdrop-blur-sm dark:border-slate-600/55 dark:bg-slate-900/35 dark:text-slate-400">
               Select an employee
             </div>
           )}

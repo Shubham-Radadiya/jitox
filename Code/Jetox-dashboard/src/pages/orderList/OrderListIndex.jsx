@@ -25,6 +25,25 @@ import {
 import OrderDetailsDrawer from "./OrderDetailsDrawer";
 import InvoiceModal from "./InvoiceModal";
 
+/** Matches Product Master summary cards (gradient panel + value pill). */
+const ORDER_SUMMARY_METRIC_CARD = {
+  tone:
+    "from-emerald-100 to-teal-100 text-emerald-800 dark:from-emerald-900/50 dark:to-teal-900/40 dark:text-emerald-200",
+  cardTone:
+    "from-white to-emerald-50/90 dark:from-slate-900 dark:to-emerald-950/30",
+  borderTone: "border-emerald-200/80 dark:border-emerald-800/60",
+};
+
+function formatOrderSummaryMetricValue(label, raw, loading) {
+  if (loading) return "…";
+  if (raw == null || raw === "") return "—";
+  if (typeof raw === "string" && raw.trim().startsWith("₹")) return raw;
+  if (typeof raw === "number" && /amount|revenue/i.test(label)) {
+    return `₹${Number(raw).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  }
+  return String(raw);
+}
+
 const OrderListIndex = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("all");
@@ -57,7 +76,7 @@ const OrderListIndex = () => {
     []
   );
 
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ["dashboard", "orders", "summary"],
     queryFn: async () => {
       const { data } = await dashboardUiApi.getOrdersSummary();
@@ -301,24 +320,30 @@ const OrderListIndex = () => {
   return (
     <DashboardLayout>
       <div className="ds-stack-page min-w-0 max-w-full">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
           {[
-            { label: "Total orders", value: summary?.totalOrders },
-            { label: "Returns", value: summary?.orderReturns },
-            { label: "Order amount", value: summary?.totalOrderAmount },
-            { label: "Revenue", value: summary?.revenue },
-            { label: "Dispatched", value: summary?.orderDispatched },
+            { label: "Total orders", raw: summary?.totalOrders },
+            { label: "Returns", raw: summary?.orderReturns },
+            { label: "Order amount", raw: summary?.totalOrderAmount },
+            { label: "Revenue", raw: summary?.revenue },
+            { label: "Dispatched", raw: summary?.orderDispatched },
           ].map((s) => (
             <div
               key={s.label}
-              className="flex items-center justify-between gap-2 rounded-lg jitox-panel jitox-panel--shadow px-3 py-2.5 min-w-0"
+              className={`group relative overflow-hidden rounded-xl border bg-gradient-to-r p-3 shadow-sm transition-shadow duration-200 hover:shadow-md ${ORDER_SUMMARY_METRIC_CARD.cardTone} ${ORDER_SUMMARY_METRIC_CARD.borderTone}`}
             >
-              <span className="text-xs font-medium text-gray-500 truncate pr-1 dark:text-slate-400">
-                {s.label}
-              </span>
-              <span className="text-lg font-semibold tabular-nums text-gray-900 shrink-0 dark:text-slate-100">
-                {s.value ?? "—"}
-              </span>
+              <div className="flex min-h-9 items-center justify-between gap-3">
+                <span className="block min-w-0 flex-1 truncate text-left text-sm font-semibold leading-tight text-slate-700 dark:text-slate-200">
+                  {s.label}
+                </span>
+                <div
+                  className={`inline-flex min-w-10 max-w-[min(100%,11rem)] shrink-0 items-center justify-center rounded-md border border-white/70 bg-gradient-to-br px-3 py-1 text-sm font-bold tabular-nums shadow-sm dark:border-slate-700/70 ${ORDER_SUMMARY_METRIC_CARD.tone}`}
+                >
+                  <span className="truncate">
+                    {formatOrderSummaryMetricValue(s.label, s.raw, summaryLoading)}
+                  </span>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -329,7 +354,7 @@ const OrderListIndex = () => {
               key={t.key}
               type="button"
               onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-2 pb-2 px-0.5 text-sm transition rounded-t-md ${
+              className={`flex items-center gap-1.5 pb-2 px-0.5 text-xs transition rounded-t-md ${
                 activeTab === t.key
                   ? "text-emerald-600 font-medium border-b-2 border-emerald-600 -mb-px dark:text-emerald-400"
                   : "text-gray-600 hover:text-gray-900 border-b-2 border-transparent dark:text-slate-400 dark:hover:text-slate-200"
@@ -337,7 +362,7 @@ const OrderListIndex = () => {
             >
               {t.label}
               <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                className={`text-[11px] leading-none px-1.5 py-0.5 rounded-full font-medium tabular-nums ${
                   activeTab === t.key
                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
                     : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-300"

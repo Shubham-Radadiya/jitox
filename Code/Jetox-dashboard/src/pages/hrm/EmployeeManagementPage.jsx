@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, User } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { mergePageAddButton } from "../../utils/pageAddButton";
 import {
@@ -16,6 +16,7 @@ import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { isAdminUser } from "../../utils/authSession";
 import { useTableData } from "../../hooks/useTableData";
+import { tableTdClasses } from "../../utils/tableUi";
 
 const STATUS_OPTS = [
   { value: "", label: "All statuses" },
@@ -236,12 +237,12 @@ export default function EmployeeManagementPage() {
     if (key === "Status") {
       const active = String(value) === "Active";
       return (
-        <td key={key} className="px-4 py-3 text-sm align-middle">
+        <td key={key} className={tableTdClasses("Status")}>
           <span
-            className={`px-2 py-0.5 rounded text-xs font-medium border ${
+            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
               active
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                : "bg-slate-100 text-slate-600 border-slate-200"
+                ? "border-emerald-200/80 bg-emerald-50/90 text-emerald-800 dark:border-emerald-700/50 dark:bg-emerald-950/50 dark:text-emerald-200"
+                : "border-slate-200/80 bg-slate-100/90 text-slate-600 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-300"
             }`}
           >
             {value}
@@ -252,33 +253,42 @@ export default function EmployeeManagementPage() {
     return baseCell(key, value, row);
   };
 
+  const actionBtnBase =
+    "inline-flex size-8 shrink-0 items-center justify-center rounded-lg border shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:size-9 [&_svg]:pointer-events-none [&_svg]:size-3.5 sm:[&_svg]:size-4 [&_svg]:shrink-0";
+
   const renderEmployeeActions = (row) => (
-    <td className="px-3 py-2.5 text-sm align-middle whitespace-nowrap border-b border-gray-200">
-      <div className="flex flex-wrap items-center justify-center gap-2">
+    <td className={tableTdClasses("Actions")}>
+      <div className="flex flex-nowrap items-center justify-center gap-1 sm:gap-1.5">
         <button
           type="button"
-          className="text-xs font-medium text-primary hover:underline"
+          title="Profile"
+          aria-label="Open employee profile"
+          className={`${actionBtnBase} border-emerald-200/70 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100/90 dark:border-emerald-700/50 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/50`}
           onClick={(e) => {
             e.stopPropagation();
             navigate(`/dashboard/hrm/employees/${row._id}`);
           }}
         >
-          Profile
+          <User aria-hidden />
         </button>
         <button
           type="button"
-          className="text-xs font-medium text-dark hover:underline"
+          title="Edit"
+          aria-label="Edit employee"
+          className={`${actionBtnBase} border-slate-200/80 bg-white/90 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:bg-slate-700/80`}
           onClick={(e) => {
             e.stopPropagation();
             openEdit(row);
           }}
         >
-          Edit
+          <Pencil aria-hidden />
         </button>
         {isAdminUser() ? (
           <button
             type="button"
-            className="text-xs font-medium text-rose-600 hover:underline"
+            title="Delete"
+            aria-label="Delete employee"
+            className={`${actionBtnBase} border-rose-200/70 bg-rose-50/80 text-rose-700 hover:bg-rose-100/90 dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/45`}
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -290,7 +300,7 @@ export default function EmployeeManagementPage() {
               }
             }}
           >
-            Delete
+            <Trash2 aria-hidden />
           </button>
         ) : null}
       </div>
@@ -315,8 +325,10 @@ export default function EmployeeManagementPage() {
             HRM home
           </button>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-xl font-bold text-dark">User management</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+            User management
+          </h1>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               label="Add employee"
@@ -333,6 +345,7 @@ export default function EmployeeManagementPage() {
           renderRowCell={renderRowCell}
           renderAction={renderEmployeeActions}
           maxHeight="calc(100vh - 14rem)"
+          className="rounded-xl border-slate-200/65 bg-white/90 shadow-lg! shadow-slate-900/5! ring-0! backdrop-blur-md dark:border-slate-600/45 dark:bg-slate-900/50 dark:shadow-black/25! [&_td]:px-2.5 [&_td]:py-2 [&_th]:px-2.5 [&_th]:py-2"
         />
 
         <CommonModal
@@ -340,82 +353,120 @@ export default function EmployeeManagementPage() {
           onClose={() => setModalOpen(false)}
           title={editingId ? "Edit employee" : "Add employee"}
           width="min(560px, 96vw)"
-          footer={
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-light-border">
-              <Button label="Cancel" variant="outline" onClick={() => setModalOpen(false)} />
-              <Button
-                label={saveMutation.isPending ? "Saving…" : "Save"}
-                variant="primary"
-                onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending}
-              />
-            </div>
-          }
+          headerClassName="!px-4 sm:!px-5"
+          bodyClassName="!px-0 sm:!px-0"
+          footerClassName="!px-4 sm:!px-5"
+          footer={[
+            <Button
+              key="cancel"
+              label="Cancel"
+              variant="outline"
+              onClick={() => setModalOpen(false)}
+            />,
+            <Button
+              key="save"
+              label={saveMutation.isPending ? "Saving…" : "Save"}
+              variant="primary"
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+              className="text-white! hover:text-white! disabled:border-transparent! disabled:bg-primary/85! disabled:text-white!"
+            />,
+          ]}
         >
-          <div className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
-            <InputField
-              label="Full name"
-              name="name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              required
-            />
-            <InputField
-              label="Email"
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              required
-            />
-            <InputField
-              label="Phone"
-              name="phone"
-              value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            />
-            <InputField
-              label="Role / designation"
-              name="roleDesignation"
-              value={form.roleDesignation}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, roleDesignation: e.target.value }))
-              }
-              required
-            />
-            <InputField
-              label="Department"
-              name="department"
-              value={form.department}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, department: e.target.value }))
-              }
-              required
-            />
-            <InputField
-              label="Joining date"
-              name="joiningDate"
-              type="date"
-              value={form.joiningDate}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, joiningDate: e.target.value }))
-              }
-              required
-            />
-            <CommonDropdown
-              hideAdd
-              label="Status"
-              options={STATUS_OPTS.filter((o) => o.value)}
-              value={form.status}
-              onChange={(v) => setForm((f) => ({ ...f, status: v }))}
-            />
-            <CommonDropdown
-              label="Linked app user (optional)"
-              options={userLinkOptions}
-              value={form.linkedUserId}
-              onChange={(v) => setForm((f) => ({ ...f, linkedUserId: v }))}
-              addNavigateTo="/dashboard/user-master"
-            />
+          <div className="max-h-[70vh] space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+              <div className="min-w-0">
+                <InputField
+                  label="Full name"
+                  name="name"
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <div className="min-w-0">
+                <InputField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, email: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+              <div className="min-w-0">
+                <InputField
+                  label="Phone"
+                  name="phone"
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, phone: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="min-w-0">
+                <InputField
+                  label="Role / designation"
+                  name="roleDesignation"
+                  value={form.roleDesignation}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, roleDesignation: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+              <div className="min-w-0">
+                <InputField
+                  label="Department"
+                  name="department"
+                  value={form.department}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, department: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <div className="min-w-0">
+                <InputField
+                  label="Joining date"
+                  name="joiningDate"
+                  type="date"
+                  value={form.joiningDate}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, joiningDate: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+              <div className="min-w-0">
+                <CommonDropdown
+                  hideAdd
+                  label="Status"
+                  options={STATUS_OPTS.filter((o) => o.value)}
+                  value={form.status}
+                  onChange={(v) => setForm((f) => ({ ...f, status: v }))}
+                />
+              </div>
+              <div className="min-w-0">
+                <CommonDropdown
+                  label="Linked app user (optional)"
+                  options={userLinkOptions}
+                  value={form.linkedUserId}
+                  onChange={(v) => setForm((f) => ({ ...f, linkedUserId: v }))}
+                  addNavigateTo="/dashboard/user-master"
+                />
+              </div>
+            </div>
             <p className="text-xs font-semibold text-dark pt-2">Salary structure</p>
             <InputField
               label="Basic salary (₹)"

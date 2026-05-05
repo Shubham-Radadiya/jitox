@@ -10,7 +10,14 @@ import { dayBooksApi } from "../../services/api";
 import toast from "react-hot-toast";
 import { getApiErrorMessage, isEmptyListNotFound } from "../../utils/apiError";
 import { CommonModal, Button } from "../../components/ui/CommanUI";
-import { TABLE_ACTION_ICON_BTN, tableFooterTdClasses } from "../../utils/tableUi";
+import {
+  TABLE_ACTION_ICON_BTN,
+  tableFooterTdClasses,
+  tableTdClasses,
+} from "../../utils/tableUi";
+
+/** Light-mode icons were invisible: avoid forcing `text-slate-200` outside dark mode. */
+const DAY_BOOK_ACTION_BTN_CLASS = `${TABLE_ACTION_ICON_BTN} !bg-transparent !shadow-none !border-slate-400/90 !text-slate-700 hover:!border-emerald-500/70 hover:!bg-emerald-500/10 hover:!text-emerald-700 dark:!border-slate-500/70 dark:!text-slate-200 dark:hover:!bg-emerald-400/10 dark:hover:!text-emerald-300`;
 import { objectToHtmlTable, printHtmlDocument } from "../../utils/printAndExport";
 
 function mapDayBookRow(doc) {
@@ -115,12 +122,12 @@ const DayBookIndex = () => {
   };
 
   const renderProductActions = (row) => (
-    <td className="px-3 py-2.5 align-middle border-b border-gray-200 dark:border-slate-700">
+    <td className={tableTdClasses("Actions")}>
       <div className="flex items-center justify-center gap-2">
         <button
           type="button"
           title="View"
-          className={`${TABLE_ACTION_ICON_BTN} !bg-transparent !shadow-none !border-slate-500/70 !text-slate-200 hover:!bg-emerald-400/10 hover:!text-emerald-300`}
+          className={DAY_BOOK_ACTION_BTN_CLASS}
           onClick={(e) => {
             e.stopPropagation();
             handleView(row);
@@ -131,7 +138,7 @@ const DayBookIndex = () => {
         <button
           type="button"
           title="Edit"
-          className={`${TABLE_ACTION_ICON_BTN} !bg-transparent !shadow-none !border-slate-500/70 !text-slate-200 hover:!bg-emerald-400/10 hover:!text-emerald-300`}
+          className={DAY_BOOK_ACTION_BTN_CLASS}
           onClick={(e) => {
             e.stopPropagation();
             handleEdit(row);
@@ -142,7 +149,7 @@ const DayBookIndex = () => {
         <button
           type="button"
           title="Document"
-          className={`${TABLE_ACTION_ICON_BTN} !bg-transparent !shadow-none !border-slate-500/70 !text-slate-200 hover:!bg-emerald-400/10 hover:!text-emerald-300`}
+          className={DAY_BOOK_ACTION_BTN_CLASS}
           onClick={(e) => {
             e.stopPropagation();
             handleDocument(row);
@@ -163,32 +170,60 @@ const DayBookIndex = () => {
       const n = Number(String(row["Debit (₹)"]).replace(/,/g, ""));
       return sum + (Number.isFinite(n) ? n : 0);
     }, 0);
+    const footerTop =
+      "border-t-2 border-t-slate-200 dark:border-t-slate-600";
     return (
-      <tfoot className="sticky bottom-0 z-20 border-t border-light-border bg-headBg dark:border-slate-700">
+      <tfoot className="sticky bottom-0 z-20 bg-headBg dark:bg-slate-800">
         <tr>
           {columns.map((col) => {
             if (col === "Date") {
               return (
-                <td key={col} className={tableFooterTdClasses(col, { variant: "head" })}>
+                <td
+                  key={col}
+                  className={tableFooterTdClasses(col, {
+                    variant: "head",
+                    extra: footerTop,
+                  })}
+                >
                   Total
                 </td>
               );
             }
             if (col === "Credit (₹)") {
               return (
-                <td key={col} className={tableFooterTdClasses(col, { variant: "head" })}>
+                <td
+                  key={col}
+                  className={tableFooterTdClasses(col, {
+                    variant: "head",
+                    extra: footerTop,
+                  })}
+                >
                   {totalCredit.toLocaleString("en-IN")}
                 </td>
               );
             }
             if (col === "Debit (₹)") {
               return (
-                <td key={col} className={tableFooterTdClasses(col, { variant: "head" })}>
+                <td
+                  key={col}
+                  className={tableFooterTdClasses(col, {
+                    variant: "head",
+                    extra: footerTop,
+                  })}
+                >
                   {totalDebit.toLocaleString("en-IN")}
                 </td>
               );
             }
-            return <td key={col} className={tableFooterTdClasses(col, { variant: "head" })} />;
+            return (
+              <td
+                key={col}
+                className={tableFooterTdClasses(col, {
+                  variant: "head",
+                  extra: footerTop,
+                })}
+              />
+            );
           })}
         </tr>
       </tfoot>
@@ -242,7 +277,7 @@ const DayBookIndex = () => {
           ]}
         >
           {detailRow ? (
-            <dl className="space-y-2 text-sm">
+            <dl className="mb-0 space-y-2 text-sm">
               {columns
                 .filter((c) => c !== "Actions")
                 .map((col) => (

@@ -20,7 +20,8 @@ export default function AddressForm({ value, onChange, errors = {}, compact = fa
     onChange({ pincode: normalizePincodeInput(e.target.value) });
   };
 
-  const labelCls = "text-xs text-gray-500 dark:text-slate-400";
+  /** Avoid `text-dark` / token `gray` on white cards in dark mode (low-contrast “ghost” labels). */
+  const labelCls = "text-xs font-semibold text-slate-700 dark:text-slate-300";
   const inputCls = "!min-h-9 !py-1.5 !text-sm";
 
   return (

@@ -28,6 +28,10 @@ function DashboardLayout({ children }) {
     isSalesInvoice ||
     location.pathname.includes("/dashboard/documents");
 
+  /** Single-employee profile: use a bit less horizontal gutter so the card breathes. */
+  const isHrmEmployeeProfile =
+    /^\/dashboard\/hrm\/employees\/[^/]+$/.test(location.pathname) === true;
+
   return (
     <div className="min-h-screen min-h-[100dvh] lg:h-[100dvh] lg:max-h-[100dvh] flex flex-col lg:flex-row bg-gray-50 relative overflow-hidden dark:bg-slate-950">
       <div className="hidden lg:flex lg:flex-col lg:shrink-0 lg:h-full lg:max-h-[100dvh] lg:min-h-0">
@@ -54,7 +58,9 @@ function DashboardLayout({ children }) {
             className={
               isFullBleed
                 ? "min-h-full"
-                : "min-h-full px-4 py-3 sm:px-5 sm:py-3 lg:px-6"
+                : isHrmEmployeeProfile
+                  ? "min-h-full px-2 py-3 sm:px-3 sm:py-3 lg:px-3"
+                  : "min-h-full px-4 py-3 sm:px-5 sm:py-3 lg:px-6"
             }
           >
             {isFullBleed ? (

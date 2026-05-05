@@ -28,6 +28,33 @@ const API_BASE =
 
 const { RangePicker } = DatePicker;
 
+/** Same category often appears twice when API sends both grid + sidebar lists — keep one row per id/name. */
+function dedupeGridSections(list) {
+  const out = [];
+  const seenIds = new Set();
+  const seenNames = new Set();
+  for (const s of list || []) {
+    const id = String(s?.id ?? "").trim();
+    const name = String(s?.name ?? "").trim().toLowerCase();
+    if (!name) continue;
+    if (id && seenIds.has(id)) continue;
+    if (seenNames.has(name)) continue;
+    if (id) seenIds.add(id);
+    seenNames.add(name);
+    out.push(s);
+  }
+  return out;
+}
+
+function sidebarFromSections(sections) {
+  return dedupeGridSections(sections).map((s) => ({
+    id: String(s.id),
+    name: s.name,
+    icon: s.icon,
+    count: s.count,
+  }));
+}
+
 const FALLBACK = {
   gridSections: [
     {
@@ -121,21 +148,21 @@ const DocumentsIndex = () => {
 
     try {
       const { data } = await dashboardUiService.getDocuments(params);
-      if (data?.gridSections?.length) {
-        setGridSections(data.gridSections);
-      }
-      if (data?.sidebarCategories?.length) {
-        setSidebarCategories(data.sidebarCategories);
-      }
-      if (data?.gridSections?.length) {
+      const rawGrid = data?.gridSections;
+      if (rawGrid?.length) {
+        const sections = dedupeGridSections(rawGrid);
+        setGridSections(sections);
+        setSidebarCategories(sidebarFromSections(sections));
         setCategoriesForModal(
-          data.gridSections.map((s) => ({
+          sections.map((s) => ({
             id: s.id,
             name: s.name,
             icon: s.icon,
             count: s.count,
           }))
         );
+      } else if (data?.sidebarCategories?.length) {
+        setSidebarCategories(dedupeGridSections(data.sidebarCategories));
       }
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not load documents"));
@@ -161,12 +188,16 @@ const DocumentsIndex = () => {
           }).length,
         }));
       }
-      setGridSections(sections);
-      setSidebarCategories(side);
+      const dedupedSections = dedupeGridSections(sections);
+      setGridSections(dedupedSections);
+      const dedupedSide = dedupeGridSections(side);
+      setSidebarCategories(dedupedSide);
       const agr = FALLBACK.gridSections.find((s) => s.id === "5");
       setCategoriesForModal([
-        ...side.map((c) => ({ ...c })),
-        ...(agr ? [{ id: agr.id, name: agr.name, icon: agr.icon, count: agr.count }] : []),
+        ...dedupedSide.map((c) => ({ ...c })),
+        ...(agr && !dedupedSide.some((c) => String(c.id) === String(agr.id))
+          ? [{ id: agr.id, name: agr.name, icon: agr.icon, count: agr.count }]
+          : []),
       ]);
     }
   }, [debouncedSearch, dateRange]);
