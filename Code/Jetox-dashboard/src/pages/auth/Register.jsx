@@ -1,11 +1,9 @@
-import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import AuthLayout from "../../layouts/AuthLayout";
 import { InputField, Button } from "../../components/ui/CommanUI";
 import AddressForm from "../../components/address/AddressForm";
-import { Eye, EyeOff } from "lucide-react";
 import { createUser } from "../../redux/auth/AuthThunk";
 import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
@@ -42,7 +40,6 @@ const validationSchema = Yup.object().shape({
 });
 
 function Register() {
-  const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -87,10 +84,10 @@ function Register() {
           {({ values, errors, touched, handleChange, handleBlur, handleSubmit, isValid, setFieldValue }) => (
             <form
               onSubmit={handleSubmit}
-              className="flex flex-col gap-5"
+              className="flex flex-col gap-4 sm:gap-5"
             >
-              <div className="flex flex-col gap-5 max-h-[calc(100vh-20rem)] overflow-auto scrollbar-hide">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-4 sm:gap-5 max-h-[calc(100vh-20rem)] overflow-auto scrollbar-hide">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div>
                     <InputField
                       label="First Name"
@@ -119,7 +116,7 @@ function Register() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div>
                     <InputField
                       label="Email Address"
@@ -135,24 +132,16 @@ function Register() {
                     )}
                   </div>
 
-                  <div className="relative w-full">
+                  <div className="w-full">
                     <InputField
                       label="Password"
                       type="password"
-                      // type={showPassword ? "text" : "password"}
                       name="password"
                       value={values.password}
                       onChange={handleChange}
                       onBlur={handleBlur}
                       required
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-9 text-gray-500 hover:text-gray-700"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
                     {touched.password && errors.password && (
                       <p className="text-xs text-red-500 mt-1">{errors.password}</p>
                     )}

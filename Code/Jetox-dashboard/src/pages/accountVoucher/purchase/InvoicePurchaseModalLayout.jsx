@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import {
@@ -32,13 +33,27 @@ import {
   shareOrCopyText,
 } from "../../../utils/voucherShare";
 
+function useMatchMedia(query) {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(query).matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const fn = () => setMatches(mq.matches);
+    mq.addEventListener("change", fn);
+    fn();
+    return () => mq.removeEventListener("change", fn);
+  }, [query]);
+  return matches;
+}
+
 /** Line-items grid — flat fields; centered text so placeholders align (not hugging one edge) */
 const cellTable =
-  "w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center text-[13px] leading-tight text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-primary/25";
+  "w-full min-w-0 min-h-8 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-[11px] leading-snug text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-primary/25 sm:min-h-0 sm:px-2.5 sm:py-2 sm:text-[13px] sm:leading-tight";
 /** Numeric line cells — centered like placeholders; tabular nums for digits */
 const cellNum = `${cellTable} tabular-nums`;
 const thBase =
-  "sticky top-0 z-[1] bg-slate-100 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-400";
+  "sticky top-0 z-[1] bg-slate-100 px-1.5 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:py-2.5 sm:text-[11px] dark:bg-slate-800 dark:text-slate-400";
 const th = `${thBase} text-left`;
 const thC = `${thBase} text-center`;
 
@@ -115,17 +130,27 @@ export default function InvoicePurchaseModalLayout({
   const [notesOpen, setNotesOpen] = useState(false);
   const [roundOff, setRoundOff] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const shareNarrow = useMatchMedia("(max-width: 639px)");
   const shareWrapRef = useRef(null);
 
   useEffect(() => {
-    if (!shareOpen) return undefined;
+    if (!shareOpen || shareNarrow) return undefined;
     const onDoc = (e) => {
       const el = shareWrapRef.current;
       if (el && !el.contains(e.target)) setShareOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [shareOpen]);
+  }, [shareOpen, shareNarrow]);
+
+  useEffect(() => {
+    if (!shareOpen || !shareNarrow) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setShareOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [shareOpen, shareNarrow]);
 
   const clock = liveNow ? dayjs(liveNow).format("DD MMM YYYY, hh:mm:ss A") : "";
 
@@ -173,9 +198,12 @@ export default function InvoicePurchaseModalLayout({
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary dark:text-emerald-400">
                 Purchase invoice
               </p>
-              <h2 className="truncate text-base font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-lg">
+              <h2 className="text-[1.05rem] font-bold leading-snug tracking-tight text-slate-900 dark:text-slate-50 sm:truncate sm:text-lg">
                 Create Purchase Invoice
               </h2>
+              <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:hidden">
+                Totals and taxes update as you fill each line.
+              </p>
               <p className="mt-0.5 hidden text-[11px] leading-snug text-slate-500 sm:block dark:text-slate-400">
                 Fields below calculate totals and taxes as you type.
               </p>
@@ -230,7 +258,112 @@ export default function InvoicePurchaseModalLayout({
                     aria-hidden
                   />
                 </button>
-                {shareOpen ? (
+                {shareOpen && shareNarrow && typeof document !== "undefined"
+                  ? createPortal(
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Close share menu"
+                          className="fixed inset-0 z-[200] bg-slate-950/55 backdrop-blur-[2px]"
+                          onClick={() => setShareOpen(false)}
+                        />
+                        <div
+                          role="menu"
+                          className="fixed left-1/2 top-1/2 z-[210] w-[min(calc(100vw-1.25rem),20rem)] max-h-[min(70vh,24rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl ring-1 ring-slate-900/8 dark:border-slate-600 dark:bg-slate-900 dark:ring-white/10"
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] font-medium leading-snug text-slate-800 hover:bg-slate-50 active:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800 dark:active:bg-slate-800/90"
+                            onClick={async () => {
+                              setShareOpen(false);
+                              const snap =
+                                typeof getShareSnapshot === "function"
+                                  ? getShareSnapshot()
+                                  : null;
+                              if (!snap) {
+                                toast.error("Nothing to share yet.");
+                                return;
+                              }
+                              const text = buildPurchasePayloadShareText(snap);
+                              const r = await shareOrCopyText(
+                                `Purchase ${snap.voucherNo || ""}`,
+                                text
+                              );
+                              if (r === "shared") toast.success("Shared");
+                              else if (r === "copied")
+                                toast.success("Summary copied to clipboard");
+                              else toast.error("Could not share or copy");
+                            }}
+                          >
+                            <Copy
+                              className="h-5 w-5 shrink-0 text-primary"
+                              strokeWidth={2}
+                            />
+                            Copy / system share
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] font-medium leading-snug text-slate-800 hover:bg-slate-50 active:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800 dark:active:bg-slate-800/90"
+                            onClick={() => {
+                              setShareOpen(false);
+                              const snap =
+                                typeof getShareSnapshot === "function"
+                                  ? getShareSnapshot()
+                                  : null;
+                              if (!snap) {
+                                toast.error("Nothing to export yet.");
+                                return;
+                              }
+                              downloadPurchasePayloadCsv(snap);
+                              toast.success("Excel-compatible CSV downloaded");
+                            }}
+                          >
+                            <FileSpreadsheet
+                              className="h-5 w-5 shrink-0 text-primary"
+                              strokeWidth={2}
+                            />
+                            Download Excel (CSV)
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] font-medium leading-snug text-slate-800 hover:bg-slate-50 active:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800 dark:active:bg-slate-800/90"
+                            onClick={() => {
+                              setShareOpen(false);
+                              const snap =
+                                typeof getShareSnapshot === "function"
+                                  ? getShareSnapshot()
+                                  : null;
+                              if (!snap) {
+                                toast.error("Nothing to print yet.");
+                                return;
+                              }
+                              const ok = printPurchasePayloadBill(snap);
+                              if (ok) {
+                                toast.success(
+                                  "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
+                                );
+                              } else {
+                                toast.error(
+                                  "Allow downloads in your browser to save the bill."
+                                );
+                              }
+                            }}
+                          >
+                            <Printer
+                              className="h-5 w-5 shrink-0 text-primary"
+                              strokeWidth={2}
+                            />
+                            Print bill (PDF)
+                          </button>
+                        </div>
+                      </>,
+                      document.body
+                    )
+                  : null}
+                {shareOpen && !shareNarrow ? (
                   <div
                     role="menu"
                     className="absolute right-0 z-40 mt-1.5 w-[min(100vw-2rem,15.5rem)] rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-900"
@@ -307,7 +440,9 @@ export default function InvoicePurchaseModalLayout({
                             "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
                           );
                         } else {
-                          toast.error("Allow downloads in your browser to save the bill.");
+                          toast.error(
+                            "Allow downloads in your browser to save the bill."
+                          );
                         }
                       }}
                     >
@@ -322,13 +457,13 @@ export default function InvoicePurchaseModalLayout({
                 className="hidden h-6 w-px shrink-0 bg-slate-200 sm:block dark:bg-slate-600"
                 aria-hidden
               />
-              <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-2">
+              <div className="grid w-full min-w-0 grid-cols-2 gap-1.5 sm:flex sm:w-auto sm:gap-2">
               <Button
                 type="button"
                 label="Save & New"
                 variant="outline"
                 size="sm"
-                className="min-h-11 w-full justify-center border-primary/35 px-2 font-semibold text-primary shadow-sm hover:bg-emerald-50 sm:min-h-10 sm:w-auto sm:px-3 dark:border-primary/45 dark:text-emerald-300 dark:hover:bg-primary/15"
+                className="max-sm:!min-h-9 max-sm:!py-2 max-sm:!text-[12px] max-sm:!leading-tight w-full justify-center border-primary/35 px-2 font-semibold text-primary shadow-sm hover:bg-emerald-50 sm:min-h-10 sm:w-auto sm:px-3 sm:text-sm dark:border-primary/45 dark:text-emerald-300 dark:hover:bg-primary/15"
                 onClick={() => onSave("new")}
               />
               <Button
@@ -336,7 +471,7 @@ export default function InvoicePurchaseModalLayout({
                 label="Save"
                 variant="primary"
                 size="sm"
-                className="min-h-11 w-full justify-center bg-primary px-3 font-semibold text-white shadow-md hover:bg-primary/90 sm:min-h-10 sm:min-w-[5.5rem] sm:w-auto sm:px-5 dark:bg-primary dark:hover:bg-primary/85"
+                className="max-sm:!min-h-9 max-sm:!py-2 max-sm:!text-[12px] max-sm:!leading-tight w-full justify-center bg-primary px-2.5 font-semibold text-white shadow-md hover:bg-primary/90 sm:min-h-10 sm:min-w-[5.5rem] sm:w-auto sm:px-5 sm:text-sm dark:bg-primary dark:hover:bg-primary/85"
                 onClick={() => onSave("close")}
               />
               </div>
@@ -345,11 +480,11 @@ export default function InvoicePurchaseModalLayout({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6 sm:py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-6 sm:py-6">
         <div className="mx-auto w-full max-w-[1200px] flex flex-col">
-          <div className="-mx-3 flex flex-col gap-5 sm:-mx-6">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-            <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm ring-1 ring-slate-900/[0.02] transition-shadow hover:shadow-md hover:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:ring-white/5 sm:p-4">
+          <div className="flex flex-col gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:items-stretch">
+            <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm ring-1 ring-slate-900/[0.02] transition-shadow hover:shadow-md hover:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:ring-white/5 sm:p-4">
               <div className="mb-2.5 flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                   <Building2 className="h-3.5 w-3.5 shrink-0 text-primary dark:text-emerald-400" aria-hidden />
@@ -369,11 +504,11 @@ export default function InvoicePurchaseModalLayout({
                 placeholder="Search or select party"
                 className="w-full"
               />
-              <div className="mt-2 rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/35">
-                <p className="text-[13px] font-semibold leading-snug text-slate-900 dark:text-slate-50">
+              <div className="mt-2 rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/35">
+                <p className="text-[14px] font-semibold leading-snug text-slate-900 sm:text-[13px] dark:text-slate-50">
                   {partyLabel}
                 </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 text-[12px] leading-snug text-slate-500 sm:text-[11px] dark:text-slate-400">
                   Phone on file when linked in Account master.
                 </p>
               </div>
@@ -388,7 +523,7 @@ export default function InvoicePurchaseModalLayout({
             </div>
 
             <div
-              className={`flex h-full min-h-0 flex-col rounded-2xl border bg-white p-3 shadow-sm ring-1 transition-all dark:bg-slate-900 sm:p-4 ${
+              className={`flex h-full min-h-0 flex-col rounded-2xl border bg-white p-3.5 shadow-sm ring-1 transition-all dark:bg-slate-900 sm:p-4 ${
                 shipDifferent
                   ? "border-primary/35 ring-primary/15 dark:border-primary/40 dark:ring-primary/25"
                   : "border-slate-200/90 ring-slate-900/[0.02] dark:border-slate-700 dark:ring-white/5"
@@ -403,11 +538,11 @@ export default function InvoicePurchaseModalLayout({
                   Change shipping
                 </span>
               </div>
-              <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/35">
-                <p className="whitespace-pre-wrap text-[13px] font-semibold leading-snug text-slate-900 dark:text-slate-50">
+              <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/35">
+                <p className="whitespace-pre-wrap text-[14px] font-semibold leading-snug text-slate-900 sm:text-[13px] dark:text-slate-50">
                   {shipSummaryPrimary}
                 </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 text-[12px] leading-snug text-slate-500 sm:text-[11px] dark:text-slate-400">
                   {shipDifferent
                     ? "Edit ship-to below if needed."
                     : "Same as billing unless different ship address."}
@@ -420,7 +555,7 @@ export default function InvoicePurchaseModalLayout({
                   checked={shipDifferent}
                   onChange={(e) => setShipDifferent(e.target.checked)}
                 />
-                <span className="text-[12px] font-medium leading-snug text-slate-700 dark:text-slate-300">
+                <span className="text-[13px] font-medium leading-snug text-slate-700 sm:text-[12px] dark:text-slate-300">
                   Different ship address
                 </span>
               </label>
@@ -432,15 +567,15 @@ export default function InvoicePurchaseModalLayout({
                     rows={2}
                     value={shipTo}
                     onChange={(e) => setShipTo(e.target.value)}
-                    inputClassName="!text-[13px] min-h-[3.25rem]"
+                    inputClassName="!text-[14px] min-h-[3.25rem] sm:!text-[13px]"
                   />
                 </div>
               ) : null}
             </div>
           </div>
 
-          <section className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm ring-1 ring-slate-900/[0.02] dark:border-slate-700 dark:bg-slate-900 dark:ring-white/5 sm:p-5">
-            <h3 className="mb-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+          <section className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm ring-1 ring-slate-900/[0.02] dark:border-slate-700 dark:bg-slate-900 dark:ring-white/5 sm:p-5">
+            <h3 className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:mb-4 dark:text-slate-400">
               <Receipt
                 className="h-4 w-4 shrink-0 text-primary dark:text-emerald-400"
                 strokeWidth={2}
@@ -448,7 +583,7 @@ export default function InvoicePurchaseModalLayout({
               />
               Invoice details
             </h3>
-            <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 [&_input]:!text-[13px] [&_input]:!leading-tight [&_textarea]:!text-[13px] [&_textarea]:!leading-tight">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 sm:gap-y-4 lg:grid-cols-3 xl:grid-cols-6 [&_input]:!text-[14px] [&_input]:!leading-tight [&_textarea]:!text-[14px] [&_textarea]:!leading-tight sm:[&_input]:!text-[13px] sm:[&_textarea]:!text-[13px] max-sm:[&_input]:!min-h-11 max-sm:[&_.ant-picker]:!min-h-[2.75rem]">
               <div className="min-w-0">
                 <InputField
                   label="Invoice prefix"
@@ -503,8 +638,11 @@ export default function InvoicePurchaseModalLayout({
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50/80 to-white shadow-md shadow-slate-900/5 ring-1 ring-slate-900/[0.03] dark:border-slate-700 dark:from-slate-950 dark:to-slate-900 dark:shadow-black/30 dark:ring-white/5">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1312px] table-fixed border-collapse text-[13px]">
+            <p className="border-b border-slate-100 px-2 py-2 text-center text-[10px] leading-snug text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400 sm:hidden">
+              Swipe horizontally to reach every column on small screens.
+            </p>
+            <div className="overflow-x-auto overscroll-x-auto [-webkit-overflow-scrolling:touch] touch-pan-x">
+              <table className="w-full min-w-[1180px] table-fixed border-collapse text-[11px] sm:min-w-[1312px] sm:text-[13px]">
                 <thead className="border-b border-slate-200 dark:border-slate-600">
                   <tr>
                     <th className={`${thC} w-10`}>No</th>
@@ -532,12 +670,13 @@ export default function InvoicePurchaseModalLayout({
                         key={row.id}
                         className="group border-b border-slate-100/90 transition-colors hover:bg-slate-50/70 dark:border-slate-800/80 dark:hover:bg-slate-800/25"
                       >
-                        <td className="px-3 py-2.5 text-center text-xs font-medium tabular-nums text-slate-400 dark:text-slate-500">
+                        <td className="px-2 py-1.5 text-center text-[10px] font-medium tabular-nums text-slate-400 sm:px-3 sm:py-2.5 sm:text-xs dark:text-slate-500">
                           {idx + 1}
                         </td>
-                        <td className="min-w-0 max-w-52 px-2 py-2 align-middle">
+                        <td className="min-w-0 max-w-52 px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <div className="w-full min-w-0 max-w-full">
                             <CommonDropdown
+                              formCompact
                               hideAdd
                               searchable
                               searchPlaceholder="Search item…"
@@ -545,11 +684,11 @@ export default function InvoicePurchaseModalLayout({
                               value={row.product}
                               onChange={(v) => updateProductRow(row.id, "product", v)}
                               placeholder="Select item"
-                              className="w-full min-w-0 text-[13px]"
+                              className="w-full min-w-0 max-sm:[&_button]:!h-8 max-sm:[&_button]:!min-h-8 max-sm:[&_button]:!max-h-8 max-sm:[&_button]:!px-2 max-sm:[&_button]:!py-1 max-sm:[&_button>span]:!text-[11px]"
                             />
                           </div>
                         </td>
-                        <td className="px-2 py-2 align-middle text-center">
+                        <td className="px-1.5 py-1 align-middle text-center sm:px-2 sm:py-2">
                           <input
                             className={cellTable}
                             value={row.hsn}
@@ -560,7 +699,7 @@ export default function InvoicePurchaseModalLayout({
                             inputMode="numeric"
                           />
                         </td>
-                        <td className="px-2 py-2 align-middle text-center">
+                        <td className="px-1.5 py-1 align-middle text-center sm:px-2 sm:py-2">
                           <input
                             className={cellTable}
                             value={row.batch}
@@ -570,7 +709,7 @@ export default function InvoicePurchaseModalLayout({
                             placeholder="—"
                           />
                         </td>
-                        <td className="px-2 py-2 align-middle">
+                        <td className="px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <input
                             type="date"
                             className={`${cellTable} min-w-0 max-w-full`}
@@ -581,7 +720,7 @@ export default function InvoicePurchaseModalLayout({
                             title="Expiry date"
                           />
                         </td>
-                        <td className="px-2 py-2 align-middle">
+                        <td className="px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <input
                             type="date"
                             className={`${cellTable} min-w-0 max-w-full`}
@@ -592,7 +731,7 @@ export default function InvoicePurchaseModalLayout({
                             title="Manufacturing date"
                           />
                         </td>
-                        <td className="px-2 py-2 align-middle">
+                        <td className="px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <input
                             className={cellNum}
                             value={row.mrp}
@@ -603,7 +742,7 @@ export default function InvoicePurchaseModalLayout({
                             inputMode="decimal"
                           />
                         </td>
-                        <td className="px-2 py-2 align-middle">
+                        <td className="px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <input
                             className={cellNum}
                             value={row.qty}
@@ -614,7 +753,7 @@ export default function InvoicePurchaseModalLayout({
                             inputMode="decimal"
                           />
                         </td>
-                        <td className="px-2 py-2 align-middle">
+                        <td className="px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <input
                             className={cellNum}
                             value={row.rate}
@@ -625,7 +764,7 @@ export default function InvoicePurchaseModalLayout({
                             inputMode="decimal"
                           />
                         </td>
-                        <td className="px-2 py-2 align-middle">
+                        <td className="px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <input
                             className={cellNum}
                             placeholder="%"
@@ -637,7 +776,7 @@ export default function InvoicePurchaseModalLayout({
                             inputMode="decimal"
                           />
                         </td>
-                        <td className="px-2 py-2 align-middle">
+                        <td className="px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <input
                             className={cellNum}
                             placeholder="₹"
@@ -649,11 +788,11 @@ export default function InvoicePurchaseModalLayout({
                             inputMode="decimal"
                           />
                         </td>
-                        <td className="bg-slate-50/70 px-1.5 py-2 text-center text-xs tabular-nums text-slate-700 dark:bg-slate-800/40 dark:text-slate-200">
+                        <td className="bg-slate-50/70 px-1 py-1.5 text-center text-[10px] tabular-nums text-slate-700 sm:px-1.5 sm:py-2 sm:text-xs dark:bg-slate-800/40 dark:text-slate-200">
                           {m.gstPct ? (
                             <span className="inline-block w-full max-w-full leading-tight">
                               {fmtInr(m.tax)}
-                              <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                              <span className="block text-[9px] font-medium text-slate-500 max-sm:leading-tight dark:text-slate-400 sm:text-[10px]">
                                 ({m.gstPct}%)
                               </span>
                             </span>
@@ -661,10 +800,10 @@ export default function InvoicePurchaseModalLayout({
                             <span className="text-slate-400">—</span>
                           )}
                         </td>
-                        <td className="bg-slate-50/70 px-2 py-2 text-center text-sm font-semibold tabular-nums text-slate-900 dark:bg-slate-800/40 dark:text-slate-50">
+                        <td className="bg-slate-50/70 px-1.5 py-1.5 text-center text-xs font-semibold tabular-nums text-slate-900 sm:px-2 sm:py-2 sm:text-sm dark:bg-slate-800/40 dark:text-slate-50">
                           {fmtInr(m.amount)}
                         </td>
-                        <td className="min-w-0 max-w-56 px-2 py-2 align-middle">
+                        <td className="min-w-0 max-w-56 px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <textarea
                             rows={1}
                             placeholder="Optional note"
@@ -672,18 +811,18 @@ export default function InvoicePurchaseModalLayout({
                             onChange={(e) =>
                               updateProductRow(row.id, "description", e.target.value)
                             }
-                            className={`${cellTable} box-border h-10 min-h-10 max-h-10 w-full min-w-0 resize-none overflow-y-auto text-left`}
+                            className={`${cellTable} box-border h-8 min-h-8 max-h-8 w-full min-w-0 resize-none overflow-y-auto text-left sm:h-10 sm:min-h-10 sm:max-h-10`}
                           />
                         </td>
-                        <td className="px-1 py-2 text-center align-middle">
+                        <td className="px-0.5 py-1 text-center align-middle sm:px-1 sm:py-2">
                           <button
                             type="button"
                             disabled={productRows.length === 1}
                             onClick={() => removeProductRow(row.id)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-35 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-35 max-sm:h-7 max-sm:w-7 dark:hover:bg-red-950/50 dark:hover:text-red-400 sm:h-9 sm:w-9 sm:rounded-lg"
                             title="Remove line"
                           >
-                            <Trash2 size={17} strokeWidth={2} />
+                            <Trash2 className="h-[15px] w-[15px] sm:h-[17px] sm:w-[17px]" strokeWidth={2} />
                           </button>
                         </td>
                       </tr>
@@ -691,42 +830,42 @@ export default function InvoicePurchaseModalLayout({
                   })}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-slate-200 bg-slate-100/95 text-sm font-semibold dark:border-slate-600 dark:bg-slate-800">
+                  <tr className="border-t border-slate-200 bg-slate-100/95 text-xs font-semibold dark:border-slate-600 dark:bg-slate-800 sm:text-sm">
                     <td
                       colSpan={7}
-                      className="px-4 py-3 text-right text-slate-700 dark:text-slate-300"
+                      className="px-2 py-2 text-right text-slate-700 sm:px-4 sm:py-3 dark:text-slate-300"
                     >
                       Totals
                     </td>
-                    <td className="w-20 whitespace-nowrap px-2 py-3 text-center align-middle text-sm tabular-nums text-slate-700 dark:text-slate-300">
+                    <td className="w-20 whitespace-nowrap px-1.5 py-2 text-center align-middle text-[11px] tabular-nums text-slate-700 sm:px-2 sm:py-3 sm:text-sm dark:text-slate-300">
                       <span className="font-normal">Qty : </span>
                       <span className="font-semibold text-slate-900 dark:text-slate-50">
                         {lineQty.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                       </span>
                     </td>
-                    <td className="px-2 py-3 text-center tabular-nums text-slate-500 dark:text-slate-500" />
-                    <td className="px-2 py-3 text-center tabular-nums text-slate-500 dark:text-slate-500" />
-                    <td className="px-2 py-3 text-center tabular-nums text-slate-500 dark:text-slate-500" />
-                    <td className="px-2 py-3 text-center tabular-nums text-primary dark:text-emerald-300">
+                    <td className="px-1.5 py-2 text-center tabular-nums text-slate-500 sm:px-2 sm:py-3 dark:text-slate-500" />
+                    <td className="px-1.5 py-2 text-center tabular-nums text-slate-500 sm:px-2 sm:py-3 dark:text-slate-500" />
+                    <td className="px-1.5 py-2 text-center tabular-nums text-slate-500 sm:px-2 sm:py-3 dark:text-slate-500" />
+                    <td className="px-1.5 py-2 text-center text-[11px] tabular-nums text-primary sm:px-2 sm:py-3 sm:text-sm dark:text-emerald-300">
                       {fmtInr(totalTax)}
                     </td>
-                    <td className="px-2 py-3 text-center text-base tabular-nums text-slate-900 dark:text-slate-50">
+                    <td className="px-1.5 py-2 text-center text-xs tabular-nums text-slate-900 sm:px-2 sm:py-3 sm:text-base dark:text-slate-50">
                       {fmtInr(rawGrand)}
                     </td>
-                    <td className="px-2 py-3 dark:bg-slate-800" />
-                    <td className="px-2 py-3 dark:bg-slate-800" />
+                    <td className="px-1.5 py-2 dark:bg-slate-800 sm:px-2 sm:py-3" />
+                    <td className="px-1.5 py-2 dark:bg-slate-800 sm:px-2 sm:py-3" />
                   </tr>
                 </tfoot>
               </table>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/40 px-3 py-4 dark:border-slate-800 dark:bg-slate-900/50 sm:flex-row sm:flex-wrap sm:items-stretch sm:px-6">
+            <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/40 px-2.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/50 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-3 sm:px-6 sm:py-4">
               <button
                 type="button"
                 onClick={addProductRow}
-                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/40 bg-emerald-50/70 px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-primary hover:bg-emerald-50 active:scale-[0.99] dark:border-primary/50 dark:bg-primary/10 dark:text-emerald-100 dark:hover:bg-primary/15 sm:min-w-56 sm:flex-none"
+                className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-primary/40 bg-emerald-50/70 px-3 text-[13px] font-semibold text-slate-800 shadow-sm transition hover:border-primary hover:bg-emerald-50 active:scale-[0.99] dark:border-primary/50 dark:bg-primary/10 dark:text-emerald-100 dark:hover:bg-primary/15 sm:min-h-11 sm:w-56 sm:flex-none sm:gap-2 sm:rounded-xl sm:px-4 sm:text-sm"
               >
-                <Plus size={19} strokeWidth={2.25} className="shrink-0 text-primary dark:text-emerald-400" />
+                <Plus strokeWidth={2.25} className="h-4 w-4 shrink-0 text-primary sm:h-[19px] sm:w-[19px] dark:text-emerald-400" />
                 Add item
               </button>
               <button
@@ -734,16 +873,16 @@ export default function InvoicePurchaseModalLayout({
                 onClick={() =>
                   toast("Connect a barcode scanner or use the device camera to scan.")
                 }
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-primary/35 hover:bg-emerald-50/80 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-primary/40 dark:hover:bg-primary/10"
+                className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200/90 bg-white px-3 text-[13px] font-semibold text-slate-800 shadow-sm transition hover:border-primary/35 hover:bg-emerald-50/80 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-primary/40 dark:hover:bg-primary/10 sm:min-h-11 sm:w-56 sm:flex-none sm:gap-2 sm:rounded-xl sm:px-4 sm:text-sm"
               >
-                <ScanLine size={19} strokeWidth={2} className="shrink-0" />
+                <ScanLine strokeWidth={2} className="h-4 w-4 shrink-0 sm:h-[19px] sm:w-[19px]" />
                 Scan barcode
               </button>
             </div>
           </section>
 
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
-            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm ring-1 ring-slate-900/[0.04] dark:border-slate-700 dark:bg-slate-900 dark:ring-white/[0.06] sm:gap-4 sm:p-5">
               <button
                 type="button"
                 onClick={() => setNotesOpen((o) => !o)}
@@ -768,7 +907,7 @@ export default function InvoicePurchaseModalLayout({
                   rows={3}
                   value={internalNotes}
                   onChange={(e) => setInternalNotes(e.target.value)}
-                  inputClassName="text-sm"
+                  inputClassName="text-sm max-sm:!text-[15px]"
                 />
               ) : null}
 
@@ -780,7 +919,7 @@ export default function InvoicePurchaseModalLayout({
                   rows={4}
                   value={billTo}
                   onChange={(e) => setBillTo(e.target.value)}
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-800 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-[15px] leading-relaxed text-slate-800 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 sm:py-2.5 sm:text-sm"
                   placeholder="Billing address — printed on documents."
                 />
               </div>
@@ -796,7 +935,7 @@ export default function InvoicePurchaseModalLayout({
                   value={narration}
                   onChange={(e) => setNarration(e.target.value)}
                   placeholder="Short description for this voucher — included when you share, print, or export."
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-800 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-[15px] leading-relaxed text-slate-800 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 sm:py-2.5 sm:text-sm"
                 />
               </div>
               <div>
@@ -822,13 +961,13 @@ export default function InvoicePurchaseModalLayout({
                   value={termsText}
                   onChange={(e) => setTermsText(e.target.value)}
                   placeholder="Leave blank if not needed. When filled, this text can appear on printed / shared purchase documents."
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-800 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-[15px] leading-relaxed text-slate-800 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 sm:py-2.5 sm:text-sm"
                 />
               </div>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-5">
-            <aside className="rounded-2xl border border-primary/20 bg-gradient-to-b from-emerald-50/70 via-white to-slate-50/40 p-4 shadow-[0_8px_30px_-12px_rgba(5,150,105,0.12)] ring-1 ring-primary/10 dark:border-primary/25 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 dark:ring-primary/15 sm:p-5">
+            <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+            <aside className="rounded-2xl border border-primary/20 bg-gradient-to-b from-emerald-50/70 via-white to-slate-50/40 p-3.5 shadow-[0_8px_30px_-12px_rgba(5,150,105,0.12)] ring-1 ring-primary/10 dark:border-primary/25 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 dark:ring-primary/15 sm:p-5">
               <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.12em] text-primary dark:text-emerald-400">
                 Summary
               </p>
@@ -911,23 +1050,37 @@ export default function InvoicePurchaseModalLayout({
               </div>
             </aside>
 
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-4">
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm ring-1 ring-slate-900/[0.04] dark:border-slate-700 dark:bg-slate-900 dark:ring-white/[0.06] sm:p-4">
               <button
                 type="button"
                 onClick={() => setMoreDetailsOpen((o) => !o)}
-                className="flex w-fit items-center gap-1.5 text-sm font-semibold text-primary transition hover:text-primary/80 dark:text-emerald-400 dark:hover:text-emerald-300"
+                className="flex w-full flex-wrap items-center gap-0 rounded-lg border border-slate-200/90 bg-slate-50/90 px-3 py-2 text-[13px] font-semibold leading-snug text-primary shadow-sm transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:bg-slate-800 sm:inline-flex sm:w-fit sm:flex-nowrap sm:gap-1.5 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-sm sm:shadow-none sm:hover:bg-transparent"
               >
-                {moreDetailsOpen ? (
-                  <>
-                    <ChevronUp size={16} className="shrink-0" strokeWidth={2} />
-                    Hide — delivery, pricing &amp; stock options
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown size={16} className="shrink-0" strokeWidth={2} />
-                    More — delivery, pricing &amp; stock options
-                  </>
-                )}
+                {/* Mobile: single short line + chevron on the right */}
+                <span className="flex min-h-0 min-w-0 flex-1 items-center justify-between gap-2 sm:hidden">
+                  <span className="min-w-0 leading-snug">
+                    {moreDetailsOpen ? "Hide extra options" : "Delivery, stock & more"}
+                  </span>
+                  {moreDetailsOpen ? (
+                    <ChevronUp size={18} className="shrink-0 opacity-90" strokeWidth={2} />
+                  ) : (
+                    <ChevronDown size={18} className="shrink-0 opacity-90" strokeWidth={2} />
+                  )}
+                </span>
+                {/* Desktop: icon first, full label */}
+                <span className="hidden items-center gap-1.5 sm:inline-flex">
+                  {moreDetailsOpen ? (
+                    <>
+                      <ChevronUp size={16} className="shrink-0" strokeWidth={2} />
+                      Hide — delivery, pricing &amp; stock options
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={16} className="shrink-0" strokeWidth={2} />
+                      More — delivery, pricing &amp; stock options
+                    </>
+                  )}
+                </span>
               </button>
 
               {moreDetailsOpen ? (

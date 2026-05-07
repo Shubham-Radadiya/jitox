@@ -125,7 +125,11 @@ const ExpenseModal = ({ open, onClose }) => {
         <div className="flex flex-col gap-2">
           <label className="text-xs font-medium text-dark">Upload Proof</label>
           <div className="border border-dashed border-light-border rounded-xl bg-rowBg px-4 py-4 flex flex-col gap-2 items-center text-center">
-            <Button label="Upload" variant="outline" className="w-32" />
+            <Button
+              label="Upload"
+              variant="outline"
+              className="w-32 bg-white !text-gray-900 shadow-sm hover:!text-white dark:bg-slate-800 dark:!text-white dark:shadow-none dark:border-slate-500 dark:hover:!text-white"
+            />
             <p className="text-xs text-light">Choose images or drag & drop it here.</p>
             <p className="text-[11px] text-light">JPG, JPEG, PNG and WEBP, Max 20 MB.</p>
           </div>

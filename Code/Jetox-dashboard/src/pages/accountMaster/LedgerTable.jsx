@@ -10,7 +10,7 @@ import { TbMailFilled } from "react-icons/tb";
 import { TiPrinter } from "react-icons/ti";
 import { FcPrint } from "react-icons/fc";
 import DataTable from "../../components/ui/table/DataTable";
-import { printHtmlDocument } from "../../utils/printAndExport";
+import { buildStandalonePrintableHtml, downloadHtmlDocumentAsPdf } from "../../utils/printAndExport";
 import { dayBooksApi } from "../../services/api";
 import { getApiErrorMessage, isEmptyListNotFound } from "../../utils/apiError";
 import { mapDayBooksToLedgerRows } from "../../utils/ledgerRowMapper";
@@ -103,7 +103,7 @@ const LedgerTable = () => {
     return `Closing balance: ${data[data.length - 1]["Balance ₹"]}`;
   }, [data]);
 
-  const printLedgerRows = (rowsToPrint) => {
+  const printLedgerRows = async (rowsToPrint) => {
     const header =
       "<tr>" +
       columns
@@ -130,12 +130,22 @@ const LedgerTable = () => {
         return `<tr>${cells}</tr>`;
       })
       .join("");
-    const html = `<p><strong>${LEDGER_TITLE}</strong></p><p>${closingLine}</p>
+    const bodyHtml = `<p><strong>${LEDGER_TITLE}</strong></p><p>${closingLine}</p>
       <table style="border-collapse:collapse;width:100%"><thead>${header}</thead><tbody>${body}</tbody></table>`;
-    printHtmlDocument(`Ledger — ${LEDGER_TITLE}`, html);
-    toast.success(
-      "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
-    );
+    const title = `Ledger — ${LEDGER_TITLE}`;
+    const fullHtml = buildStandalonePrintableHtml(title, bodyHtml, {
+      bodyPaddingPx: 10,
+      bodyFontSizePx: 12,
+      h1FontSizePx: 16,
+      tableCellPaddingPx: 5,
+    });
+    try {
+      await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
+      toast.success("PDF downloaded successfully.");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      toast.error("PDF generation failed. Please try again.");
+    }
   };
 
   const renderLedgerActions = (row) => (
@@ -170,30 +180,30 @@ const LedgerTable = () => {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-3 2xl:gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-base font-semibold text-dark">{LEDGER_TITLE}</div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+          <div className="text-base font-semibold text-dark sm:text-lg">{LEDGER_TITLE}</div>
 
-          <div className="flex gap-3 items-center">
-            <div className="text-blue font-semibold">{closingLine}</div>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+            <div className="text-sm font-semibold text-blue sm:text-base">{closingLine}</div>
             <DateRangePicker
               filterBar
               value={dateRange}
               onChange={setDateRange}
-              className="w-60"
+              className="w-full sm:w-60"
             />
-            <div className="flex items-center border border-light-border rounded-md text-lg bg-white">
+            <div className="flex w-full items-center rounded-md border border-light-border bg-white text-lg shadow-sm dark:border-slate-600 dark:bg-slate-900/85 dark:shadow-none sm:w-auto">
               <button
                 type="button"
                 title="Print / save as PDF"
-                className="p-2 border-r flex items-center border-light-border justify-center cursor-pointer hover:bg-gray-50"
+                className="flex flex-1 cursor-pointer items-center justify-center border-r border-light-border p-2 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800 sm:flex-none"
                 onClick={() => printLedgerRows(data)}
               >
-                <BsFillFileEarmarkPdfFill className="text-red" />
+                <BsFillFileEarmarkPdfFill className="text-red dark:text-rose-400" />
               </button>
               <button
                 type="button"
                 title="Share on WhatsApp"
-                className="p-2 border-r flex items-center border-light-border justify-center cursor-pointer hover:bg-gray-50"
+                className="flex flex-1 cursor-pointer items-center justify-center border-r border-light-border p-2 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800 sm:flex-none"
                 onClick={() => {
                   const text = encodeURIComponent(
                     `Jitox — ${LEDGER_TITLE}. ${closingLine}`
@@ -201,27 +211,27 @@ const LedgerTable = () => {
                   window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
                 }}
               >
-                <RiWhatsappFill className="text-primary" />
+                <RiWhatsappFill className="text-primary dark:text-emerald-400" />
               </button>
               <button
                 type="button"
                 title="Email summary"
-                className="p-2 border-r flex items-center border-light-border justify-center cursor-pointer hover:bg-gray-50"
+                className="flex flex-1 cursor-pointer items-center justify-center border-r border-light-border p-2 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800 sm:flex-none"
                 onClick={() => {
                   const sub = encodeURIComponent(`Jitox — ${LEDGER_TITLE}`);
                   const body = encodeURIComponent(`${closingLine}\n`);
                   window.location.href = `mailto:?subject=${sub}&body=${body}`;
                 }}
               >
-                <TbMailFilled className="text-light" />
+                <TbMailFilled className="text-light dark:text-slate-300" />
               </button>
               <button
                 type="button"
                 title="Print ledger"
-                className="p-2 flex items-center justify-center cursor-pointer hover:bg-gray-50"
+                className="flex flex-1 cursor-pointer items-center justify-center p-2 transition-colors hover:bg-gray-50 dark:hover:bg-slate-800 sm:flex-none"
                 onClick={() => printLedgerRows(data)}
               >
-                <FcPrint />
+                <FcPrint className="dark:opacity-90" />
               </button>
             </div>
           </div>
@@ -242,23 +252,32 @@ const LedgerTable = () => {
           toggleSelectAll={toggleSelectAll}
           toggleRowSelect={toggleRowSelect}
           renderAction={renderLedgerActions}
+          maxHeight="calc(100vh - 18rem)"
         />
 
         <CommonModal
           open={Boolean(viewRow)}
           onClose={() => setViewRow(null)}
           title="Voucher line"
-          width="520px"
+          width="min(520px, calc(100vw - 2rem))"
+          shellClassName="!p-2.5 sm:!p-5"
+          headerClassName="!py-1.5 !px-2 sm:!py-3 sm:!px-5"
+          titleClassName="!text-[15px] sm:!text-base"
+          bodyClassName="!px-2 !pt-1 !pb-2 sm:!px-5 sm:!pt-4 sm:!pb-8"
         >
           {viewRow && (
-            <dl className="mb-0 space-y-2 text-sm">
-              {Object.entries(viewRow).map(([k, v]) => (
+            <dl className="mb-0 max-sm:text-[15px] max-sm:leading-snug sm:text-sm sm:leading-normal">
+              {Object.entries(viewRow)
+                .filter(([k]) => k !== "Actions")
+                .map(([k, v]) => (
                 <div
                   key={k}
-                  className="grid grid-cols-2 gap-2 border-b border-light-border pb-2 last:border-0"
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-x-1.5 gap-y-0 border-b border-light-border py-1.5 sm:gap-x-2 sm:py-2 last:border-b-0 dark:border-slate-700"
                 >
-                  <dt className="text-light font-medium">{k}</dt>
-                  <dd className="text-dark">{String(v ?? "—")}</dd>
+                  <dt className="text-light shrink-0 font-medium">{k}</dt>
+                  <dd className="min-w-0 break-words text-right text-dark dark:text-slate-100">
+                    {String(v ?? "—")}
+                  </dd>
                 </div>
               ))}
             </dl>

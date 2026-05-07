@@ -118,8 +118,8 @@ function VisitTable({ visits }) {
     <span className="block min-w-0 whitespace-nowrap">{text ?? "—"}</span>
   );
   return (
-    <div className="w-full min-w-0 overflow-x-auto rounded-lg border border-slate-200/70 bg-white/90 shadow-sm backdrop-blur-sm dark:border-slate-600/50 dark:bg-slate-900/60">
-      <table className="w-full min-w-full table-auto border-collapse text-[11px]">
+    <div className="w-full min-w-0 overflow-x-auto rounded-lg border border-slate-200/70 bg-white/90 shadow-sm backdrop-blur-sm [-webkit-overflow-scrolling:touch] touch-pan-x dark:border-slate-600/50 dark:bg-slate-900/60 max-sm:-mx-0.5">
+      <table className="w-full min-w-[34rem] table-auto border-collapse text-[11px] sm:min-w-full">
         <thead>
           <tr className="bg-slate-50/90 text-left text-slate-600 dark:bg-slate-800/80 dark:text-slate-300">
             <th
@@ -192,12 +192,12 @@ function DayDetailExpansion({ row }) {
   const visits = row._visits || [];
   const hasVisits = visits.length > 0;
   return (
-    <div className="space-y-3 border-l-[3px] border-primary bg-gradient-to-r from-emerald-50/80 to-white/40 px-4 py-3 dark:border-emerald-500 dark:from-emerald-950/30 dark:to-slate-900/40">
+    <div className="space-y-2.5 border-l-[3px] border-primary bg-gradient-to-r from-emerald-50/80 to-white/40 px-2.5 py-2.5 dark:border-emerald-500 dark:from-emerald-950/30 dark:to-slate-900/40 sm:space-y-3 sm:px-4 sm:py-3">
       <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-100">
         Day detail · {row.Date}
       </div>
       {hasVisits ? (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <VisitTable visits={visits} />
           <p className="text-[10px] leading-snug text-slate-500 dark:text-slate-400">
             From previous stop: straight-line distance (km) between consecutive visit GPS points.
@@ -207,7 +207,7 @@ function DayDetailExpansion({ row }) {
         <p className="py-1 text-[11px] text-slate-500 dark:text-slate-400">No stop-level visits for this day.</p>
       )}
       {hasVisits && row._mapTrack?.path?.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Live route tracking
           </div>
@@ -302,7 +302,7 @@ function EmployeeDetailPanel({
             <div className="truncate text-[10px] text-slate-500 dark:text-slate-400">{selected?.department}</div>
           </div>
         </div>
-        <div className="flex w-full min-w-0 flex-nowrap items-center justify-end gap-2 overflow-x-auto sm:w-auto sm:overflow-visible">
+        <div className="flex w-full min-w-0 flex-nowrap items-center justify-center gap-2 overflow-x-auto sm:w-auto sm:justify-end sm:overflow-visible">
           <span className="shrink-0 text-[11px] font-medium text-slate-500 dark:text-slate-400">Date</span>
           <DateRangePicker
             filterBar
@@ -526,7 +526,7 @@ const EmployeeTrackIndex = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col lg:flex-row min-h-0 lg:h-[calc(100dvh-4.5rem)] lg:max-h-[calc(100dvh-4.5rem)] gap-0">
+      <div className="flex flex-col lg:flex-row min-h-0 lg:h-[calc(100dvh-3.5rem)] lg:max-h-[calc(100dvh-3.5rem)] gap-0">
         {loadingList ? (
           <div className="w-full shrink-0 border-b border-slate-200/60 p-4 text-xs leading-relaxed text-slate-500 dark:border-slate-600/45 dark:bg-slate-900/35 dark:text-slate-400 lg:min-w-[16rem] lg:w-[min(100%,18rem)] lg:rounded-l-xl lg:border-b-0 lg:border-r lg:backdrop-blur-sm">
             Loading employees…

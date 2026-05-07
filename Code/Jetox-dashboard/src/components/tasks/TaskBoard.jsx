@@ -199,14 +199,26 @@ export default function TaskBoard({ restrictToSelf = false, showMonitoring = fal
   });
 
   const summary = analytics?.summary;
-  const showFab = admin && !restrictToSelf;
+  const canCreate = admin && !restrictToSelf;
+
+  useEffect(() => {
+    if (!canCreate) return;
+    if (searchParams.get("newTask") === "1") setCreateOpen(true);
+  }, [canCreate, searchParams]);
 
   const handleUpdateStatus = (taskId, status) => {
     updateMut.mutate({ id: taskId, body: { status } });
   };
 
+  const handleCloseCreate = () => {
+    setCreateOpen(false);
+    const next = new URLSearchParams(searchParams);
+    next.delete("newTask");
+    setSearchParams(next, { replace: true });
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {showMonitoring && admin && summary ? (
         <TaskSummaryCards summary={summary} />
       ) : null}
@@ -232,7 +244,7 @@ export default function TaskBoard({ restrictToSelf = false, showMonitoring = fal
         onUpdateStatus={handleUpdateStatus}
         onDelete={(taskId) => deleteMut.mutate(taskId)}
         onCreateClick={() => setCreateOpen(true)}
-        canCreate={showFab}
+        canCreate={canCreate}
         highlightTaskId={highlightTaskId}
       />
 
@@ -260,21 +272,9 @@ export default function TaskBoard({ restrictToSelf = false, showMonitoring = fal
         </div>
       ) : null}
 
-      {showFab ? (
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          title="Create task"
-          className="fixed bottom-6 right-6 z-30 flex h-14 items-center gap-2 rounded-full bg-primary pl-4 pr-5 text-sm font-semibold text-white shadow-lg shadow-primary/35 transition hover:scale-[1.02] hover:shadow-xl active:scale-[0.98] lg:bottom-8 lg:right-8"
-        >
-          <Plus size={22} strokeWidth={2.25} />
-          <span className="hidden sm:inline">New task</span>
-        </button>
-      ) : null}
-
       <CreateTaskModal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={handleCloseCreate}
         saving={createMut.isPending}
         userOptions={userOptions}
         onSubmit={(body) => createMut.mutateAsync(body)}

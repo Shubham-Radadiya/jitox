@@ -77,26 +77,31 @@ const PayNowModal = ({ open, onClose, voucherData, onSaved }) => {
       open={open}
       onClose={onClose}
       title="Add Payment"
-      width="700px"
+      width="min(640px, 90vw)"
+      headerClassName="py-2.5"
+      bodyClassName="px-3 sm:px-4 pb-4 sm:pb-5 pt-2.5 sm:pt-3"
+      footerClassName="px-3 sm:px-4 py-2.5 gap-2"
       footer={[
         <Button
           key="cancel"
           label="Cancel"
           variant="outline"
           onClick={onClose}
-          className="px-5"
+          size="sm"
+          className="min-h-9 w-24 justify-center px-3 text-xs font-semibold sm:w-24"
         />,
         <Button
           key="save"
           label="Save"
           variant="primary"
           onClick={handleSave}
-          className="px-12"
+          size="sm"
+          className="min-h-9 w-24 justify-center px-3 text-xs font-semibold sm:w-24"
         />,
       ]}
     >
       <div className="ds-modal-body-stack">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
           <InputField
             label="Voucher Number"
             name="voucherNo"
@@ -105,7 +110,7 @@ const PayNowModal = ({ open, onClose, voucherData, onSaved }) => {
             placeholder="Auto"
           />
           <div className="flex flex-col">
-            <label className="mb-1 text-xs font-medium text-dark">Date</label>
+            <label className="mb-1 text-sm font-semibold text-dark">Date</label>
             <DatePicker
               value={form.date}
               onChange={(date) => setForm({ ...form, date })}
@@ -114,7 +119,7 @@ const PayNowModal = ({ open, onClose, voucherData, onSaved }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 sm:gap-3">
           <CommonDropdown
             label="Payment Through"
             addNavigateTo="/dashboard/account"

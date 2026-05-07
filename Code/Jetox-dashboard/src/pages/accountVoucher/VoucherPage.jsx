@@ -29,6 +29,13 @@ import ManufacturingOverview from "./manufacturing/ManufacturingOverview";
 import PurchaseVoucherModal from "./purchase/PurchaseVoucherModal";
 import { purchaseReturnVouchersApi, purchaseVouchersApi } from "../../services/api";
 
+/** Matches `w-56` (14rem); clamp math must stay in sync with popover max-width below */
+const COLUMN_PICKER_MAX_WIDTH_PX = 224;
+
+/** Mobile payment summary: label left + value pill (aligned with HRM SummaryCard pattern). */
+const PAYMENT_SUMMARY_VALUE_PILL =
+  "inline-flex min-h-8 min-w-10 max-w-[min(100%,10rem)] shrink-0 items-center justify-center rounded-lg border border-slate-200/80 bg-gradient-to-br from-slate-100/90 to-slate-200/75 px-3 py-1 text-sm font-semibold tabular-nums text-slate-800 shadow-sm backdrop-blur-sm dark:border-slate-500/45 dark:from-slate-700/90 dark:to-slate-800/85 dark:text-slate-50 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]";
+
 const VoucherPage = () => {
   const { voucherSlug } = useParams();
   const navigate = useNavigate();
@@ -78,6 +85,37 @@ const VoucherPage = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isColumnPickerOpen]);
+
+  const computeColumnPickerPosition = useCallback(() => {
+    const btn = columnPickerButtonRef.current;
+    if (!btn) return null;
+    const rect = btn.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const margin = 12;
+    const popoverW = Math.min(COLUMN_PICKER_MAX_WIDTH_PX, vw - 2 * margin);
+    const half = popoverW / 2;
+    const centerX = rect.left + rect.width / 2;
+    const clampedLeft = Math.min(
+      Math.max(centerX, half + margin),
+      vw - half - margin
+    );
+    return { top: rect.bottom + 8, left: clampedLeft };
+  }, []);
+
+  useEffect(() => {
+    if (!isColumnPickerOpen) return undefined;
+    const update = () => {
+      const next = computeColumnPickerPosition();
+      if (next) setColumnPickerPosition(next);
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [isColumnPickerOpen, computeColumnPickerPosition]);
 
   const [activeModalKey, setActiveModalKey] = useState(null);
 
@@ -218,11 +256,8 @@ const VoucherPage = () => {
 
   const toggleColumnPicker = () => {
     if (!isColumnPickerOpen && columnPickerButtonRef.current) {
-      const rect = columnPickerButtonRef.current.getBoundingClientRect();
-      setColumnPickerPosition({
-        top: rect.bottom + 8 + window.scrollY,
-        left: rect.left + rect.width / 2 + window.scrollX,
-      });
+      const next = computeColumnPickerPosition();
+      if (next) setColumnPickerPosition(next);
     }
     setIsColumnPickerOpen((prev) => !prev);
   };
@@ -453,8 +488,36 @@ const VoucherPage = () => {
         </div>
 
         {paymentSummary && (
-          <div className="rounded-xl border border-light-border bg-white p-2.5 sm:p-3 dark:border-slate-600 dark:bg-slate-900">
-            <div className="grid grid-cols-1 gap-3 text-center md:grid-cols-3">
+          <div className="relative overflow-hidden rounded-xl border border-slate-200/55 bg-gradient-to-br from-white/80 via-slate-50/45 to-slate-100/30 p-3 shadow-sm backdrop-blur-md dark:border-slate-500/45 dark:from-slate-900/80 dark:via-slate-800/55 dark:to-slate-900/45 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] sm:p-3.5">
+            {/* Mobile & tablet &lt; md: same row layout as HRM “Total employees” summary card */}
+            <ul className="flex min-w-0 flex-col divide-y divide-slate-200/70 dark:divide-slate-600/70 md:hidden !mb-0">
+              <li className="flex items-center justify-between gap-3 py-3 first:pt-0">
+                <span className="min-w-0 flex-1 text-left text-sm font-semibold leading-tight text-slate-700 dark:text-slate-200">
+                  Total Amount Paid (₹)
+                </span>
+                <div className={`${PAYMENT_SUMMARY_VALUE_PILL} truncate font-bold`}>
+                  {paymentSummary.totalAmount}
+                </div>
+              </li>
+              <li className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0 flex-1 text-left text-sm font-semibold leading-tight text-slate-700 dark:text-slate-200">
+                  Cash (₹)
+                </span>
+                <div className={`${PAYMENT_SUMMARY_VALUE_PILL} truncate`}>
+                  {paymentSummary.cashAmount}
+                </div>
+              </li>
+              <li className="flex items-center justify-between gap-3 pb-0 pt-3 last:pb-0">
+                <span className="min-w-0 flex-1 text-left text-sm font-semibold leading-tight text-slate-700 dark:text-slate-200">
+                  Bank (₹)
+                </span>
+                <div className={`${PAYMENT_SUMMARY_VALUE_PILL} truncate font-bold`}>
+                  {paymentSummary.bankAmount}
+                </div>
+              </li>
+            </ul>
+
+            <div className="hidden grid-cols-1 gap-3 text-center md:grid md:grid-cols-3">
               <div className="flex flex-col border-gray-200 md:border-r dark:border-slate-600">
                 <div className="text-base font-bold text-dark sm:text-lg dark:text-slate-100">
                   {paymentSummary.totalAmount}
@@ -523,15 +586,15 @@ const VoucherPage = () => {
         )}
 
         {isColumnPickerOpen && (
-          <div className="fixed inset-0 right-6" style={{ zIndex: 999 }}>
-          <div
-            ref={columnPickerPopupRef}
-            className="absolute w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-light-border bg-white shadow-lg dark:border-slate-600 dark:bg-slate-900 dark:shadow-xl dark:shadow-black/40"
-            style={{
-              top: columnPickerPosition.top,
-              left: columnPickerPosition.left,
-            }}
-          >
+          <div className="fixed inset-0 z-[999]">
+            <div
+              ref={columnPickerPopupRef}
+              className="absolute w-[min(14rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 overflow-hidden rounded-lg border border-light-border bg-white shadow-lg dark:border-slate-600 dark:bg-slate-900 dark:shadow-xl dark:shadow-black/40"
+              style={{
+                top: columnPickerPosition.top,
+                left: columnPickerPosition.left,
+              }}
+            >
             <div className="flex justify-between border-b border-light-border bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-800">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Add Column
@@ -572,7 +635,7 @@ const VoucherPage = () => {
                 );
               })}
             </div>
-          </div>
+            </div>
           </div>
         )}
 

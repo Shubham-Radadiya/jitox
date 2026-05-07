@@ -253,6 +253,7 @@ const AddProductModal = ({
       onClose={onClose}
       title={modalTitle}
       width="780px"
+      shellClassName="max-sm:!px-5 max-sm:!py-7 sm:!p-5"
       bodyClassName="!pt-2 !pb-8 sm:!px-3.5 sm:!pb-10"
       footer={footerActions}
     >

@@ -150,7 +150,7 @@ export function EmployeeTrackingMap({ mapTrack, className = "" }) {
 
   return (
     <div className={`space-y-1 ${className}`}>
-      <div className="rounded-md overflow-hidden border border-light-border h-52 sm:h-60">
+      <div className="h-44 overflow-hidden rounded-md border border-light-border sm:h-60">
         <div ref={containerRef} className="h-full w-full leaflet-root" />
       </div>
       {total != null && total > 0 && (

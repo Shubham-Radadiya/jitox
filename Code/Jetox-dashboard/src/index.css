@@ -73,6 +73,14 @@
   [role="button"][aria-disabled="true"] {
     cursor: not-allowed;
   }
+
+  /* Hide native password reveal/clear so custom toggle icons do not stack (Edge / IE legacy). */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }
 
 button.text-primary {
@@ -220,6 +228,248 @@ button.text-blue {
 .dark .ant-picker-clear {
   color: #94a3b8 !important;
 }
+
+/* Ant Design Modal + Select: match JITOX form theme (light + dark). */
+.jitox-ant-modal .ant-modal-content {
+  border-radius: 1rem !important;
+  border: 1px solid var(--color-light-border) !important;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18) !important;
+}
+
+.jitox-ant-modal .ant-modal-header {
+  border-bottom: 1px solid var(--color-light-border) !important;
+  background: #ffffff !important;
+}
+
+.jitox-ant-modal .ant-modal-title {
+  font-weight: 600 !important;
+  color: #111827 !important;
+}
+
+.jitox-ant-modal .ant-modal-close {
+  color: #64748b !important;
+}
+.jitox-ant-modal .ant-modal-close:hover {
+  color: #0f172a !important;
+}
+
+.jitox-ant-modal .ant-modal-body {
+  padding-top: 12px !important;
+}
+
+/* Inputs inside modal */
+.jitox-ant-modal .ant-input,
+.jitox-ant-modal .ant-input-affix-wrapper,
+.jitox-ant-modal .ant-input-textarea-affix-wrapper {
+  border-radius: 0.5rem !important;
+  border-color: #e5e7eb !important;
+  background: #f8fafc !important;
+}
+.jitox-ant-modal .ant-input {
+  padding: 8px 12px !important;
+}
+.jitox-ant-modal .ant-input:hover,
+.jitox-ant-modal .ant-input-affix-wrapper:hover,
+.jitox-ant-modal .ant-input-textarea-affix-wrapper:hover {
+  border-color: #cbd5e1 !important;
+  background: #ffffff !important;
+}
+.jitox-ant-modal .ant-input:focus,
+.jitox-ant-modal .ant-input-focused,
+.jitox-ant-modal .ant-input-affix-wrapper-focused,
+.jitox-ant-modal .ant-input-textarea-affix-wrapper-focused {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.22) !important;
+  background: #ffffff !important;
+}
+
+/* Selects inside modal */
+.jitox-ant-modal .jitox-ant-select.ant-select .ant-select-selector {
+  min-height: 40px !important;
+  border-radius: 0.5rem !important;
+  border-color: #e5e7eb !important;
+  background: #f8fafc !important;
+  padding: 4px 12px !important;
+  box-shadow: none !important;
+}
+.jitox-ant-modal .jitox-ant-select.ant-select:hover .ant-select-selector {
+  border-color: #cbd5e1 !important;
+  background: #ffffff !important;
+}
+.jitox-ant-modal .jitox-ant-select.ant-select-focused .ant-select-selector {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.22) !important;
+  background: #ffffff !important;
+}
+.jitox-ant-modal .jitox-ant-select .ant-select-selection-placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Footer buttons (primary + ghost) */
+.jitox-ant-modal .ant-modal-footer .ant-btn {
+  border-radius: 0.5rem !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  font-weight: 600 !important;
+}
+.jitox-ant-modal .ant-modal-footer .ant-btn-default {
+  border-color: #e5e7eb !important;
+  color: #0f172a !important;
+  background: #ffffff !important;
+}
+.jitox-ant-modal .ant-modal-footer .ant-btn-default:hover {
+  border-color: #cbd5e1 !important;
+  background: #f8fafc !important;
+}
+.jitox-ant-modal .ant-modal-footer .ant-btn-primary {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: #ffffff !important;
+}
+.jitox-ant-modal .ant-modal-footer .ant-btn-primary:hover {
+  opacity: 0.92 !important;
+}
+
+/* Dark (“ghost”) mode */
+.dark .jitox-ant-modal .ant-modal-content {
+  border-color: #334155 !important;
+  background: #0f172a !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42) !important;
+}
+.dark .jitox-ant-modal .ant-modal-header {
+  border-bottom-color: #334155 !important;
+  background: #0f172a !important;
+}
+.dark .jitox-ant-modal .ant-modal-title {
+  color: #e2e8f0 !important;
+}
+.dark .jitox-ant-modal .ant-modal-close {
+  color: #94a3b8 !important;
+}
+.dark .jitox-ant-modal .ant-modal-close:hover {
+  color: #e2e8f0 !important;
+}
+.dark .jitox-ant-modal .ant-input,
+.dark .jitox-ant-modal .ant-input-affix-wrapper,
+.dark .jitox-ant-modal .ant-input-textarea-affix-wrapper {
+  border-color: #334155 !important;
+  background: #020617 !important;
+  color: #e2e8f0 !important;
+}
+.dark .jitox-ant-modal .ant-input:hover,
+.dark .jitox-ant-modal .ant-input-affix-wrapper:hover,
+.dark .jitox-ant-modal .ant-input-textarea-affix-wrapper:hover {
+  border-color: #475569 !important;
+  background: #0b1220 !important;
+}
+.dark .jitox-ant-modal .ant-input:focus,
+.dark .jitox-ant-modal .ant-input-focused,
+.dark .jitox-ant-modal .ant-input-affix-wrapper-focused,
+.dark .jitox-ant-modal .ant-input-textarea-affix-wrapper-focused {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.3) !important;
+  background: #020617 !important;
+}
+.dark .jitox-ant-modal .jitox-ant-select.ant-select .ant-select-selector {
+  border-color: #334155 !important;
+  background: #020617 !important;
+  color: #e2e8f0 !important;
+}
+.dark .jitox-ant-modal .jitox-ant-select.ant-select:hover .ant-select-selector {
+  border-color: #475569 !important;
+  background: #0b1220 !important;
+}
+.dark .jitox-ant-modal .jitox-ant-select.ant-select-focused .ant-select-selector {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.3) !important;
+}
+.dark .jitox-ant-modal .ant-modal-footer .ant-btn-default {
+  border-color: #334155 !important;
+  background: transparent !important;
+  color: #e2e8f0 !important;
+}
+.dark .jitox-ant-modal .ant-modal-footer .ant-btn-default:hover {
+  background: rgba(148, 163, 184, 0.08) !important;
+}
+
+/* Task create modal: extra polish for ghost mode */
+.jitox-task-create-modal .ant-modal-content {
+  overflow: hidden;
+}
+
+.jitox-task-create-modal .ant-modal-body {
+  padding-top: 14px !important;
+}
+
+.jitox-task-create-modal .ant-input::placeholder,
+.jitox-task-create-modal .ant-picker-input > input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.jitox-task-create-modal .ant-input,
+.jitox-task-create-modal .ant-input-affix-wrapper,
+.jitox-task-create-modal .ant-input-textarea-affix-wrapper,
+.jitox-task-create-modal .jitox-ant-select.ant-select .ant-select-selector,
+.jitox-task-create-modal .jitox-picker-form.ant-picker {
+  min-height: 42px;
+}
+
+.jitox-task-create-modal .ant-input {
+  font-size: 14px !important;
+}
+
+.jitox-task-create-modal .ant-input-textarea textarea {
+  min-height: 112px !important;
+}
+
+.jitox-task-create-modal .jitox-task-attach-btn.ant-btn {
+  height: 40px !important;
+  border-radius: 0.6rem !important;
+  font-weight: 500 !important;
+}
+
+.dark .jitox-task-create-modal .ant-modal-content {
+  background: linear-gradient(180deg, #0f172a 0%, #0b1324 100%) !important;
+}
+
+.dark .jitox-task-create-modal .ant-modal-body {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.dark .jitox-task-create-modal .ant-input::placeholder,
+.dark .jitox-task-create-modal .ant-picker-input > input::placeholder {
+  color: #64748b !important;
+}
+
+.dark .jitox-task-create-modal .ant-input,
+.dark .jitox-task-create-modal .ant-input-affix-wrapper,
+.dark .jitox-task-create-modal .ant-input-textarea-affix-wrapper,
+.dark .jitox-task-create-modal .jitox-ant-select.ant-select .ant-select-selector,
+.dark .jitox-task-create-modal .jitox-picker-form.ant-picker {
+  border-color: #334155 !important;
+  background: #020817 !important;
+}
+
+.dark .jitox-task-create-modal .ant-input:hover,
+.dark .jitox-task-create-modal .ant-input-affix-wrapper:hover,
+.dark .jitox-task-create-modal .ant-input-textarea-affix-wrapper:hover,
+.dark .jitox-task-create-modal .jitox-ant-select.ant-select:hover .ant-select-selector,
+.dark .jitox-task-create-modal .jitox-picker-form.ant-picker:hover {
+  border-color: #475569 !important;
+  background: #0b1220 !important;
+}
+
+.dark .jitox-task-create-modal .jitox-task-attach-btn.ant-btn {
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+  background: #0f172a !important;
+}
+
+.dark .jitox-task-create-modal .jitox-task-attach-btn.ant-btn:hover {
+  border-color: #64748b !important;
+  color: #f1f5f9 !important;
+  background: #111b2f !important;
+}
 .dark .ant-picker-separator {
   color: #64748b !important;
 }
@@ -297,4 +547,25 @@ button.text-blue {
 .dark .jitox-orders-table-wrap::-webkit-scrollbar-thumb {
   background: rgb(71 85 105);
   border-radius: 4px;
+}
+
+/* Ant Design Dropdown: Dark (Ghost) Mode */
+.dark .ant-dropdown .ant-dropdown-menu {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+}
+.dark .ant-dropdown .ant-dropdown-menu-item {
+  color: #e2e8f0 !important;
+}
+.dark .ant-dropdown .ant-dropdown-menu-item:hover,
+.dark .ant-dropdown .ant-dropdown-menu-item-active {
+  background: #1e293b !important;
+  color: #ffffff !important;
+}
+.dark .ant-dropdown .ant-dropdown-menu-item-divider {
+  background: #334155 !important;
+}
+.dark .ant-dropdown .ant-dropdown-menu-item-disabled {
+  color: #64748b !important;
 }

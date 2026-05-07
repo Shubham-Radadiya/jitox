@@ -196,22 +196,29 @@ export default function HrmDashboard() {
                   key={m.key}
                   type="button"
                   onClick={() => navigate(m.path)}
-                  className="group flex cursor-pointer flex-col gap-2.5 rounded-xl border border-slate-200/70 bg-white/75 p-4 text-left shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/70 hover:bg-white/90 hover:shadow-md dark:border-slate-600/50 dark:bg-slate-900/50 dark:backdrop-blur-md dark:hover:border-emerald-500/40 dark:hover:bg-slate-800/65 dark:hover:shadow-lg dark:hover:shadow-black/20"
+                  className="group flex cursor-pointer flex-col gap-3 rounded-xl border border-slate-200/70 bg-white/75 p-4 text-left shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/70 hover:bg-white/90 hover:shadow-md dark:border-slate-600/50 dark:bg-slate-900/50 dark:backdrop-blur-md dark:hover:border-emerald-500/40 dark:hover:bg-slate-800/65 dark:hover:shadow-lg dark:hover:shadow-black/20 sm:gap-2.5"
                 >
-                  <div
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ring-1 ${m.tint}`}
-                  >
-                    <Icon className="h-4 w-4" aria-hidden />
+                  <div className="flex min-w-0 flex-row items-start gap-3 sm:flex-col sm:gap-2.5">
+                    <div
+                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ${m.tint}`}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1 sm:flex sm:flex-none sm:flex-col sm:gap-0.5">
+                      <h3 className="text-sm font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-600 dark:text-slate-100 dark:group-hover:text-emerald-400">
+                        {m.title}
+                      </h3>
+                      {/* Desktop: description directly under title */}
+                      <p className="hidden line-clamp-2 text-xs leading-snug text-gray-500 sm:block dark:text-slate-400">
+                        {m.desc}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 transition-colors group-hover:text-emerald-600 dark:text-slate-100 dark:group-hover:text-emerald-400">
-                      {m.title}
-                    </h3>
-                    <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-gray-500 dark:text-slate-400">
-                      {m.desc}
-                    </p>
-                  </div>
-                  <span className="mt-auto inline-flex items-center gap-1 pt-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  {/* Mobile only: description below the icon + title row */}
+                  <p className="-mt-1 line-clamp-2 text-xs leading-snug text-gray-500 sm:hidden dark:text-slate-400">
+                    {m.desc}
+                  </p>
+                  <span className="mt-auto inline-flex items-center gap-1 pt-0.5 text-xs font-medium text-emerald-600 max-sm:w-full max-sm:justify-end dark:text-emerald-400">
                     Open
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </span>

@@ -68,45 +68,57 @@ export default function CreateTaskModal({
       okText="Create"
       confirmLoading={saving}
       okButtonProps={{ disabled: !title.trim() || assigneeIds.length === 0 }}
+      cancelButtonProps={{ disabled: saving }}
+      rootClassName="jitox-ant-modal jitox-task-create-modal"
       width={560}
       destroyOnClose
     >
-      <div className="flex flex-col gap-3 pt-2">
-        <div>
-          <div className="text-xs font-medium text-gray-600 mb-1">Title</div>
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Task title"
-          />
+      <div className="flex flex-col gap-2.5 -mt-1">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div>
+            <div className="mb-1 text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+              Title
+            </div>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Task title"
+            />
+          </div>
+          <div>
+            <div className="mb-1 text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+              Assign to
+            </div>
+            <Select
+              mode="multiple"
+              allowClear
+              className="w-full jitox-ant-select"
+              placeholder="Select users"
+              options={opts}
+              value={assigneeIds}
+              onChange={setAssigneeIds}
+              optionFilterProp="label"
+            />
+          </div>
         </div>
         <div>
-          <div className="text-xs font-medium text-gray-600 mb-1">Description</div>
+          <div className="mb-1 text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+            Description
+          </div>
           <TextArea
-            rows={3}
+            rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Details…"
           />
         </div>
-        <div>
-          <div className="text-xs font-medium text-gray-600 mb-1">Assign to</div>
-          <Select
-            mode="multiple"
-            allowClear
-            className="w-full"
-            placeholder="Select users"
-            options={opts}
-            value={assigneeIds}
-            onChange={setAssigneeIds}
-            optionFilterProp="label"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5">
           <div>
-            <div className="text-xs font-medium text-gray-600 mb-1">Priority</div>
+            <div className="mb-1 text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+              Priority
+            </div>
             <Select
-              className="w-full"
+              className="w-full jitox-ant-select"
               value={priority}
               onChange={setPriority}
               options={[
@@ -117,15 +129,19 @@ export default function CreateTaskModal({
             />
           </div>
           <div>
-            <div className="text-xs font-medium text-gray-600 mb-1">Due date</div>
-            <DatePicker className="w-full" value={due} onChange={setDue} />
+            <div className="mb-1 text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+              Due date
+            </div>
+            <DatePicker className="w-full jitox-picker-form" value={due} onChange={setDue} />
           </div>
         </div>
         <div>
-          <div className="text-xs font-medium text-gray-600 mb-1">Attachments (optional)</div>
+          <div className="mb-1 text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+            Attachments (optional)
+          </div>
           <div className="space-y-2">
             {attachments.map((row, i) => (
-              <div key={i} className="flex gap-2 items-center">
+              <div key={i} className="flex items-center gap-2">
                 <Input
                   placeholder="File name"
                   value={row.name}
@@ -146,7 +162,7 @@ export default function CreateTaskModal({
                 />
                 <button
                   type="button"
-                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                  className="rounded-md p-2 text-red-500 transition hover:bg-red-50 dark:hover:bg-red-950/30"
                   onClick={() => setAttachments(attachments.filter((_, j) => j !== i))}
                   aria-label="Remove row"
                 >
@@ -157,6 +173,7 @@ export default function CreateTaskModal({
             <Button
               type="dashed"
               block
+              className="jitox-task-attach-btn"
               icon={<Plus size={14} />}
               onClick={() => setAttachments([...attachments, { name: "", url: "" }])}
             >

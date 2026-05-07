@@ -19,7 +19,7 @@ const ROLE_OPTIONS = [
 ];
 
 const CARD =
-  "p-4 rounded-xl border border-light-border bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]";
+  "rounded-xl border border-light-border bg-white p-3 shadow-sm sm:p-4 dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]";
 const CARD_TITLE = "text-sm font-semibold text-slate-900 dark:text-slate-100";
 
 function mapRoleToApi(value) {
@@ -190,8 +190,9 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
       open={open}
       onClose={onClose}
       title="Add User"
-      width="min(680px, 94vw)"
-      footerClassName="!px-5 sm:!px-6"
+      width="min(640px, 94vw)"
+      bodyClassName="px-3 sm:px-5 pb-4 sm:pb-8 pt-2.5 sm:pt-4"
+      footerClassName="!px-3 !py-2.5 sm:!px-6"
       footer={[
         <Button
           key="cancel"
@@ -212,7 +213,7 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
         />,
       ]}
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-col items-center gap-2">
           <input
             type="file"
@@ -254,8 +255,8 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
         </div>
 
         <div className={CARD}>
-          <div className={`${CARD_TITLE} mb-4`}>Basic Information</div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className={`${CARD_TITLE} mb-3 sm:mb-4`}>Basic Information</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
             <div className="flex flex-col gap-1">
               <InputField
                 label="Name"
@@ -293,7 +294,7 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mt-4">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:mt-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
             <CommonDropdown
               label="Role"
               addNavigateTo="/dashboard/user-master"
@@ -337,7 +338,7 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
             />
           </div>
 
-          <div className="mt-6 border-t border-light-border pt-4 dark:border-slate-600">
+          <div className="mt-5 border-t border-light-border pt-3 sm:mt-6 sm:pt-4 dark:border-slate-600">
             <div className={`${CARD_TITLE} mb-2`}>
               Address <span className="text-red-500">*</span>
             </div>
@@ -355,7 +356,7 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
             <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
               Admin assigns which sidebar sections this Manager or User can open.
             </p>
-            <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+            <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
               {MODULE_ACCESS_OPTIONS.map(({ key, label }) => (
                 <label
                   key={key}
@@ -381,8 +382,8 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
         )}
 
         <div className={CARD}>
-          <div className={`${CARD_TITLE} mb-4`}>Security</div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`${CARD_TITLE} mb-3 sm:mb-4`}>Security</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <div className="flex flex-col gap-1">
               <InputField
                 label="Password"

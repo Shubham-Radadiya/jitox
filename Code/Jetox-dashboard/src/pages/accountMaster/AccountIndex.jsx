@@ -1,7 +1,6 @@
-import { IoDocumentTextOutline, IoEyeOutline } from "react-icons/io5";
+import { Eye, FileText, PenLine } from "lucide-react";
 import { Button, CommonModal } from "../../components/ui/CommanUI";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import { TbEdit } from "react-icons/tb";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +12,11 @@ import { getApiErrorMessage, isEmptyListNotFound } from "../../utils/apiError";
 import { mapAccountToRow } from "../../utils/accountMappers";
 import { isAdminUser } from "../../utils/authSession";
 import { useTableData } from "../../hooks/useTableData";
-import { objectToHtmlTable, printHtmlDocument } from "../../utils/printAndExport";
+import {
+  objectToHtmlTable,
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
+} from "../../utils/printAndExport";
 import {
   TABLE_ACTION_ICON_BTN,
   tableTdClasses,
@@ -178,7 +181,7 @@ const AccountIndex = () => {
     navigate("/dashboard/account/ledger", { state: { accountId: row._id } });
   };
   const handleEdit = (row) => setAccountDetailRow(row);
-  const handleDocument = (row) => {
+  const handleDocument = async (row) => {
     const raw = row._raw || {};
     const detail = {
       "Party Name": row["Party Name"],
@@ -196,15 +199,25 @@ const AccountIndex = () => {
       "Credit (₹)": row["Credit (₹)"],
       "Debit (₹)": row["Debit (₹)"],
     };
-    printHtmlDocument(
-      `Account — ${row["Party Name"]}`,
-      `<h2 style="font-family:sans-serif">Detail statement</h2>${objectToHtmlTable(
-        detail
-      )}`
-    );
-    toast.success(
-      "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
-    );
+
+    const title = `Account — ${row["Party Name"]}`;
+    const bodyHtml = `<h2 style="font-family:sans-serif">Detail statement</h2>${objectToHtmlTable(
+      detail
+    )}`;
+    const fullHtml = buildStandalonePrintableHtml(title, bodyHtml, {
+      bodyPaddingPx: 10,
+      bodyFontSizePx: 12,
+      h1FontSizePx: 16,
+      tableCellPaddingPx: 5,
+    });
+
+    try {
+      await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
+      toast.success("PDF downloaded successfully.");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      toast.error("PDF generation failed. Please try again.");
+    }
   };
 
   const renderRowCell = (key, value, row) => {
@@ -230,7 +243,7 @@ const AccountIndex = () => {
           className={`${tableTdClasses(key)} whitespace-nowrap`}
         >
           <span
-            className={`inline-flex max-w-full items-center rounded-md border px-2 py-0.5 text-xs font-medium ${
+            className={`inline-flex max-w-full items-center rounded-md border px-2 py-1 text-sm font-medium leading-tight ${
               isInactive
                 ? "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/80 dark:bg-rose-950 dark:text-rose-50"
                 : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-600/80 dark:bg-emerald-950 dark:text-emerald-50"
@@ -268,7 +281,7 @@ const AccountIndex = () => {
   };
 
   const renderAccountActions = (row) => (
-    <td className="px-3 py-2.5 align-middle border-b border-gray-200 dark:border-slate-700">
+    <td className={tableTdClasses("Actions")}>
       <div className="flex items-center justify-center gap-2">
         <button
           type="button"
@@ -279,7 +292,7 @@ const AccountIndex = () => {
             handleView(row);
           }}
         >
-          <IoEyeOutline size={18} strokeWidth={2} />
+          <Eye size={18} strokeWidth={2} aria-hidden />
         </button>
         <button
           type="button"
@@ -290,7 +303,7 @@ const AccountIndex = () => {
             handleEdit(row);
           }}
         >
-          <TbEdit size={18} strokeWidth={2} />
+          <PenLine size={18} strokeWidth={2} aria-hidden />
         </button>
         <button
           type="button"
@@ -301,7 +314,7 @@ const AccountIndex = () => {
             handleDocument(row);
           }}
         >
-          <IoDocumentTextOutline size={18} />
+          <FileText size={18} strokeWidth={2} aria-hidden />
         </button>
       </div>
     </td>
@@ -311,17 +324,17 @@ const AccountIndex = () => {
     <DashboardLayout>
       <div className="flex flex-col gap-3 2xl:gap-4">
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
-            <div className="inline-flex rounded-lg border border-light-border bg-rowBg p-1 text-xs sm:mr-auto dark:border-slate-700 dark:bg-slate-800/50">
+          <div className="flex w-full flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <div className="flex h-10 w-full justify-center rounded-lg border border-light-border bg-rowBg p-1 sm:w-auto sm:justify-start sm:mr-auto dark:border-slate-700 dark:bg-slate-800/50">
               {VIEW_MODES.map((v) => (
                 <button
                   key={v.id}
                   type="button"
                   onClick={() => setViewMode(v.id)}
-                  className={`px-3 py-2 rounded-md ${
+                  className={`flex min-h-0 flex-1 items-center justify-center rounded-md px-2.5 text-sm font-medium sm:flex-none sm:px-3.5 ${
                     viewMode === v.id
-                      ? "bg-white text-dark shadow-sm font-medium dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
-                      : "text-light dark:text-slate-400"
+                      ? "bg-primary text-white shadow-sm dark:bg-primary dark:text-white"
+                      : "text-slate-600 hover:bg-white/70 dark:text-slate-400 dark:hover:bg-slate-800/90"
                   }`}
                 >
                   {v.label}
@@ -330,22 +343,23 @@ const AccountIndex = () => {
             </div>
 
             {isAdminUser() && (
-              <div className="flex h-10 items-center gap-2 text-xs text-light border border-light-border rounded-lg bg-white px-2 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                <span className="whitespace-nowrap text-[12px] text-dark/80 dark:text-slate-200">
+              <div className="flex h-10 w-full min-w-0 shrink-0 items-center justify-between gap-2 rounded-lg border border-light-border bg-white px-2.5 text-sm text-light sm:w-auto sm:justify-start sm:gap-2.5 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                <span className="whitespace-nowrap font-medium text-dark/90 dark:text-slate-200">
                   Customer activity
                 </span>
+                <div className="flex shrink-0 items-center gap-1.5">
                 <input
                   type="number"
                   min={1}
                   max={activityUnit === "days" ? 3660 : 120}
                   title="Customer Activity Timeframe"
-                  className="h-7 w-14 border border-light-border rounded px-1 text-dark dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className="h-8 w-[3.75rem] rounded border border-light-border px-1.5 text-sm tabular-nums text-dark dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   value={activityValueInput}
                   onChange={(e) => setActivityValueInput(e.target.value)}
                   onBlur={persistCustomerActivitySetting}
                 />
                 <select
-                  className="border border-light-border rounded px-1 py-1.5 text-dark text-[11px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className="h-8 min-w-[5.25rem] rounded border border-light-border bg-white px-2 py-0 text-sm text-dark dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   value={activityUnit}
                   onChange={async (e) => {
                     const next = e.target.value === "days" ? "days" : "months";
@@ -378,6 +392,7 @@ const AccountIndex = () => {
                   <option value="months">months</option>
                   <option value="days">days</option>
                 </select>
+                </div>
               </div>
             )}
 
@@ -385,7 +400,8 @@ const AccountIndex = () => {
               type="button"
               label="Add account"
               {...mergePageAddButton({
-                className: "w-full sm:w-auto justify-center min-h-9 px-3.5 text-[13px]",
+                className:
+                  "w-full shrink-0 !h-10 !min-h-10 !max-h-10 !py-0 !px-4 justify-center gap-1.5 !text-sm font-semibold sm:w-auto [&_svg]:!h-[17px] [&_svg]:!w-[17px]",
               })}
               onClick={() => setIsAddAccOpen(true)}
             />

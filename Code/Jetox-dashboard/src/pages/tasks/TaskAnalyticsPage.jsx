@@ -59,29 +59,29 @@ export default function TaskAnalyticsPage() {
 
   return (
     <>
-      <div className="space-y-2 mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Task analytics</h1>
-        <p className="text-sm text-gray-500">
+      <div className="space-y-1 mb-4 md:mb-5">
+        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-slate-100">Task analytics</h1>
+        <p className="text-sm text-gray-500 dark:text-slate-400">
           Volume, ownership, and completion trends (admin only).
         </p>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-20 text-gray-500">Loading analytics…</div>
+        <div className="text-center py-20 text-gray-500 dark:text-slate-400">Loading analytics…</div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-light-border bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-800 mb-4">Tasks by status</h2>
-            <div className="h-72">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 items-stretch">
+          <div className="rounded-2xl border border-light-border bg-white p-3 md:p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-200 mb-2 md:mb-3">Tasks by status</h2>
+            <div className="h-[190px] sm:h-[210px] md:h-[220px] lg:h-[240px] xl:h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                   <Pie
                     data={pieData}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={100}
+                    outerRadius="72%"
                     label={({ name, percent }) =>
                       `${name} ${(percent * 100).toFixed(0)}%`
                     }
@@ -90,21 +90,28 @@ export default function TaskAnalyticsPage() {
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "var(--color-headBg)", borderColor: "var(--color-light-border)", color: "var(--color-dark)", borderRadius: "8px" }}
+                    itemStyle={{ color: "var(--color-dark)" }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-light-border bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-800 mb-4">Tasks by user</h2>
-            <div className="h-72">
+          <div className="rounded-2xl border border-light-border bg-white p-3 md:p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-200 mb-2 md:mb-3">Tasks by user</h2>
+            <div className="h-[190px] sm:h-[210px] md:h-[220px] lg:h-[240px] xl:h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip />
+                <BarChart data={barData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-light-border)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--color-light)" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--color-light)" }} allowDecimals={false} />
+                  <Tooltip
+                    cursor={{ fill: "var(--color-rowBg)" }}
+                    contentStyle={{ backgroundColor: "var(--color-headBg)", borderColor: "var(--color-light-border)", color: "var(--color-dark)", borderRadius: "8px" }}
+                    itemStyle={{ color: "var(--color-dark)" }}
+                  />
                   <Bar dataKey="total" fill="#0d9488" name="Total" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="completed" fill="#34d399" name="Done" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -112,15 +119,26 @@ export default function TaskAnalyticsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-light-border bg-white p-4 shadow-sm lg:col-span-2">
-            <h2 className="text-sm font-semibold text-gray-800 mb-4">Tasks created over time</h2>
-            <div className="h-72">
+          <div className="rounded-2xl border border-light-border bg-white p-3 md:p-4 shadow-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-200 mb-2 md:mb-3">Tasks created over time</h2>
+            <div className="h-[190px] sm:h-[210px] md:h-[220px] lg:h-[240px] xl:h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={lineData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip />
+                <LineChart data={lineData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-light-border)" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 10, fill: "var(--color-light)" }} 
+                    tickFormatter={(val) => {
+                      if (!val) return "";
+                      const parts = val.split('-');
+                      return parts.length === 3 ? `${parts[1]}/${parts[2]}` : val;
+                    }}
+                  />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--color-light)" }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "var(--color-headBg)", borderColor: "var(--color-light-border)", color: "var(--color-dark)", borderRadius: "8px" }}
+                    itemStyle={{ color: "var(--color-dark)" }}
+                  />
                   <Line
                     type="monotone"
                     dataKey="count"

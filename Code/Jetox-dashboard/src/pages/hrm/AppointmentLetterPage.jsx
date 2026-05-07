@@ -8,6 +8,7 @@ import { Button, InputField, CommonDropdown } from "../../components/ui/CommanUI
 import { hrmApi } from "../../services/api";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { downloadHtmlDocumentAsPdf } from "../../utils/printAndExport";
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
@@ -27,6 +28,27 @@ export default function AppointmentLetterPage() {
     companyName: "Jitox Agro",
     companyAddress: "",
   });
+
+  const downloadAppointmentLetterPdfFromPath = async (path, fileHint = "employee") => {
+    if (!path) {
+      toast.error("Could not find generated document.");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}${path}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const fullHtml = await res.text();
+      const safeHint = String(fileHint || "employee")
+        .trim()
+        .replace(/[/\\?%*:|"<>]/g, "-")
+        .replace(/\s+/g, "-");
+      await downloadHtmlDocumentAsPdf(fullHtml, `appointment-letter-${safeHint}.pdf`);
+      toast.success("Appointment letter downloaded as PDF.");
+    } catch (err) {
+      console.error("Appointment letter PDF generation failed:", err);
+      toast.error("Could not download PDF from generated letter.");
+    }
+  };
 
   const { data: employees = [] } = useQuery({
     queryKey: ["hrm", "employees", "all"],
@@ -65,11 +87,11 @@ export default function AppointmentLetterPage() {
       });
       return data;
     },
-    onSuccess: (d) => {
+    onSuccess: async (d) => {
       toast.success("Appointment letter saved");
       qc.invalidateQueries({ queryKey: ["hrm", "appointment-letters"] });
-      const path = d?.previewUrl;
-      if (path) window.open(`${API_BASE}${path}`, "_blank", "noopener,noreferrer");
+      const path = d?.previewUrl || d?.documentPath;
+      await downloadAppointmentLetterPdfFromPath(path, form.employeeName);
     },
     onError: (e) =>
       toast.error(getApiErrorMessage(e, "Could not generate letter")),
@@ -241,10 +263,14 @@ export default function AppointmentLetterPage() {
                         </p>
                       </div>
                       {r.documentPath ? (
-                        <a
-                          href={`${API_BASE}${r.documentPath}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            downloadAppointmentLetterPdfFromPath(
+                              r.documentPath,
+                              r.employeeName || "employee"
+                            )
+                          }
                           className="inline-flex w-fit max-w-full shrink-0 items-center justify-center justify-self-end gap-1 rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white shadow-sm ring-1 ring-primary/40 hover:bg-emerald-600 hover:text-white hover:ring-emerald-600/50 active:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 dark:bg-primary dark:text-white dark:hover:bg-emerald-600"
                         >
                           Open
@@ -252,7 +278,7 @@ export default function AppointmentLetterPage() {
                             className="h-3 w-3 shrink-0 text-white opacity-95"
                             aria-hidden
                           />
-                        </a>
+                        </button>
                       ) : null}
                     </div>
                   </li>

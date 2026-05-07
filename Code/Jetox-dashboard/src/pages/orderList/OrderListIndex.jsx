@@ -348,13 +348,20 @@ const OrderListIndex = () => {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-1 dark:border-slate-700">
+        <div
+          className="min-w-0 border-b border-gray-200 pb-1 dark:border-slate-700 max-md:-mx-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:overscroll-x-contain max-md:px-1 max-md:[-webkit-overflow-scrolling:touch] max-md:touch-pan-x"
+          role="tablist"
+          aria-label="Order filters"
+        >
+          <div className="flex flex-nowrap items-center gap-2 md:flex-wrap">
           {tabs.map((t) => (
             <button
               key={t.key}
               type="button"
+              role="tab"
+              aria-selected={activeTab === t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-1.5 pb-2 px-0.5 text-xs transition rounded-t-md ${
+              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap pb-2 px-0.5 text-xs transition rounded-t-md ${
                 activeTab === t.key
                   ? "text-emerald-600 font-medium border-b-2 border-emerald-600 -mb-px dark:text-emerald-400"
                   : "text-gray-600 hover:text-gray-900 border-b-2 border-transparent dark:text-slate-400 dark:hover:text-slate-200"
@@ -372,6 +379,7 @@ const OrderListIndex = () => {
               </span>
             </button>
           ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">

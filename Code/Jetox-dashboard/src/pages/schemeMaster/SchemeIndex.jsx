@@ -139,7 +139,7 @@ const SchemeIndex = () => {
       <div className="ds-stack-major">
         <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <h1 className="min-w-0 truncate whitespace-nowrap text-base font-bold text-dark sm:text-xl">
+            <h1 className="min-w-0 truncate whitespace-nowrap text-base font-bold text-dark sm:text-xl !mb-0">
               All Scheme
             </h1>
             <span className="mt-0.5 rounded-full bg-blue/10 px-1.5 py-0.5 text-[10px] font-bold text-blue sm:mt-0 sm:px-2 sm:text-xs">

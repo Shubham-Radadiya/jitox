@@ -5,34 +5,47 @@ const UserAddedSuccessModal = ({ open, onClose, userData, onAddAnother }) => {
   if (!userData) return null;
 
   return (
-    <CommonModal open={open} onClose={onClose} width="450px" title="">
-      <div className="flex flex-col items-center text-center p-4">
-        {/* Success Illustration */}
-        <div className="mb-6 w-full max-w-[280px]">
-          <img src={successImg} alt="Success" className="w-full h-26 object-contain" />
+    <CommonModal
+      open={open}
+      onClose={onClose}
+      width="min(480px, 92vw)"
+      title=""
+      bodyClassName="!px-3 !pt-2.5 !pb-3.5 sm:!px-5 sm:!pt-4 sm:!pb-5"
+      footerClassName="hidden"
+    >
+      <div className="flex flex-col items-center text-center">
+        <div className="mb-2.5 w-full max-w-[180px] sm:mb-4 sm:max-w-[240px]">
+          <img src={successImg} alt="Success" className="h-20 w-full object-contain sm:h-24" />
         </div>
 
-        <h2 className="text-xl font-bold text-dark mb-4">Users Added Successfully</h2>
-        
-        <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-          <span className="font-semibold text-dark">{userData.name}</span> has been added as a new <span className="text-dark font-medium">{userData.role || "user"}</span> for <span className="text-dark font-medium">{userData.region || "All Regions"}</span> covering <span className="text-dark font-medium">{userData.assignedAreas || "All Areas"}</span>.
+        <h2 className="mb-1.5 text-base font-bold tracking-tight text-dark sm:mb-2 sm:text-2xl dark:text-slate-100">
+          Users Added Successfully
+        </h2>
+
+        <p className="mb-2.5 max-w-[38ch] text-[12px] leading-relaxed text-slate-600 sm:mb-3 sm:text-sm dark:text-slate-300">
+          <span className="font-semibold text-dark dark:text-slate-100">{userData.name}</span> has been added as a new{" "}
+          <span className="font-semibold text-dark dark:text-slate-100">{userData.role || "user"}</span> for{" "}
+          <span className="font-semibold text-dark dark:text-slate-100">{userData.region || "All Regions"}</span> covering{" "}
+          <span className="font-semibold text-dark dark:text-slate-100">{userData.assignedAreas || "All Areas"}</span>.
         </p>
 
-        <p className="text-sm font-medium text-primary mb-8">
+        <p className="mb-4 text-[13px] font-semibold text-primary sm:mb-5 sm:text-sm">
           Login credentials have been emailed to the {userData.role || "User"}
         </p>
 
-        <div className="flex gap-4 w-full">
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:gap-2.5">
           <Button
             label={`View ${userData.role || "User"} Profile`}
             variant="outline"
-            className="flex-1 text-primary border-primary hover:bg-primary/5 px-0 text-sm whitespace-nowrap"
+            size="sm"
+            className="w-full border-primary/45 max-sm:min-h-8! max-sm:px-2.5! max-sm:py-1! max-sm:text-[12px]! max-sm:leading-tight! font-semibold text-primary hover:bg-primary/10 sm:flex-1 sm:px-2 sm:py-1.5 sm:text-sm"
             onClick={onClose}
           />
           <Button
             label={`Add Another ${userData.role || "User"}`}
             variant="outline"
-            className="flex-1 text-dark border-gray-200 hover:bg-gray-50 px-0 text-sm whitespace-nowrap"
+            size="sm"
+            className="w-full border-slate-300 max-sm:min-h-8! max-sm:px-2.5! max-sm:py-1! max-sm:text-[12px]! max-sm:leading-tight! font-semibold text-dark hover:bg-slate-100 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800 sm:flex-1 sm:px-2 sm:py-1.5 sm:text-sm"
             onClick={() => {
               onClose();
               onAddAnother();

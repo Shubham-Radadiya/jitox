@@ -191,7 +191,7 @@ const ReceivableIndex = () => {
               !isLoading && rows.length > 0 ? renderFooter : undefined
             }
             renderAction={renderReceivableAction}
-            tableClassName="text-sm"
+            tableClassName="text-sm [&_th]:px-1.5 [&_th]:py-1 [&_td]:px-1.5 [&_td]:py-1"
             maxHeight="calc(100vh - 16rem)"
           />
         </div>

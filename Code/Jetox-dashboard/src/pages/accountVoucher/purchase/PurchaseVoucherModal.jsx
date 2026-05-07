@@ -69,9 +69,10 @@ export default function PurchaseVoucherModal({
       onClose={onClose}
       title=""
       hideClose
-      width="min(1320px, 98vw)"
+      width="1320px"
       size="4xl"
-      className="!max-w-[min(1320px,98vw)] w-full max-h-[min(94vh,56rem)] overflow-hidden border-slate-200/90 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-900/[0.05] dark:border-slate-700 dark:shadow-black/40 dark:ring-white/5"
+      shellClassName="max-sm:!px-3 max-sm:!py-4 sm:!p-5"
+      className="w-full max-h-[min(92dvh,56rem)] overflow-hidden border-slate-200/90 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-900/[0.05] dark:border-slate-700 dark:shadow-black/40 dark:ring-white/5 max-sm:max-h-[min(100dvh-5.5rem,56rem)]"
       bodyClassName="!p-0 !pt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
       footer={null}
     >

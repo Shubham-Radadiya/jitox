@@ -102,7 +102,7 @@ const Sidebar = () => {
             return (
               <li
                 key={`${entry.permissionKey}-link-${idx}`}
-                className="flex min-h-0 flex-1 basis-0"
+                className="flex min-h-0 flex-1 basis-0 max-h-[44px]"
               >
                 <NavLink
                   to={entry.path}

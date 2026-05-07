@@ -97,7 +97,43 @@ const UserMasterIndex = () => {
     "Total Users",
   ]);
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
+  const [columnPickerPos, setColumnPickerPos] = useState({ top: 0, left: 8 });
   const columnBtnRef = useRef(null);
+
+  const computeColumnPickerPosition = useCallback((rect) => {
+    const vw = window.innerWidth;
+    const popupWidth = Math.min(240, Math.max(208, vw - 16));
+    const left = Math.max(8, Math.min(rect.right - popupWidth, vw - popupWidth - 8));
+    return {
+      top: rect.bottom + 8,
+      left,
+    };
+  }, []);
+
+  const toggleColumnPicker = (event) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setColumnPickerPos(computeColumnPickerPosition(rect));
+    setIsColumnPickerOpen((prev) => !prev);
+  };
+
+  useEffect(() => {
+    if (!isColumnPickerOpen) return undefined;
+    const updatePosition = () => {
+      const rect = columnBtnRef.current?.getBoundingClientRect?.();
+      if (!rect) return;
+      setColumnPickerPos(computeColumnPickerPosition(rect));
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener?.("resize", updatePosition);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener?.("resize", updatePosition);
+    };
+  }, [isColumnPickerOpen, computeColumnPickerPosition]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -172,7 +208,7 @@ const UserMasterIndex = () => {
           <button
             type="button"
             ref={columnBtnRef}
-            onClick={() => setIsColumnPickerOpen(!isColumnPickerOpen)}
+            onClick={toggleColumnPicker}
             className="w-6 h-6 flex items-center justify-center rounded border border-gray-300 hover:bg-gray-50 transition-colors"
           >
             <Plus size={14} className="text-primary" />
@@ -182,7 +218,7 @@ const UserMasterIndex = () => {
       key: "Actions",
     });
     return list;
-  }, [visibleColumnKeys, isColumnPickerOpen]);
+  }, [visibleColumnKeys, toggleColumnPicker]);
 
   const renderRowCell = (key, value, row) => {
     if (key === "Employee ID") {
@@ -455,7 +491,7 @@ const UserMasterIndex = () => {
             <div
               ref={userActionsMenuRef}
               role="menu"
-              className="fixed z-200 w-40 rounded-xl border border-light-border bg-white py-2 shadow-xl dark:border-slate-600 dark:bg-slate-900"
+              className="fixed z-200 w-32 rounded-lg border border-light-border bg-white py-1.5 shadow-xl sm:w-40 sm:rounded-xl sm:py-2 dark:border-slate-600 dark:bg-slate-900"
               style={{
                 top: userActionsMenu.top,
                 right: userActionsMenu.right,
@@ -472,7 +508,7 @@ const UserMasterIndex = () => {
                   key={item}
                   type="button"
                   role="menuitem"
-                  className="block w-full px-4 py-2 text-right text-sm text-dark hover:bg-gray-50 cursor-pointer dark:hover:bg-slate-800"
+                  className="block w-full cursor-pointer px-2.5 py-1.5 text-right text-xs text-dark hover:bg-gray-50 sm:px-4 sm:py-2 sm:text-sm dark:hover:bg-slate-800"
                   onClick={() => {
                     setUserActionsMenu(null);
                     const tabSlug = item.toLowerCase().replace(/\s+/g, "-");
@@ -490,14 +526,14 @@ const UserMasterIndex = () => {
 
         {isColumnPickerOpen && (
           <div
-            className="absolute z-50 bg-white border border-light-border rounded-lg shadow-xl w-60 overflow-hidden dark:bg-slate-900 dark:border-slate-600"
+            className="fixed z-50 w-[min(15rem,calc(100vw-1rem))] overflow-hidden rounded-lg border border-light-border bg-white shadow-xl dark:border-slate-600 dark:bg-slate-900"
             style={{
-              top: columnBtnRef.current?.offsetTop + 32,
-              right: 16,
+              top: columnPickerPos.top,
+              left: columnPickerPos.left,
             }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-light-border bg-gray-50 dark:bg-slate-800/80 dark:border-slate-600">
-              <span className="text-sm font-semibold text-dark">Add Column</span>
+              <span className="text-sm font-semibold text-dark dark:text-slate-100">Add Column</span>
               <X
                 size={18}
                 className="text-gray-400 cursor-pointer"
@@ -516,7 +552,7 @@ const UserMasterIndex = () => {
                     checked={visibleColumnKeys.includes(col)}
                     onChange={() => toggleColumn(col)}
                   />
-                  <span className="text-sm text-gray-600">{col}</span>
+                  <span className="text-sm text-gray-600 dark:text-white">{col}</span>
                 </label>
               ))}
             </div>

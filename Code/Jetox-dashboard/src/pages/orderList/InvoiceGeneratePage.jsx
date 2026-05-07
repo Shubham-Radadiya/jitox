@@ -128,12 +128,12 @@ export default function InvoiceGeneratePage() {
       )
       .join("");
     return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${escapeHtml(invoiceNo)}</title>
-<style>html,body{margin:0;background:#fff;color:#111;height:auto;min-height:0;}body{font-family:system-ui,sans-serif;padding:10px 12px;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:6px 8px;font-size:13px;}</style></head><body>
-<h1 style="color:#0f766e;margin:0 0 4px;font-size:22px">Jitox Agro</h1>
-<p style="color:#666;font-size:11px;margin:0 0 8px">Sample address — Surat, Gujarat</p>
-<div style="display:flex;justify-content:space-between;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px">
-<div><div style="font-size:11px;color:#666">Invoice No</div><div style="font-weight:600">${escapeHtml(invoiceNo)}</div></div>
-<div style="text-align:right"><div style="font-size:11px;color:#666">Date</div><div>${escapeHtml(formatInvoiceDate(issueDate))}</div></div>
+<style>html,body{margin:0;background:#fff;color:#111;height:auto;min-height:0;}body{font-family:system-ui,sans-serif;padding:10px 12px;font-size:14px;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:5px 7px;font-size:14px;} .meta-row{font-size:14px;} .meta-label{font-weight:700;color:#374151;} .meta-value{font-weight:500;color:#111827;}</style></head><body>
+<h1 style="color:#0f766e;margin:0 0 4px;font-size:24px">Jitox Agro</h1>
+<p style="color:#666;font-size:12px;margin:0 0 8px">Sample address — Surat, Gujarat</p>
+<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px">
+<div class="meta-row"><span class="meta-label">Invoice No:</span> <span class="meta-value">${escapeHtml(invoiceNo)}</span></div>
+<div class="meta-row" style="text-align:right"><span class="meta-label">Date:</span> <span class="meta-value">${escapeHtml(formatInvoiceDate(issueDate))}</span></div>
 </div>
 <p><strong>Billed to:</strong> ${escapeHtml(client)}</p>
 <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rowHtml}</tbody></table>

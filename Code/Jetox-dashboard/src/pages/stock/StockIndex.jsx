@@ -314,7 +314,7 @@ const StockIndex = () => {
         {viewMode === "product" ? (
           <div className="rounded-xl jitox-panel jitox-panel--shadow p-2.5 sm:p-3 md:p-4 flex flex-col gap-2 sm:gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
-              <h2 className="text-sm font-semibold leading-snug text-dark sm:text-base md:text-lg">
+              <h2 className="text-sm font-semibold leading-snug text-dark sm:text-base">
                 Stock Management — Product Wise
               </h2>
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -323,6 +323,7 @@ const StockIndex = () => {
                   addNavigateTo="/dashboard/product"
                   className="min-w-0 flex-1 sm:w-40 sm:flex-none"
                   value={viewMode}
+                  filterBar
                   onChange={(v) => setViewMode(v)}
                   options={[
                     { label: "Product Wise", value: "product" },
@@ -332,9 +333,7 @@ const StockIndex = () => {
                 <Button
                   label="Add"
                   {...mergePageAddButton({
-                    size: "sm",
-                    className:
-                      "!min-h-8 shrink-0 px-3 text-xs sm:!min-h-10 sm:px-5 sm:text-[14px]",
+                    className: "!min-h-9 !px-3.5 !text-[13px]",
                   })}
                   onClick={() => setAddOpen(true)}
                 />
@@ -358,7 +357,7 @@ const StockIndex = () => {
         ) : (
           <div className="rounded-xl jitox-panel jitox-panel--shadow p-2.5 sm:p-3 md:p-4 flex flex-col gap-2 sm:gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
-              <h2 className="text-sm font-semibold leading-snug text-dark sm:text-base md:text-lg">
+              <h2 className="text-sm font-semibold leading-snug text-dark sm:text-base">
                 Stock Management — Group Wise
               </h2>
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -367,6 +366,7 @@ const StockIndex = () => {
                   addNavigateTo="/dashboard/product"
                   className="min-w-0 flex-1 sm:w-40 sm:flex-none"
                   value={viewMode}
+                  filterBar
                   onChange={(v) => setViewMode(v)}
                   options={[
                     { label: "Group Wise", value: "group" },
@@ -376,9 +376,7 @@ const StockIndex = () => {
                 <Button
                   label="Add"
                   {...mergePageAddButton({
-                    size: "sm",
-                    className:
-                      "!min-h-8 shrink-0 px-3 text-xs sm:!min-h-10 sm:px-5 sm:text-[14px]",
+                    className: "!min-h-9 !px-3.5 !text-[13px]",
                   })}
                   onClick={() => setAddOpen(true)}
                 />

@@ -78,7 +78,11 @@ const CashTransferModal = ({ open, onClose }) => {
         <div className="flex flex-col gap-2">
           <label className="text-xs font-medium text-dark">Attachment (Optional)</label>
           <div className="border border-dashed border-light-border rounded-xl bg-rowBg px-4 py-3 flex gap-3 items-center justify-center text-center">
-            <Button label="Upload" variant="outline" className="w-32 bg-white" />
+            <Button
+              label="Upload"
+              variant="outline"
+              className="w-32 bg-white !text-gray-900 shadow-sm hover:!text-white dark:bg-slate-800 dark:!text-white dark:shadow-none dark:border-slate-500 dark:hover:!text-white"
+            />
             <div>
             <div className="text-xs text-light">Choose images or drag & drop it here.</div>
             <div className="text-[11px] text-light">JPG, JPEG, PNG and WEBP, Max 20 MB.</div>

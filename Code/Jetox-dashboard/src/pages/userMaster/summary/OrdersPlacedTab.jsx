@@ -15,10 +15,10 @@ import {
 function DetailRow({ label, children }) {
   return (
     <>
-      <dt className="py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:pr-2 dark:text-slate-400">
+      <dt className="py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:py-2.5 sm:pr-2 sm:text-[11px] dark:text-slate-400">
         {label}
       </dt>
-      <dd className="min-w-0 py-2.5 text-left wrap-break-word text-xs font-semibold leading-snug text-slate-900 dark:text-slate-100 sm:text-sm">
+      <dd className="min-w-0 py-2 text-left wrap-break-word text-[11px] font-semibold leading-snug text-slate-900 sm:py-2.5 sm:text-sm dark:text-slate-100">
         {children}
       </dd>
     </>
@@ -147,15 +147,15 @@ const OrdersPlacedTab = () => {
           <tr className={rowBg}>
             <td
               colSpan={6}
-              className={`${TABLE_CELL_BORDER} border-t-0 bg-slate-50/90 px-3 py-3 sm:px-4 sm:py-4 dark:bg-slate-950/50`}
+              className={`${TABLE_CELL_BORDER} border-t-0 bg-slate-50/90 px-2 py-2.5 sm:px-4 sm:py-4 dark:bg-slate-950/50`}
             >
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
-                <div className="grid min-w-0 gap-6 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-slate-200 dark:lg:divide-slate-600">
+              <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm max-sm:max-h-[70vh] max-sm:overflow-y-auto sm:rounded-xl sm:p-4 dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
+                <div className="grid min-w-0 gap-3.5 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-slate-200 dark:lg:divide-slate-600">
                   <div className="min-w-0 lg:pr-6 xl:pr-8">
-                    <h4 className="mb-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                    <h4 className="mb-1.5 text-xs font-bold text-slate-900 sm:mb-2 sm:text-sm dark:text-slate-100">
                       Person Details
                     </h4>
-                    <dl className="grid grid-cols-1 items-start gap-x-0 gap-y-0 sm:grid-cols-[15rem_minmax(0,1fr)] sm:gap-x-3">
+                    <dl className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-start gap-x-2 gap-y-0 sm:grid-cols-[15rem_minmax(0,1fr)] sm:gap-x-3">
                       <DetailRow label="Contact">
                         {row.personDetails.contact}
                       </DetailRow>
@@ -178,10 +178,10 @@ const OrdersPlacedTab = () => {
                   </div>
 
                   <div className="min-w-0 lg:pl-6 xl:pl-8">
-                    <h4 className="mb-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                    <h4 className="mb-1.5 text-xs font-bold text-slate-900 sm:mb-2 sm:text-sm dark:text-slate-100">
                       Dispatch Details
                     </h4>
-                    <dl className="grid grid-cols-1 items-start gap-x-0 gap-y-0 sm:grid-cols-[15rem_minmax(0,1fr)] sm:gap-x-3">
+                    <dl className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-start gap-x-2 gap-y-0 sm:grid-cols-[15rem_minmax(0,1fr)] sm:gap-x-3">
                       <DetailRow label="Payment method">
                         {row.dispatchDetails.paymentMethod}
                       </DetailRow>
@@ -195,8 +195,8 @@ const OrdersPlacedTab = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600">
-                  <table className="w-full border-collapse text-sm">
+                <div className="mt-3 overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 max-sm:max-h-48 [-webkit-overflow-scrolling:touch] touch-pan-x dark:border-slate-600 sm:mt-4">
+                  <table className="w-full min-w-[30rem] border-collapse text-xs sm:min-w-0 sm:text-sm">
                     <thead>
                       <tr>
                         <th className={tableThClasses("Description")}>Description</th>

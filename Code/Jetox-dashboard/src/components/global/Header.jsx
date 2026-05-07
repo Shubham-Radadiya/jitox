@@ -91,8 +91,8 @@ const Header = ({
 
   return (
     <>
-      <header className="flex h-14 min-h-14 w-full shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 sm:gap-3 sm:px-6 dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+      <header className="flex h-14 min-h-14 w-full shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-2.5 sm:gap-3 sm:px-6 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
           {isMobile && (
             <button
               type="button"
@@ -106,7 +106,7 @@ const Header = ({
           <div className="min-w-0 py-0.5">
             {pageTitle ? (
               <>
-                <div className="truncate text-base font-semibold leading-tight tracking-tight text-gray-900 sm:text-[17px] dark:text-slate-100">
+                <div className="truncate text-[15px] font-semibold leading-tight tracking-tight text-gray-900 sm:text-[17px] dark:text-slate-100">
                   {pageTitle}
                 </div>
                 {pageSubtitle && (
@@ -127,9 +127,9 @@ const Header = ({
             )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <div
-            className="flex h-9 max-h-9 min-w-0 max-w-[10rem] items-center gap-2 rounded-lg bg-primary px-1.5 text-white shadow-sm ring-1 ring-primary/20 sm:max-w-[14rem]"
+            className="flex h-9 max-h-9 min-w-9 max-w-[2.25rem] items-center justify-center gap-2 rounded-lg bg-primary px-0 text-white shadow-sm ring-1 ring-primary/20 sm:min-w-0 sm:max-w-[14rem] sm:justify-start sm:px-1.5"
             title={profileTitle}
           >
             <div
@@ -150,7 +150,7 @@ const Header = ({
               ) : null}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200/80 bg-slate-50/90 p-1 shadow-sm dark:border-slate-600 dark:bg-slate-800/80">
+          <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-slate-200/80 bg-slate-50/90 p-0.5 shadow-sm dark:border-slate-600 dark:bg-slate-800/80 sm:gap-1 sm:rounded-xl sm:p-1">
             <button
               type="button"
               onClick={() => setShowNotifications((v) => !v)}

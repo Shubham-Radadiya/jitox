@@ -129,17 +129,17 @@ export default function TargetProductIncentivePage() {
                       {productLineFooterCols.map((col) => {
                         if (col === "Prod. Group") {
                           return (
-                            <td key={col} className="border-0 px-3 py-2.5 font-semibold text-slate-900 dark:text-slate-100">
+                            <td key={col} className="border-0 px-2 py-1.5 font-semibold text-slate-900 sm:px-3 sm:py-2.5 dark:text-slate-100">
                               Total
                             </td>
                           );
                         }
                         if (col === "Prod. Category" || col === "Prod. Name") {
-                          return <td key={col} className="border-0 px-3 py-2.5" />;
+                          return <td key={col} className="border-0 px-2 py-1.5 sm:px-3 sm:py-2.5" />;
                         }
                         if (col === "Qty") {
                           return (
-                            <td key={col} className="border-0 px-3 py-2.5 text-left font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                            <td key={col} className="border-0 px-2 py-1.5 text-left font-semibold tabular-nums text-slate-900 sm:px-3 sm:py-2.5 dark:text-slate-100">
                               {lineTotals.qty.toLocaleString("en-IN")}
                             </td>
                           );
@@ -148,7 +148,7 @@ export default function TargetProductIncentivePage() {
                           return (
                             <td
                               key={col}
-                              className="border-0 px-3 py-2.5 font-semibold tabular-nums text-slate-900 dark:text-slate-100"
+                              className="border-0 px-2 py-1.5 font-semibold tabular-nums text-slate-900 sm:px-3 sm:py-2.5 dark:text-slate-100"
                             >
                               {fmt(lineTotals.selling)}
                             </td>
@@ -156,16 +156,16 @@ export default function TargetProductIncentivePage() {
                         }
                         if (col === "Total (₹)") {
                           return (
-                            <td key={col} className="border-0 px-3 py-2.5 font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                            <td key={col} className="border-0 px-2 py-1.5 font-semibold tabular-nums text-slate-900 sm:px-3 sm:py-2.5 dark:text-slate-100">
                               {fmt(lineTotals.total)}
                             </td>
                           );
                         }
                         if (col === "% Incentive") {
-                          return <td key={col} className="border-0 px-3 py-2.5" />;
+                          return <td key={col} className="border-0 px-2 py-1.5 sm:px-3 sm:py-2.5" />;
                         }
                         return (
-                          <td key={col} className="border-0 px-3 py-2.5 font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                          <td key={col} className="border-0 px-2 py-1.5 font-semibold tabular-nums text-slate-900 sm:px-3 sm:py-2.5 dark:text-slate-100">
                             {fmt(lineTotals.incentive)}
                           </td>
                         );
@@ -207,20 +207,20 @@ export default function TargetProductIncentivePage() {
                     {sumCols.map((col) => {
                       if (col === "Group") {
                         return (
-                          <td key={col} className="border-0 px-3 py-2.5 font-semibold text-slate-900 dark:text-slate-100">
+                          <td key={col} className="border-0 px-2 py-1.5 font-semibold text-slate-900 sm:px-3 sm:py-2.5 dark:text-slate-100">
                             Total
                           </td>
                         );
                       }
                       if (col === "Total Sales (₹)") {
                         return (
-                          <td key={col} className="border-0 px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                          <td key={col} className="border-0 px-2 py-1.5 text-right font-semibold tabular-nums text-slate-900 sm:px-3 sm:py-2.5 dark:text-slate-100">
                             {fmt(totals.sales)}
                           </td>
                         );
                       }
                       return (
-                        <td key={col} className="border-0 px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                        <td key={col} className="border-0 px-2 py-1.5 text-right font-semibold tabular-nums text-slate-900 sm:px-3 sm:py-2.5 dark:text-slate-100">
                           {fmt(totals.incentive)}
                         </td>
                       );

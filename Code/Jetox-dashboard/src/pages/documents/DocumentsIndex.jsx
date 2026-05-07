@@ -437,12 +437,8 @@ const DocumentsIndex = () => {
                 className="flex flex-col gap-3 rounded-2xl jitox-panel jitox-panel--shadow p-3 sm:gap-4 sm:p-4"
               >
                 <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                  <div className="flex h-5 w-5 items-center justify-center text-base leading-none sm:text-lg">
-                    {cat.icon}
-                  </div>
-                  <span className="truncate text-sm font-bold leading-none text-dark sm:text-base">
-                    {cat.name}
-                  </span>
+                  <div className="text-xl">{cat.icon}</div>
+                  <h4 className="truncate text-sm font-bold text-dark sm:text-base !mb-0">{cat.name}</h4>
                   <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded leading-none">
                     {cat.count}
                   </span>

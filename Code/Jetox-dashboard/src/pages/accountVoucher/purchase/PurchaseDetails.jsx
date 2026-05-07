@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import {
   buildPurchaseDetailShareText,
   downloadPurchaseDetailCsv,
-  printPurchaseDetailBill,
+  downloadPurchaseDetailBillPdf,
   shareOrCopyText,
 } from "../../../utils/voucherShare";
 
@@ -242,14 +242,13 @@ const PurchaseDetails = ({ open, onClose, data }) => {
           <button
             type="button"
             className="flex flex-col items-center justify-center gap-1 py-3 text-xs font-semibold text-slate-800 transition hover:bg-slate-200/80 dark:text-slate-200 dark:hover:bg-slate-700 md:py-3.5 md:text-sm"
-            onClick={() => {
-              const ok = printPurchaseDetailBill(data);
-              if (ok) {
-                toast.success(
-                  "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
-                );
-              } else {
-                toast.error("Allow downloads in your browser to save the bill.");
+            onClick={async () => {
+              try {
+                await downloadPurchaseDetailBillPdf(data);
+                toast.success("PDF downloaded successfully.");
+              } catch (err) {
+                console.error("Purchase detail PDF generation failed:", err);
+                toast.error("Could not generate PDF. Please try again.");
               }
             }}
           >

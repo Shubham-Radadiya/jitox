@@ -10,6 +10,7 @@ import {
 import { parseRupeeCell, fmtRupee } from "../../utils/voucherRowMappers";
 import {
   STATUS_CELL_INNER,
+  paymentStatusBadgeClasses,
   tableFooterTdClasses,
   tableTdClasses,
 } from "../../utils/tableUi";
@@ -240,6 +241,8 @@ const voucherAddButton = (overrides = {}) => {
     ...mergePageAddButton({
       size: "sm",
       className: [
+        // Narrow screens: smaller than global mergePageAddButton defaults (min-h-10 / px-4)
+        "max-sm:min-h-8! max-sm:px-2.5! max-sm:py-1! max-sm:text-[12px]! max-sm:gap-1! max-sm:[&_svg]:h-3! max-sm:[&_svg]:w-3!",
         "min-h-9 px-3 sm:px-4 text-[13px] font-semibold gap-1 [&_svg]:h-3.5 [&_svg]:w-3.5",
         extraCls,
       ]
@@ -457,16 +460,10 @@ const purchasePaymentRenderer = (key, value, defaultRenderer) => {
     );
   }
   if (key === "Payment Status") {
-    const v = String(value).toLowerCase();
-    let cls = "bg-gray-200 text-gray-700";
-    if (v === "paid") cls = "bg-primary text-white";
-    if (v === "pending") cls = "bg-gray-100 text-gray-600 border border-gray-200";
     return (
       <td className={tableTdClasses(key)}>
         <div className={STATUS_CELL_INNER}>
-          <span
-            className={`inline-flex px-3 py-1 rounded-md text-xs font-medium ${cls}`}
-          >
+          <span className={paymentStatusBadgeClasses(value)}>
             {value}
           </span>
         </div>

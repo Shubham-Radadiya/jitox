@@ -16,9 +16,11 @@ import {
   tableTdClasses,
 } from "../../utils/tableUi";
 
-/** Light-mode icons were invisible: avoid forcing `text-slate-200` outside dark mode. */
-const DAY_BOOK_ACTION_BTN_CLASS = `${TABLE_ACTION_ICON_BTN} !bg-transparent !shadow-none !border-slate-400/90 !text-slate-700 hover:!border-emerald-500/70 hover:!bg-emerald-500/10 hover:!text-emerald-700 dark:!border-slate-500/70 dark:!text-slate-200 dark:hover:!bg-emerald-400/10 dark:hover:!text-emerald-300`;
-import { objectToHtmlTable, printHtmlDocument } from "../../utils/printAndExport";
+import {
+  objectToHtmlTable,
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
+} from "../../utils/printAndExport";
 
 function mapDayBookRow(doc) {
   const credit = String(doc.creditAmount ?? "").replace(/,/g, "");
@@ -95,7 +97,7 @@ const DayBookIndex = () => {
     setDetailRow(null);
     navigate("/dashboard/accounting-voucher/purchase");
   };
-  const handleDocument = (row) => {
+  const handleDocument = async (row) => {
     const raw = row._raw || {};
     const detail = {
       Date: row.Date,
@@ -110,15 +112,23 @@ const DayBookIndex = () => {
         )
       ),
     };
-    printHtmlDocument(
-      `Day book — ${row["Voucher No"]}`,
-      `<h2 style="font-family:sans-serif;font-size:14px">Voucher line</h2>${objectToHtmlTable(
-        detail
-      )}`
-    );
-    toast.success(
-      "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
-    );
+    const title = `Day book — ${row["Voucher No"]}`;
+    const bodyHtml = `<h2 style="font-family:sans-serif;font-size:14px">Voucher line</h2>${objectToHtmlTable(
+      detail
+    )}`;
+    const fullHtml = buildStandalonePrintableHtml(title, bodyHtml, {
+      bodyPaddingPx: 10,
+      bodyFontSizePx: 12,
+      h1FontSizePx: 16,
+      tableCellPaddingPx: 5,
+    });
+    try {
+      await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
+      toast.success("PDF downloaded successfully.");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      toast.error("PDF generation failed. Please try again.");
+    }
   };
 
   const renderProductActions = (row) => (
@@ -127,7 +137,7 @@ const DayBookIndex = () => {
         <button
           type="button"
           title="View"
-          className={DAY_BOOK_ACTION_BTN_CLASS}
+          className={TABLE_ACTION_ICON_BTN}
           onClick={(e) => {
             e.stopPropagation();
             handleView(row);
@@ -138,7 +148,7 @@ const DayBookIndex = () => {
         <button
           type="button"
           title="Edit"
-          className={DAY_BOOK_ACTION_BTN_CLASS}
+          className={TABLE_ACTION_ICON_BTN}
           onClick={(e) => {
             e.stopPropagation();
             handleEdit(row);
@@ -149,7 +159,7 @@ const DayBookIndex = () => {
         <button
           type="button"
           title="Document"
-          className={DAY_BOOK_ACTION_BTN_CLASS}
+          className={TABLE_ACTION_ICON_BTN}
           onClick={(e) => {
             e.stopPropagation();
             handleDocument(row);

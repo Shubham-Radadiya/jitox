@@ -1,4 +1,9 @@
-import { escapeHtml, printHtmlDocument } from "./printAndExport";
+import {
+  escapeHtml,
+  printHtmlDocument,
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
+} from "./printAndExport";
 
 function csvEscape(value) {
   const s = String(value ?? "");
@@ -84,8 +89,8 @@ export function downloadPurchaseDetailCsv(detail) {
   downloadCsv(`${safe}-lines.csv`, header, rows);
 }
 
-export function printPurchaseDetailBill(detail) {
-  if (!detail) return false;
+function buildPurchaseDetailBillBody(detail) {
+  if (!detail) return "";
   const narr = detail.narration
     ? `<p><strong>Narration</strong><br/>${escapeHtml(detail.narration).replace(/\n/g, "<br/>")}</p>`
     : "";
@@ -103,7 +108,7 @@ export function printPurchaseDetailBill(detail) {
         )}</td><td>${escapeHtml(p.gst)}</td><td>${escapeHtml(p.subtotal)}</td></tr>`
     )
     .join("");
-  const body = `
+  return `
 <p><strong>Date:</strong> ${escapeHtml(detail.purchaseDate)}</p>
 ${narr}
 <table><tbody>${partyRows}</tbody></table>
@@ -113,7 +118,25 @@ ${narr}
 </table>
 <p><strong>Total:</strong> ${escapeHtml(detail.totals?.totalAmount ?? "—")}</p>
 `;
+}
+
+export function printPurchaseDetailBill(detail) {
+  if (!detail) return false;
+  const body = buildPurchaseDetailBillBody(detail);
   return printHtmlDocument(`Purchase — ${detail.voucherNo}`, body);
+}
+
+export async function downloadPurchaseDetailBillPdf(detail) {
+  if (!detail) return;
+  const title = `Purchase — ${detail.voucherNo || "voucher"}`;
+  const body = buildPurchaseDetailBillBody(detail);
+  const fullHtml = buildStandalonePrintableHtml(title, body, {
+    bodyPaddingPx: 10,
+    bodyFontSizePx: 12,
+    h1FontSizePx: 16,
+    tableCellPaddingPx: 5,
+  });
+  await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
 }
 
 function rowMoneyForPayload(row, gstRate) {

@@ -3,7 +3,11 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { CheckCircle2 } from "lucide-react";
 import { CommonModal, Button } from "../../components/ui/CommanUI";
-import { escapeHtml, printHtmlDocument } from "../../utils/printAndExport";
+import {
+  escapeHtml,
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
+} from "../../utils/printAndExport";
 
 export default function InvoiceModal({ open, onClose, invoice }) {
   const navigate = useNavigate();
@@ -20,22 +24,42 @@ export default function InvoiceModal({ open, onClose, invoice }) {
     ? termsItems
     : ["Please pay within the agreed credit period."];
 
-  const printInvoiceSummary = () => {
+  const printInvoiceSummary = async () => {
     const rows = lines
       .map(
         (line) =>
           `<tr><td>${escapeHtml(line.detail)}</td><td>${escapeHtml(line.qty)}</td><td>${escapeHtml(line.rate)}</td><td>${escapeHtml(line.amount)}</td></tr>`
       )
       .join("");
-    printHtmlDocument(
-      `Invoice-${invoice.invoiceNo || "statement"}`,
-      `<p><strong>${escapeHtml(invoice.billedTo?.name || "Client")}</strong></p>
-       <p>Total: ${escapeHtml(invoice.invoiceTotalLabel || "")} · Final: ${escapeHtml(invoice.finalPayable || "")}</p>
-       <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>`
-    );
-    toast.success(
-      "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
-    );
+    const title = `Invoice-${invoice.invoiceNo || "statement"}`;
+    const bodyHtml = `
+      <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
+        <tr>
+          <td style="border:none;padding:0 0 4px 0;font-size:12px">
+            <strong>Invoice Number:</strong> ${escapeHtml(invoice.invoiceNo || "—")}
+          </td>
+          <td style="border:none;padding:0 0 4px 0;text-align:right;font-size:12px">
+            <strong>Date:</strong> ${escapeHtml(invoice.invoiceDate || "—")}
+          </td>
+        </tr>
+      </table>
+      <p><strong>Billed To:</strong> ${escapeHtml(invoice.billedTo?.name || "Client")}</p>
+      <p>Total: ${escapeHtml(invoice.invoiceTotalLabel || "")} · Final: ${escapeHtml(invoice.finalPayable || "")}</p>
+      <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
+    `;
+    const fullHtml = buildStandalonePrintableHtml(title, bodyHtml, {
+      bodyPaddingPx: 10,
+      bodyFontSizePx: 12,
+      h1FontSizePx: 16,
+      tableCellPaddingPx: 5,
+    });
+    try {
+      await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
+      toast.success("PDF downloaded successfully.");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      toast.error("PDF generation failed. Please try again.");
+    }
   };
 
   return (

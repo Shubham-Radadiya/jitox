@@ -213,7 +213,7 @@ function RevenueSparkline({ series }) {
   return (
     <svg
       viewBox={`0 0 ${w} ${h}`}
-      className="w-full h-[120px] max-w-[200px] text-sky-500"
+      className="w-full h-[88px] max-w-[200px] text-sky-500 sm:h-[120px]"
       preserveAspectRatio="none"
       aria-hidden
     >
@@ -477,33 +477,33 @@ function DashboardHome() {
 
     if (type === "payment") {
       if (value === "paid") {
-        return `${base} border-emerald-300/80 bg-emerald-50 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/35 dark:text-emerald-300`;
+        return `${base} border-emerald-300/80 bg-emerald-50 text-emerald-700 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50`;
       }
       if (value === "pending") {
-        return `${base} border-amber-300/80 bg-amber-50 text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/35 dark:text-amber-300`;
+        return `${base} border-amber-300/80 bg-amber-50 text-amber-700 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50`;
       }
-      return `${base} border-slate-300/90 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200`;
+      return `${base} border-slate-300/90 bg-slate-100 text-slate-700 dark:border-slate-500/40 dark:bg-slate-500/18 dark:text-slate-100`;
     }
 
     const orderTone = {
       approved:
-        "border-emerald-300/80 bg-emerald-50 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/35 dark:text-emerald-300",
+        "border-emerald-300/80 bg-emerald-50 text-emerald-700 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50",
       processing:
-        "border-sky-300/80 bg-sky-50 text-sky-700 dark:border-sky-700/60 dark:bg-sky-950/35 dark:text-sky-300",
+        "border-sky-300/80 bg-sky-50 text-sky-700 dark:border-sky-400/45 dark:bg-sky-500/18 dark:text-sky-50",
       dispatched:
-        "border-violet-300/80 bg-violet-50 text-violet-700 dark:border-violet-700/60 dark:bg-violet-950/35 dark:text-violet-300",
+        "border-violet-300/80 bg-violet-50 text-violet-700 dark:border-violet-400/45 dark:bg-violet-500/18 dark:text-violet-50",
       pending:
-        "border-amber-300/80 bg-amber-50 text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/35 dark:text-amber-300",
+        "border-amber-300/80 bg-amber-50 text-amber-700 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50",
       cancelled:
-        "border-rose-300/80 bg-rose-50 text-rose-700 dark:border-rose-700/60 dark:bg-rose-950/35 dark:text-rose-300",
+        "border-rose-300/80 bg-rose-50 text-rose-700 dark:border-rose-400/45 dark:bg-rose-500/18 dark:text-rose-50",
       partsupply:
-        "border-orange-300/80 bg-orange-50 text-orange-700 dark:border-orange-700/60 dark:bg-orange-950/35 dark:text-orange-300",
+        "border-orange-300/80 bg-orange-50 text-orange-700 dark:border-orange-400/45 dark:bg-orange-500/16 dark:text-orange-50",
       "part-supply":
-        "border-orange-300/80 bg-orange-50 text-orange-700 dark:border-orange-700/60 dark:bg-orange-950/35 dark:text-orange-300",
+        "border-orange-300/80 bg-orange-50 text-orange-700 dark:border-orange-400/45 dark:bg-orange-500/16 dark:text-orange-50",
     };
     return `${base} ${
       orderTone[value] ||
-      "border-slate-300/90 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200"
+      "border-slate-300/90 bg-slate-100 text-slate-700 dark:border-slate-500/35 dark:bg-slate-500/15 dark:text-slate-200"
     }`;
   };
 
@@ -653,7 +653,7 @@ function DashboardHome() {
   return (
     <DashboardLayout>
       <div className="ds-stack-page min-w-0">
-        <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 items-stretch gap-3 min-[480px]:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
           {statKpis.map((k) => {
             const Icon = STAT_ICONS[k.key] || PackagePlus;
             return (
@@ -675,7 +675,7 @@ function DashboardHome() {
           })}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+        <div className="grid grid-cols-1 gap-4 items-stretch xl:grid-cols-2">
           <CustomerSummaryCard />
 
           <div className="rounded-xl jitox-panel p-4 shadow-[0_4px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.45)] flex flex-col min-h-[240px]">
@@ -798,7 +798,7 @@ function DashboardHome() {
             <DateRangePicker
               filterBar
               placeholder={["Date", "Date"]}
-              className="w-full min-w-0 shrink-0 sm:w-52 [&_.ant-picker-input>input]:font-medium [&_.ant-picker-input>input]:text-slate-900 [&_.ant-picker-input>input]:placeholder:text-slate-600 [&_.ant-picker-separator]:text-slate-700 dark:[&_.ant-picker-input>input]:text-slate-100 dark:[&_.ant-picker-input>input]:placeholder:text-slate-400 dark:[&_.ant-picker-separator]:text-slate-400"
+              className="min-w-0 shrink w-auto flex-1 sm:w-52 sm:flex-none [&_.ant-picker-input>input]:font-medium [&_.ant-picker-input>input]:text-slate-900 [&_.ant-picker-input>input]:placeholder:text-slate-600 [&_.ant-picker-separator]:text-slate-700 dark:[&_.ant-picker-input>input]:text-slate-100 dark:[&_.ant-picker-input>input]:placeholder:text-slate-400 dark:[&_.ant-picker-separator]:text-slate-400"
               value={orderDates}
               onChange={setOrderDates}
             />
@@ -862,7 +862,7 @@ function DashboardHome() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+        <div className="grid grid-cols-1 gap-4 items-stretch xl:grid-cols-2">
           <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col">
             <h2 className="text-sm font-semibold text-dark mb-4">Sales Target</h2>
             <div className="grid grid-cols-2 gap-4 flex-1 content-start">
@@ -882,7 +882,7 @@ function DashboardHome() {
             <div className="mt-5 relative pt-1">
               <div className="h-3 rounded-full bg-slate-100 overflow-hidden dark:bg-slate-800">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-300 via-lime-400 to-emerald-500 transition-[width] duration-500"
+                  className="h-full rounded-full bg-linear-to-r from-amber-300 via-lime-400 to-emerald-500 transition-[width] duration-500"
                   style={{ width: `${primaryPct}%` }}
                 />
               </div>
@@ -895,16 +895,16 @@ function DashboardHome() {
             </div>
           </div>
 
-          <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col sm:flex-row gap-4 items-center sm:items-stretch min-h-[200px]">
-            <div className="flex-1 min-w-0 w-full sm:w-1/2 flex items-end justify-center sm:justify-start pb-1">
+          <div className="rounded-xl jitox-panel jitox-panel--shadow flex flex-col gap-3 px-3 pt-4 pb-4 sm:flex-row sm:items-stretch sm:gap-4 sm:p-4 min-h-0 sm:min-h-[200px] max-sm:items-stretch">
+            <div className="flex w-full min-w-0 flex-none items-center justify-center sm:flex-1 sm:items-end sm:justify-start sm:pb-1">
               <RevenueSparkline series={st.revenueSparkline} />
             </div>
-            <div className="flex flex-col justify-center text-center sm:text-right flex-1 gap-2">
-              <p className="text-xl sm:text-2xl font-bold text-dark tabular-nums">
+            <div className="flex w-full flex-none flex-col justify-center gap-1 text-center max-sm:pb-0.5 sm:flex-1 sm:gap-2 sm:text-right">
+              <p className="text-lg sm:text-2xl font-bold text-dark tabular-nums leading-tight">
                 ₹{revenueDisplay.toLocaleString("en-IN")}
               </p>
               <p className="text-xs text-light">Total Revenue</p>
-              <div className="flex items-center justify-center sm:justify-end gap-1.5 text-sm font-semibold">
+              <div className="flex items-center justify-center sm:justify-end gap-1 sm:gap-1.5 text-sm font-semibold">
                 {trendPositive ? (
                   <TrendingUp
                     className="h-4 w-4 shrink-0 text-emerald-600"
@@ -932,7 +932,7 @@ function DashboardHome() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        <div className="grid grid-cols-1 gap-4 items-stretch md:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-xl jitox-panel jitox-panel--shadow p-4 flex flex-col min-h-[220px]">
             <div className="flex items-center justify-between gap-4 mb-3">
               <span className="text-sm font-semibold text-dark">
@@ -940,7 +940,7 @@ function DashboardHome() {
               </span>
               <PeriodToggle value={stockPeriod} onChange={setStockPeriod} />
             </div>
-            <div className="grid grid-cols-3 gap-3 flex-1 content-start">
+            <div className="grid grid-cols-2 gap-3 flex-1 content-start sm:grid-cols-3">
               {(overview.stockItems || []).slice(0, 9).map((item) => (
                 <button
                   key={item.name}
@@ -994,7 +994,7 @@ function DashboardHome() {
               </span>
               <PeriodToggle value={userPeriod} onChange={setUserPeriod} />
             </div>
-            <div className="flex flex-1 items-center gap-4">
+            <div className="flex flex-1 flex-col items-center gap-4 sm:flex-row">
               <div className="relative flex items-center justify-center w-[92px] h-[92px] shrink-0">
                 <DonutRing
                   pct={overview.userDistribution?.totalPct || 0}

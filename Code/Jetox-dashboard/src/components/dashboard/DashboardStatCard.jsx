@@ -77,28 +77,28 @@ export function DashboardStatCard({
           onActivate?.();
         }
       }}
-      className={`group relative flex h-full min-h-[7rem] cursor-pointer flex-row rounded-2xl px-5 py-4 text-left transition-all duration-200 ease-in-out hover:-translate-y-[3px] ${v.shell} ${className}`.trim()}
+      className={`group relative flex h-full min-h-[5.6rem] cursor-pointer flex-row rounded-xl px-3.5 py-2.5 text-left transition-all duration-200 ease-in-out hover:-translate-y-[2px] ${v.shell} ${className}`.trim()}
     >
       {infoSlot}
-      <div className="flex min-h-0 flex-1 items-stretch gap-4">
+      <div className="flex min-h-0 flex-1 items-stretch gap-2.5">
         <div
-          className={`flex h-14 w-14 shrink-0 items-center justify-center self-center transition-transform duration-200 ease-in-out group-hover:scale-[1.03] ${v.iconShell}`}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center self-center transition-transform duration-200 ease-in-out group-hover:scale-[1.02] ${v.iconShell}`}
         >
-          <Icon className="h-6 w-6" strokeWidth={1.75} aria-hidden />
+          <Icon className="h-4.5 w-4.5" strokeWidth={1.75} aria-hidden />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 pr-6">
-          <div className="text-xs font-semibold uppercase leading-snug tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-5">
+          <div className="text-[10px] font-semibold uppercase leading-snug tracking-wider text-slate-500 dark:text-slate-400">
             {label}
           </div>
           <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
             <span
-              className={`min-w-0 truncate text-xl font-bold tabular-nums tracking-tight sm:text-2xl ${v.amount}`}
+              className={`min-w-0 truncate text-[1.06rem] font-bold tabular-nums tracking-tight sm:text-[1.28rem] ${v.amount}`}
             >
               {loading ? "…" : value}
             </span>
             {TrendIcon && trend?.direction ? (
               <TrendIcon
-                className={`h-4 w-4 shrink-0 ${TREND_CLASS[trend.direction]}`}
+                className={`h-3.5 w-3.5 shrink-0 ${TREND_CLASS[trend.direction]}`}
                 strokeWidth={2.5}
                 aria-hidden
               />

@@ -21,7 +21,7 @@ const ROLE_OPTIONS = [
 
 /** In `.dark`, `text-dark` resolves to a light color meant for page chrome — illegible on white cards. */
 const CARD =
-  "p-4 rounded-xl border border-light-border bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]";
+  "rounded-xl border border-light-border bg-white p-3 shadow-sm sm:p-4 dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]";
 const CARD_TITLE = "text-sm font-semibold text-slate-900 dark:text-slate-100";
 
 function mapRoleToApi(value) {
@@ -207,8 +207,34 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
   };
 
   return (
-    <CommonModal open={open} onClose={onClose} title="Edit Details" width="min(720px, 94vw)">
-      <div className="flex flex-col gap-4">
+    <CommonModal
+      open={open}
+      onClose={onClose}
+      title="Edit Details"
+      width="min(640px, 94vw)"
+      bodyClassName="px-3 sm:px-5 pb-4 sm:pb-8 pt-2.5 sm:pt-4"
+      footerClassName="!px-3 !py-2.5 sm:!px-6"
+      footer={[
+        <Button
+          key="cancel"
+          label="Cancel"
+          variant="outline"
+          size="sm"
+          onClick={onClose}
+          disabled={saving}
+        />,
+        <Button
+          key="save"
+          label={saving ? "Saving…" : "Save"}
+          variant="primary"
+          size="sm"
+          onClick={handleSave}
+          disabled={saving}
+          className="text-white! hover:text-white! disabled:border-transparent! disabled:bg-primary/85! disabled:text-white!"
+        />,
+      ]}
+    >
+      <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-col items-center">
           <input
             type="file"
@@ -218,7 +244,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
             accept="image/*"
           />
           <div className="relative group">
-            <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden border-2 border-primary/20 shadow-sm">
+            <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-primary/20 bg-gray-100 shadow-sm sm:h-24 sm:w-24">
               {imagePreview ? (
                 <img
                   src={imagePreview}
@@ -226,7 +252,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-slate-400 dark:text-slate-500">
+                <div className="flex h-full w-full items-center justify-center text-xl font-bold text-slate-400 sm:text-2xl dark:text-slate-500">
                   {form.name?.charAt(0) || "U"}
                 </div>
               )}
@@ -243,8 +269,8 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
         </div>
 
         <div className={CARD}>
-          <div className={`${CARD_TITLE} mb-4`}>Basic Information</div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className={`${CARD_TITLE} mb-3 sm:mb-4`}>Basic Information</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
             <div className="flex flex-col gap-1">
               <InputField
                 label="Name"
@@ -275,7 +301,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mt-4">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:mt-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
             <CommonDropdown
               label="Role"
               addNavigateTo="/dashboard/user-master"
@@ -315,7 +341,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
             />
           </div>
 
-          <div className="mt-6 border-t border-light-border pt-4 dark:border-slate-600">
+          <div className="mt-5 border-t border-light-border pt-3 sm:mt-6 sm:pt-4 dark:border-slate-600">
             <div className={`${CARD_TITLE} mb-2`}>Address</div>
             <AddressForm
               value={address}
@@ -328,7 +354,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
         {!isAdminRole && (
           <div className={CARD}>
             <div className={`${CARD_TITLE} mb-2`}>Module access</div>
-            <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+            <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
               {MODULE_ACCESS_OPTIONS.map(({ key, label }) => (
                 <label
                   key={key}
@@ -349,7 +375,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
 
         <div className={CARD}>
           <div className={`${CARD_TITLE} mb-2`}>New password (optional)</div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <InputField
               label="Password"
               name="password"
@@ -373,23 +399,6 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
           )}
         </div>
 
-        <div className="flex justify-end gap-2 mt-3">
-          <Button
-            label="Cancel"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={saving}
-          />
-          <Button
-            label={saving ? "Saving…" : "Save"}
-            variant="primary"
-            size="sm"
-            onClick={handleSave}
-            disabled={saving}
-            className="text-white! hover:text-white! disabled:border-transparent! disabled:bg-primary/85! disabled:text-white!"
-          />
-        </div>
       </div>
     </CommonModal>
   );

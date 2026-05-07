@@ -80,10 +80,10 @@ export function getCellTextAlign(columnKey) {
 }
 
 const TABLE_FOOTER_TD_BASE_DEFAULT =
-  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-gray-900 dark:bg-slate-800/80 dark:text-slate-100`;
+  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-[15px] font-semibold text-gray-900 dark:bg-slate-800/80 dark:text-slate-100`;
 
 const TABLE_FOOTER_TD_BASE_HEAD =
-  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-sm font-semibold text-dark dark:bg-slate-800/80 dark:text-slate-100`;
+  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-[15px] font-semibold text-dark dark:bg-slate-800/80 dark:text-slate-100`;
 
 /**
  * Consistent `<tfoot>` cell styling; alignment follows {@link getTableCellAlignClass}.
@@ -116,24 +116,24 @@ export const ORDER_TABLE_COL = {
     td: "hidden min-w-[11rem] md:table-cell",
   },
   "Manager Name": {
-    th: "min-w-[7rem] hidden lg:table-cell",
-    td: "hidden min-w-[7rem] lg:table-cell",
+    th: "min-w-[8.75rem] hidden lg:table-cell",
+    td: "hidden min-w-[8.75rem] lg:table-cell",
   },
   Paid: { th: "min-w-[4.5rem]", td: "min-w-[4.5rem]" },
   Due: { th: "min-w-[4.5rem]", td: "min-w-[4.5rem]" },
   "Payment Status": {
-    th: "min-w-[7.25rem]",
-    td: "min-w-[7.25rem]",
+    th: "min-w-[8.5rem]",
+    td: "min-w-[8.5rem]",
   },
-  "Total Amount": { th: "min-w-[7rem]", td: "min-w-[7rem]" },
-  "Order Status": { th: "min-w-[7rem]", td: "min-w-[7rem]" },
+  "Total Amount": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
+  "Order Status": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
   Actions: {
-    th: "w-[14rem] min-w-[14rem] max-w-[14rem]",
-    td: "w-[14rem] min-w-[14rem] max-w-[14rem]",
+    th: "w-[9rem] min-w-[9rem] max-w-[9rem]",
+    td: "w-[9rem] min-w-[9rem] max-w-[9rem]",
   },
   Action: {
-    th: "w-[14rem] min-w-[14rem] max-w-[14rem]",
-    td: "w-[14rem] min-w-[14rem] max-w-[14rem]",
+    th: "w-[9rem] min-w-[9rem] max-w-[9rem]",
+    td: "w-[9rem] min-w-[9rem] max-w-[9rem]",
   },
 };
 
@@ -234,7 +234,7 @@ export function reportOrderTdClasses(columnKey) {
 /** <th> classes: hierarchy + alignment */
 export function tableThClasses(columnKey) {
   return [
-    "px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
+    "px-2 py-2 text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
     TABLE_CELL_BORDER,
     "bg-slate-100 dark:bg-slate-800/90",
     getTableCellAlignClass(columnKey),
@@ -244,11 +244,11 @@ export function tableThClasses(columnKey) {
 
 /** Default <td> for data cells (non-badge) */
 export function tableTdClasses(columnKey, { dense = false } = {}) {
-  const py = dense ? "py-1" : "py-1.5";
+  const py = dense ? "py-1.5" : "py-2";
   const clip =
     columnKey === "Actions" || columnKey === "Action" ? "" : "min-w-0";
   return [
-    "whitespace-nowrap px-2 text-sm align-middle text-slate-800 leading-snug dark:text-slate-100",
+    "whitespace-nowrap px-2 text-[15px] align-middle text-slate-800 leading-snug dark:text-slate-100",
     py,
     TABLE_CELL_BORDER,
     "transition-colors duration-150",
@@ -274,16 +274,17 @@ export const ORDERS_TABLE_WRAPPER_CLASS =
  * wrapper scrolls horizontally on narrow viewports.
  */
 export const ORDERS_TABLE_ELEMENT_CLASS =
-  "w-full min-w-[1128px] table-fixed border-collapse text-sm leading-snug";
+  "w-full min-w-[1260px] table-auto border-collapse text-sm leading-snug";
 
 /** Auto layout so nowrap cells can widen columns; use horizontal scroll on the wrapper. */
 export const TABLE_ELEMENT_CLASS =
-  "w-full min-w-full table-auto border-collapse text-sm leading-snug";
+  "w-full min-w-full table-auto border-collapse text-[15px] leading-snug";
 
 const BADGE_BASE =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium leading-none";
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-2.5 py-1 text-[11px] font-semibold leading-tight";
 
-const BADGE_DENSE_BASE = BADGE_BASE;
+const BADGE_DENSE_BASE =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] font-semibold leading-tight";
 
 function pickBadgeBase(dense) {
   return dense ? BADGE_DENSE_BASE : BADGE_BASE;
@@ -294,12 +295,12 @@ export function paymentStatusBadgeClasses(value, options = {}) {
   const B = pickBadgeBase(options.dense);
   const s = String(value ?? "").toLowerCase();
   if (s === "paid")
-    return `${B} bg-green-100 text-green-800 dark:bg-emerald-950 dark:text-emerald-300`;
+    return `${B} border-green-200/90 bg-green-100 text-green-800 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50`;
   if (s === "pending")
-    return `${B} bg-yellow-100 text-yellow-800 dark:bg-amber-950 dark:text-amber-200`;
+    return `${B} border-amber-200/90 bg-amber-100 text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50`;
   if (s === "unpaid")
-    return `${B} bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200`;
-  return `${B} bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300`;
+    return `${B} border-slate-200/90 bg-gray-100 text-gray-700 dark:border-slate-500/40 dark:bg-slate-500/18 dark:text-slate-100`;
+  return `${B} border-slate-200/80 bg-gray-100 text-gray-600 dark:border-slate-500/35 dark:bg-slate-500/15 dark:text-slate-200`;
 }
 
 /** Order / workflow status pill */
@@ -307,15 +308,18 @@ export function orderStatusBadgeClasses(value, options = {}) {
   const B = pickBadgeBase(options.dense);
   const s = String(value ?? "").toLowerCase().replace(/\s+/g, "");
   const map = {
-    pending: `${B} bg-yellow-100 text-yellow-800 dark:bg-amber-950 dark:text-amber-200`,
-    approved: `${B} bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300`,
-    dispatched: `${B} bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200`,
-    cancelled: `${B} bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300`,
-    processing: `${B} bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200`,
-    partsupply: `${B} bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200`,
-    "part-supply": `${B} bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200`,
+    pending: `${B} border-amber-200/90 bg-amber-100 text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50`,
+    approved: `${B} border-emerald-200/90 bg-emerald-100 text-emerald-900 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50`,
+    dispatched: `${B} border-purple-200/90 bg-purple-100 text-purple-900 dark:border-violet-400/45 dark:bg-violet-500/18 dark:text-violet-50`,
+    cancelled: `${B} border-red-200/90 bg-red-100 text-red-900 dark:border-rose-400/45 dark:bg-rose-500/18 dark:text-rose-50`,
+    processing: `${B} border-blue-200/90 bg-blue-100 text-blue-900 dark:border-sky-400/45 dark:bg-sky-500/18 dark:text-sky-50`,
+    partsupply: `${B} border-orange-200/90 bg-amber-100 text-amber-900 dark:border-orange-400/45 dark:bg-orange-500/16 dark:text-orange-50`,
+    "part-supply": `${B} border-orange-200/90 bg-amber-100 text-amber-900 dark:border-orange-400/45 dark:bg-orange-500/16 dark:text-orange-50`,
   };
-  return map[s] || `${B} bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200`;
+  return (
+    map[s] ||
+    `${B} border-slate-200/80 bg-gray-100 text-gray-700 dark:border-slate-500/35 dark:bg-slate-500/15 dark:text-slate-200`
+  );
 }
 
 /** Centers status pills vertically without breaking single-line row layout. */
@@ -335,7 +339,7 @@ export const TABLE_ACTIONS_ROW_DENSE =
 
 /** Icon button in Actions column — compact on xs so a full row stays on one line. */
 export const TABLE_ACTION_ICON_BTN =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-500/60 bg-transparent text-slate-700 text-sm transition-colors duration-150 hover:border-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-500/70 dark:bg-transparent dark:text-slate-200 dark:hover:border-emerald-400/70 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300 sm:h-8 sm:w-8 [&_svg]:opacity-100 [&_svg]:max-h-[16px] [&_svg]:max-w-[16px] sm:[&_svg]:max-h-[18px] sm:[&_svg]:max-w-[18px]";
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-500/60 bg-transparent text-slate-700 transition-colors duration-150 hover:border-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-500/70 dark:bg-transparent dark:text-slate-200 dark:hover:border-emerald-400/70 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:opacity-100 [&_svg]:max-h-[18px] [&_svg]:max-w-[18px]";
 
 /** Order table action icons — tighter on small screens for fixed Actions column. */
 export const TABLE_ACTION_ICON_BTN_DENSE =

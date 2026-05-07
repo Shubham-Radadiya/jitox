@@ -315,6 +315,12 @@ export const CommonModal = ({
 
   const maxWClass = width ? "" : MODAL_SIZE_MAX[size] || MODAL_SIZE_MAX.md;
 
+  /** Centered modals use `relative` so `w-full` respects the shell padding; absolute centering made panels edge-to-edge on narrow screens. */
+  const dialogPositionClass =
+    position === "center"
+      ? "relative z-10 w-full min-w-0 max-h-[min(92vh,52rem)]"
+      : `absolute z-10 w-full max-h-[min(92vh,52rem)] ${positionClasses[position]}`;
+
   return (
     <div
       className={`fixed inset-0 z-[99] flex items-center justify-center p-3 sm:p-5 pointer-events-none ${shellClassName}`}
@@ -329,7 +335,7 @@ export const CommonModal = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={`absolute flex flex-col w-full max-h-[min(92vh,52rem)] overflow-hidden rounded-2xl border border-light-border/90 bg-white shadow-xl pointer-events-auto dark:bg-slate-900 dark:border-slate-700 ${maxWClass} ${positionClasses[position]} ${className}`}
+        className={`flex flex-col overflow-hidden rounded-2xl border border-light-border/90 bg-white shadow-xl pointer-events-auto dark:bg-slate-900 dark:border-slate-700 ${dialogPositionClass} ${maxWClass} ${className}`}
         style={width ? { maxWidth: width } : undefined}
       >
         {title ? (

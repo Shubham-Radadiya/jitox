@@ -8,6 +8,7 @@ import { Button, InputField } from "../../components/ui/CommanUI";
 import { hrmApi } from "../../services/api";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { downloadHtmlDocumentAsPdf } from "../../utils/printAndExport";
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
@@ -23,6 +24,27 @@ export default function OfferLetterPage() {
     companyName: "Jitox Agro",
     companyAddress: "",
   });
+
+  const downloadOfferLetterPdfFromPath = async (path, fileHint = "candidate") => {
+    if (!path) {
+      toast.error("Could not find generated document.");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}${path}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const fullHtml = await res.text();
+      const safeHint = String(fileHint || "candidate")
+        .trim()
+        .replace(/[/\\?%*:|"<>]/g, "-")
+        .replace(/\s+/g, "-");
+      await downloadHtmlDocumentAsPdf(fullHtml, `offer-letter-${safeHint}.pdf`);
+      toast.success("Offer letter downloaded as PDF.");
+    } catch (err) {
+      console.error("Offer letter PDF generation failed:", err);
+      toast.error("Could not download PDF from generated letter.");
+    }
+  };
 
   const { data: records = [] } = useQuery({
     queryKey: ["hrm", "offer-letters"],
@@ -44,11 +66,11 @@ export default function OfferLetterPage() {
       });
       return data;
     },
-    onSuccess: (d) => {
+    onSuccess: async (d) => {
       toast.success("Offer letter saved");
       qc.invalidateQueries({ queryKey: ["hrm", "offer-letters"] });
-      const path = d?.previewUrl;
-      if (path) window.open(`${API_BASE}${path}`, "_blank", "noopener,noreferrer");
+      const path = d?.previewUrl || d?.documentPath;
+      await downloadOfferLetterPdfFromPath(path, form.candidateName);
     },
     onError: (e) =>
       toast.error(getApiErrorMessage(e, "Could not generate letter")),
@@ -69,8 +91,8 @@ export default function OfferLetterPage() {
         <div>
           <h1 className="text-xl font-bold text-dark">Offer letter</h1>
           <p className="text-sm text-light mt-1 max-w-3xl">
-            Fill the fields, generate from the template, and open the HTML
-            document — use Print → Save as PDF in your browser.
+            Fill the fields and generate the letter from template as a PDF
+            download.
           </p>
         </div>
 
@@ -189,10 +211,14 @@ export default function OfferLetterPage() {
                         </p>
                       </div>
                       {r.documentPath ? (
-                        <a
-                          href={`${API_BASE}${r.documentPath}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            downloadOfferLetterPdfFromPath(
+                              r.documentPath,
+                              r.candidateName || "candidate"
+                            )
+                          }
                           className="inline-flex w-fit max-w-full shrink-0 items-center justify-center justify-self-end gap-1 rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white shadow-sm ring-1 ring-primary/40 hover:bg-emerald-600 hover:text-white hover:ring-emerald-600/50 active:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 dark:bg-primary dark:text-white dark:hover:bg-emerald-600"
                         >
                           Open
@@ -200,7 +226,7 @@ export default function OfferLetterPage() {
                             className="h-3 w-3 shrink-0 text-white opacity-95"
                             aria-hidden
                           />
-                        </a>
+                        </button>
                       ) : null}
                     </div>
                   </li>

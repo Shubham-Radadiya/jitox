@@ -17,7 +17,11 @@ import {
   mapProductToPriceRow,
 } from "../../utils/productMappers";
 import { TABLE_ACTION_ICON_BTN, tableFooterTdClasses } from "../../utils/tableUi";
-import { downloadPrintableDocument, rowsToHtmlTable } from "../../utils/printAndExport";
+import {
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
+  rowsToHtmlTable,
+} from "../../utils/printAndExport";
 
 const ProductIndex = () => {
   const queryClient = useQueryClient();
@@ -75,19 +79,23 @@ const ProductIndex = () => {
     },
   });
 
-  const exportPriceListDocument = () => {
+  const exportPriceListDocument = async () => {
     if (!priceRows.length) {
       toast.error("No price rows to export");
       return;
     }
-    const cols = priceColumns.filter((c) => c !== "Actions");
-    downloadPrintableDocument(
-      `Jitox-price-list-${new Date().toISOString().slice(0, 10)}`,
-      rowsToHtmlTable(cols, priceRows)
-    );
-    toast.success(
-      "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
-    );
+    try {
+      const cols = priceColumns.filter((c) => c !== "Actions");
+      const title = `Jitox-price-list-${new Date().toISOString().slice(0, 10)}`;
+      const html = buildStandalonePrintableHtml(
+        title,
+        rowsToHtmlTable(cols, priceRows)
+      );
+      await downloadHtmlDocumentAsPdf(html, `${title}.pdf`);
+      toast.success("Price list exported as PDF");
+    } catch (e) {
+      toast.error("Could not generate PDF");
+    }
   };
 
   const totalProducts = rawProducts.length;
@@ -194,7 +202,7 @@ const ProductIndex = () => {
   }, []);
 
   const renderProductActions = (row) => (
-    <td className="px-3 py-2.5">
+    <td className="px-2 py-1 border-b border-gray-200 dark:border-slate-700">
       <div className="flex items-center justify-center gap-2">
         <button
           type="button"
@@ -275,15 +283,15 @@ const ProductIndex = () => {
           ))}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-2 dark:border-slate-700">
-          <div className="flex gap-4">
+        <div className="flex flex-wrap items-end gap-x-2 gap-y-2 border-b border-gray-200 pb-2 dark:border-slate-700 sm:gap-x-4 sm:justify-between">
+          <div className="flex min-w-0 shrink-0 gap-4">
             <button
               type="button"
               onClick={() => setActiveTab("productList")}
-              className={`pb-2 text-sm transition ${
+              className={`pb-1 text-xs transition sm:pb-2 sm:text-sm ${
                 activeTab === "productList"
-                  ? "text-emerald-600 font-medium border-b-2 border-emerald-600 -mb-px dark:text-emerald-400"
-                  : "text-gray-600 hover:text-gray-900 border-b-2 border-transparent dark:text-slate-400 dark:hover:text-slate-200"
+                  ? "font-medium text-emerald-600 -mb-px border-b-2 border-emerald-600 dark:text-emerald-400"
+                  : "border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               Product list
@@ -292,22 +300,25 @@ const ProductIndex = () => {
             <button
               type="button"
               onClick={() => setActiveTab("priceList")}
-              className={`pb-2 text-sm transition ${
+              className={`pb-1 text-xs transition sm:pb-2 sm:text-sm ${
                 activeTab === "priceList"
-                  ? "text-emerald-600 font-medium border-b-2 border-emerald-600 -mb-px dark:text-emerald-400"
-                  : "text-gray-600 hover:text-gray-900 border-b-2 border-transparent dark:text-slate-400 dark:hover:text-slate-200"
+                  ? "font-medium text-emerald-600 -mb-px border-b-2 border-emerald-600 dark:text-emerald-400"
+                  : "border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               Price list
             </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto sm:justify-end">
+          <div className="ml-auto flex min-w-0 shrink-0 justify-end">
             {activeTab === "productList" ? (
               <Button
                 type="button"
                 label="Add product"
-                {...mergePageAddButton()}
+                {...mergePageAddButton({
+                  className:
+                    "max-sm:!min-h-9 max-sm:!px-3 max-sm:!py-2 max-sm:!text-[13px] max-sm:[&_svg]:hidden",
+                })}
                 onClick={() =>
                   setProductModal({ open: true, mode: "create", product: null })
                 }
@@ -316,7 +327,11 @@ const ProductIndex = () => {
               <Button
                 type="button"
                 label="Export as PDF"
-                {...mergePageAddButton({ icon: undefined })}
+                {...mergePageAddButton({
+                  icon: undefined,
+                  className:
+                    "max-sm:!min-h-9 max-sm:!px-3 max-sm:!py-2 max-sm:!text-[13px]",
+                })}
                 onClick={exportPriceListDocument}
               />
             )}
