@@ -191,7 +191,7 @@ const DataTable = ({
         }
       >
         <div className={`flex w-full min-w-0 items-center gap-2 ${justify}`}>
-          <span className="min-w-0 truncate font-medium text-gray-700 dark:text-slate-200">
+          <span className="min-w-0 truncate font-bold text-gray-700 dark:text-slate-200">
             {labelText}
           </span>
           <ExcelColumnFilterHeader
@@ -249,7 +249,7 @@ const DataTable = ({
           <tr>
             {enableSelect && (
               <th
-                className={`px-2 py-1.5 text-center w-12 align-middle ${TABLE_CELL_BORDER} bg-slate-100 dark:bg-slate-800/90`}
+                className={`px-1 py-0.5 text-center text-xs w-12 align-middle ${TABLE_CELL_BORDER} bg-slate-100 dark:bg-slate-800/90`}
               >
                 <input
                   type="checkbox"

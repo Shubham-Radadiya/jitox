@@ -38,14 +38,14 @@ const UserAddedSuccessModal = ({ open, onClose, userData, onAddAnother }) => {
             label={`View ${userData.role || "User"} Profile`}
             variant="outline"
             size="sm"
-            className="w-full border-primary/45 max-sm:min-h-8! max-sm:px-2.5! max-sm:py-1! max-sm:text-[12px]! max-sm:leading-tight! font-semibold text-primary hover:bg-primary/10 sm:flex-1 sm:px-2 sm:py-1.5 sm:text-sm"
+            className="w-full border-primary/45 min-h-9! px-3! py-1.5! text-[13px]! leading-tight! font-semibold text-primary hover:bg-primary hover:text-white dark:hover:text-white sm:flex-1 sm:min-h-10! sm:px-3! sm:py-2! sm:text-[13px]!"
             onClick={onClose}
           />
           <Button
             label={`Add Another ${userData.role || "User"}`}
             variant="outline"
             size="sm"
-            className="w-full border-slate-300 max-sm:min-h-8! max-sm:px-2.5! max-sm:py-1! max-sm:text-[12px]! max-sm:leading-tight! font-semibold text-dark hover:bg-slate-100 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800 sm:flex-1 sm:px-2 sm:py-1.5 sm:text-sm"
+            className="w-full border-slate-300 min-h-9! px-3! py-1.5! text-[13px]! leading-tight! font-semibold text-dark hover:bg-primary hover:text-white dark:border-slate-600 dark:text-slate-100 dark:hover:bg-primary dark:hover:text-white sm:flex-1 sm:min-h-10! sm:px-3! sm:py-2! sm:text-[13px]!"
             onClick={() => {
               onClose();
               onAddAnother();

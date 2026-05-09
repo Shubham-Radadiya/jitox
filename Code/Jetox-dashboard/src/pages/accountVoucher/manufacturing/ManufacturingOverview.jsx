@@ -109,33 +109,33 @@ const ManufacturingOverview = ({
   }, []);
 
   return (
-    <div className="bg-white rounded-2xl flex flex-col gap-3 2xl:gap-4">
+    <div className="rounded-2xl bg-white dark:bg-slate-900 flex flex-col gap-3 2xl:gap-4">
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 border border-light-border rounded-2xl p-4 text-center">
-        <div className="border-r border-light-border">
-          <div className="text-lg font-semibold">{statusSummary.total}</div>
-          <div className="text-xs">Total Batches</div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 border border-light-border rounded-2xl p-4 text-center dark:border-slate-600 dark:bg-slate-800/40">
+        <div className="border-r border-light-border dark:border-slate-600">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.total}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Total Batches</div>
         </div>
-        <div className="border-r border-light-border">
-          <div className="text-lg font-semibold">{statusSummary.completed}</div>
-          <div className="text-xs">Completed Batches</div>
+        <div className="border-r border-light-border dark:border-slate-600">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.completed}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Completed Batches</div>
         </div>
-        <div className="border-r border-light-border">
-          <div className="text-lg font-semibold">{statusSummary.inProgress}</div>
-          <div className="text-xs">In-Progress</div>
+        <div className="border-r border-light-border dark:border-slate-600">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.inProgress}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">In-Progress</div>
         </div>
-        <div className="border-r border-light-border">
-          <div className="text-lg font-semibold">{statusSummary.failed}</div>
-          <div className="text-xs">Failed/Paused</div>
+        <div className="border-r border-light-border dark:border-slate-600">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.failed}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Failed/Paused</div>
         </div>
         <div>
-          <div className="text-lg font-semibold">{statusSummary.totalCost}</div>
-          <div className="text-xs">Total Cost</div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.totalCost}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Total Cost</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-      <div className="border border-light-border rounded-2xl p-4">
+      <div className="border border-light-border rounded-2xl p-4 dark:border-slate-600 dark:bg-slate-800/40">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-lg font-semibold text-dark ">Manufacturing Trend</div>
@@ -149,8 +149,8 @@ const ManufacturingOverview = ({
                 onChange={setSelectedProduct}
                 className="w-44"
               />
-              <button className="p-2 border border-light-border rounded-lg hover:bg-gray-50">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button className="p-2 border border-light-border rounded-lg hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-700/70">
+                <svg className="w-5 h-5 text-gray-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                   <line x1="16" y1="2" x2="16" y2="6" />
                   <line x1="8" y1="2" x2="8" y2="6" />
@@ -161,7 +161,7 @@ const ManufacturingOverview = ({
           </div>
           <div className="relative">
             {/* Y-axis labels and grid lines */}
-            <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-gray-400">
+            <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-gray-400 dark:text-slate-500">
               <span>5k</span>
               <span>4k</span>
               <span>3k</span>
@@ -173,7 +173,7 @@ const ManufacturingOverview = ({
             {/* Grid lines */}
             <div className="absolute left-10 right-0 top-0 bottom-6 flex flex-col justify-between">
               {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="border-t border-gray-100" />
+                <div key={i} className="border-t border-gray-100 dark:border-slate-700/70" />
               ))}
             </div>
 
@@ -189,12 +189,12 @@ const ManufacturingOverview = ({
                  return (
                   <div key={item.month} className="flex flex-col items-center gap-2 flex-1">
                      <div
-                       className="relative h-full w-full max-w-[0.5rem] flex items-end z-[9999]"
+                       className="relative z-0 h-full w-full max-w-[0.5rem] flex items-end"
                        onMouseEnter={() => setHoveredMonth(item)}
                        onMouseLeave={() => setHoveredMonth(null)}
                      >
                        {hoveredMonth?.month === item.month && (
-                         <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-dark text-white text-xs px-2 py-0.5 rounded-md shadow">
+                         <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-dark text-white text-xs px-2 py-0.5 rounded-md shadow dark:bg-slate-700">
                            ₹{item.value.toLocaleString("en-IN")}
                          </div>
                        )}
@@ -203,7 +203,7 @@ const ManufacturingOverview = ({
                         style={{ height: `${height}px` }}
                       />
                     </div>
-                    <span className="text-xs text-gray-500 mt-1">{monthNames[item.month]}</span>
+                    <span className="text-xs text-gray-500 mt-1 dark:text-slate-400">{monthNames[item.month]}</span>
                   </div>
                 );
               })}
@@ -211,7 +211,7 @@ const ManufacturingOverview = ({
           </div>
         </div>
 
-          <div className="border border-light-border rounded-2xl p-4">
+          <div className="border border-light-border rounded-2xl p-4 dark:border-slate-600 dark:bg-slate-800/40">
           <div className="flex items-center justify-between mb-4">
                <div className="font-semibold text-dark text-lg">Raw Material Overview</div>
             <CommonDropdown
@@ -242,7 +242,7 @@ const ManufacturingOverview = ({
                   />
                 ))}
               </svg>
-              <div className="absolute inset-4 bg-white rounded-full flex flex-col text-center items-center justify-center pointer-events-none">
+              <div className="absolute inset-4 bg-white rounded-full flex flex-col text-center items-center justify-center pointer-events-none dark:bg-slate-900">
                 <span className="font-semibold text-dark text-lg">
                   {hoveredMaterial ? `${hoveredMaterial.value}%` : "100%"}
                 </span>
@@ -258,7 +258,7 @@ const ManufacturingOverview = ({
                 const y = 80 + tooltipRadius * Math.sin(angleRad);
                 return (
                   <div
-                    className="absolute bg-dark text-white text-xs px-2 py-0.5 rounded-md shadow z-10 pointer-events-none whitespace-nowrap"
+                    className="absolute bg-dark text-white text-xs px-2 py-0.5 rounded-md shadow z-10 pointer-events-none whitespace-nowrap dark:bg-slate-700"
                     style={{
                       left: `${x}px`,
                       top: `${y}px`,
@@ -277,8 +277,8 @@ const ManufacturingOverview = ({
                   className="flex items-center gap-3 text-sm"
                 >
                   <span className={`h-2 w-2 rounded-full ${item.color}`} />
-                  <span className="text-dark flex-1">{item.label}</span>
-                  <span className="text-xs text-light">{item.value}%</span>
+                  <span className="text-dark flex-1 dark:text-slate-200">{item.label}</span>
+                  <span className="text-xs text-light dark:text-slate-400">{item.value}%</span>
                 </div>
               ))}
             </div>

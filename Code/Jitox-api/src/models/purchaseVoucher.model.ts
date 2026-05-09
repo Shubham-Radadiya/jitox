@@ -11,6 +11,11 @@ const PurchaseItemSchema = new Schema<IPurchaseItem>(
     unit: { type: String, trim: true },
     subtotal: { type: Number, required: true },
     remarks: { type: String, trim: true },
+    hsn: { type: String, trim: true },
+    batch: { type: String, trim: true },
+    expDate: { type: String, trim: true },
+    mfgDate: { type: String, trim: true },
+    mrp: { type: String, trim: true },
   },
   { _id: false }
 );
@@ -22,6 +27,11 @@ const PurchaseVoucherSchema = new Schema<IPurchaseVoucher>(
     deliveryAt: { type: String, trim: true },
     orderby: { type: String, trim: true },
     shipToAndBillTo: { type: String, trim: true },
+    billTo: { type: String, trim: true },
+    shipTo: { type: String, trim: true },
+    shipDifferent: { type: Boolean, default: false },
+    narration: { type: String, trim: true },
+    termsAndConditions: { type: String, trim: true },
     voucherNo: { type: String, required: true, trim: true, unique: true },
     voucherDate: { type: Date, required: true },
     items: [PurchaseItemSchema],

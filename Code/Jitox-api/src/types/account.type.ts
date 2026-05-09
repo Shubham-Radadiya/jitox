@@ -5,6 +5,14 @@ export interface IAccount extends Document {
   accountType: string;
   gstNumber?: string;
   address?: string;
+  businessStreetAddress?: string;
+  businessArea?: string;
+  businessCity?: string;
+  businessTaluka?: string;
+  businessDistrict?: string;
+  businessState?: string;
+  businessPincode?: string;
+  businessCountry?: string;
   category?: string;
   name: string;
   email: string;
@@ -38,4 +46,6 @@ export interface IAccount extends Document {
   deliveryAt?: string;
   customerStatus?: "Active" | "Inactive";
   lastBillingAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

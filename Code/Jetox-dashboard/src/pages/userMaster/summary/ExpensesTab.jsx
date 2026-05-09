@@ -1,9 +1,13 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import DataTable from "../../../components/ui/table/DataTable";
-import { Plus, Paperclip, Edit3 } from "lucide-react";
+import { Plus, Paperclip, Edit3, CalendarDays, CircleDot, Search } from "lucide-react";
 import { tableTdClasses } from "../../../utils/tableUi";
 
 const ExpensesTab = () => {
+  const [expenseTypeSearch, setExpenseTypeSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [modeFilter, setModeFilter] = useState("");
+
   const columns = [
     "Date",
     "Expense Type",
@@ -60,6 +64,32 @@ const ExpensesTab = () => {
     ],
     []
   );
+
+  const dateOptions = useMemo(() => {
+    const seen = new Set(data.map((row) => String(row.Date || "").trim()).filter(Boolean));
+    return [...seen].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [data]);
+
+  const modeOptions = useMemo(() => {
+    const seen = new Set(data.map((row) => String(row.Mode || "").trim()).filter(Boolean));
+    return [...seen].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [data]);
+
+  const filteredData = useMemo(() => {
+    return data.filter((row) => {
+      if (
+        expenseTypeSearch &&
+        !String(row["Expense Type"] || "")
+          .toLowerCase()
+          .includes(expenseTypeSearch.toLowerCase().trim())
+      ) {
+        return false;
+      }
+      if (dateFilter && String(row.Date) !== dateFilter) return false;
+      if (modeFilter && String(row.Mode) !== modeFilter) return false;
+      return true;
+    });
+  }, [data, expenseTypeSearch, dateFilter, modeFilter]);
 
   const renderRowCell = (colKey, value) => {
     const cell = `${tableTdClasses(colKey)} text-left!`;
@@ -123,21 +153,127 @@ const ExpensesTab = () => {
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-0.5">
-        <h3 className="text-lg font-bold text-dark">Expenses</h3>
-        <button
-          type="button"
-          className="rounded-lg bg-primary p-2.5 text-white shadow-sm transition-colors hover:bg-primary/90"
-          title="Add expense"
-        >
-          <Plus size={20} />
-        </button>
+      <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-0.5 rounded-lg bg-slate-100/90 p-0.5 whitespace-nowrap dark:bg-slate-800/80">
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            My Data
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            User (10)
+          </button>
+        </div>
+
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
+          <div className="relative w-full sm:w-44">
+            <CalendarDays
+              size={14}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <select
+              className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              aria-label="Filter by date"
+            >
+              <option value="">Date</option>
+              {dateOptions.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative w-full sm:w-44">
+            <CircleDot
+              size={14}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <select
+              className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={modeFilter}
+              onChange={(e) => setModeFilter(e.target.value)}
+              aria-label="Filter by mode"
+            >
+              <option value="">Status</option>
+              {modeOptions.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+
+        </div>
       </div>
 
       <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-900/4 dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)] dark:ring-white/6">
+        <div className="flex w-full min-w-0 flex-col gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2 dark:border-slate-600 dark:bg-slate-800/40 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <h3 className="text-lg font-bold text-dark dark:text-slate-100">Expenses</h3>
+
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition-colors hover:bg-primary/90"
+              title="Add expense"
+            >
+              <Plus size={18} />
+            </button>
+
+            <div className="relative w-full sm:w-44">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={expenseTypeSearch}
+                onChange={(e) => setExpenseTypeSearch(e.target.value)}
+                placeholder="Expense Type"
+                className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                aria-label="Search by expense type"
+              />
+            </div>
+
+            <select
+              className="h-9 w-full rounded-lg border border-light-border bg-white px-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:w-40"
+              value={modeFilter}
+              onChange={(e) => setModeFilter(e.target.value)}
+              aria-label="Filter by mode"
+            >
+              <option value="">Mode</option>
+              {modeOptions.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="h-9 w-full rounded-lg border border-light-border bg-white px-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:w-40"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              aria-label="Filter by date"
+            >
+              <option value="">Date</option>
+              {dateOptions.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <DataTable
           columns={columns}
-          data={data}
+          data={filteredData}
           renderRowCell={renderRowCell}
           renderAction={renderExpenseAction}
           allCellsLeft

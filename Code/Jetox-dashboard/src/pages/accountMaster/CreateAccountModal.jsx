@@ -179,7 +179,189 @@ function buildCommaAddress(parts) {
   return out.join(", ");
 }
 
-const CreateAccountModal = ({ open, onClose, onSaved }) => {
+/**
+ * Reverse `buildCommaAddress` output into structured fields for edit prefill.
+ * Format: street[, area][, city][, taluka][, district], State - PIN[, Country]
+ * Falls back to single-line street when PIN/state pattern is missing.
+ */
+function parseCommaBusinessAddress(raw) {
+  const trimP = (x) =>
+    String(x ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+  const fullLine = trimP(raw);
+  const legacy = (street) => ({
+    streetAddress: street,
+    area: "",
+    city: "",
+    taluka: "",
+    district: "",
+    state: "",
+    pincode: "",
+    country: "India",
+    legacySingleLineOnly: true,
+  });
+
+  if (!fullLine) {
+    return legacy("");
+  }
+
+  const segments = fullLine.split(",").map(trimP).filter(Boolean);
+  if (!segments.length) {
+    return legacy("");
+  }
+
+  const parts = [...segments];
+  let country = "India";
+  const maybeCountry = parts[parts.length - 1];
+  if (/^(India|IN|Bharat)$/i.test(maybeCountry)) {
+    country = maybeCountry;
+    parts.pop();
+  }
+
+  if (!parts.length) {
+    return { ...legacy(fullLine), country };
+  }
+
+  let state = "";
+  let pincode = "";
+  const tail = parts[parts.length - 1];
+  // Accept: "State - 123456", "State–123456", "State 123456"
+  const statePin = tail.match(/^(.+?)(?:\s*[-–—]\s*|\s+)(\d{5,10})$/);
+  if (statePin) {
+    state = trimP(statePin[1]);
+    pincode = normalizePincodeInput(statePin[2]);
+    parts.pop();
+  } else if (parts.length >= 2) {
+    const last = trimP(parts[parts.length - 1]);
+    const prev = trimP(parts[parts.length - 2]);
+    const lastPinOnly = normalizePincodeInput(last);
+    if (lastPinOnly && /^\d{5,10}$/.test(last)) {
+      pincode = lastPinOnly;
+      parts.pop();
+      state = trimP(parts.pop() || "");
+    } else {
+      const prevPinOnly = normalizePincodeInput(prev);
+      if (prevPinOnly && /^\d{5,10}$/.test(prev)) {
+        pincode = prevPinOnly;
+        parts.splice(parts.length - 2, 1);
+        state = last;
+        parts.pop();
+      }
+    }
+  }
+
+  const n = parts.length;
+  let streetAddress = "";
+  let area = "";
+  let city = "";
+  let taluka = "";
+  let district = "";
+
+  if (n === 1) streetAddress = parts[0];
+  else if (n === 2) {
+    streetAddress = parts[0];
+    area = parts[1];
+  } else if (n === 3) {
+    streetAddress = parts[0];
+    area = parts[1];
+    city = parts[2];
+  } else if (n === 4) {
+    streetAddress = parts[0];
+    area = parts[1];
+    city = parts[2];
+    taluka = parts[3];
+  } else if (n >= 5) {
+    streetAddress = parts.slice(0, n - 4).join(", ");
+    area = parts[n - 4];
+    city = parts[n - 3];
+    taluka = parts[n - 2];
+    district = parts[n - 1];
+  }
+
+  const hasStructuredBits =
+    Boolean(state) ||
+    Boolean(pincode) ||
+    n >= 3;
+
+  return {
+    streetAddress,
+    area,
+    city,
+    taluka,
+    district,
+    state,
+    pincode,
+    country,
+    legacySingleLineOnly: !hasStructuredBits,
+  };
+}
+
+const EMPTY_FORM = {
+  businessName: "",
+  accountType: "",
+  gst: "",
+  businessStreetAddress: "",
+  businessCity: "",
+  businessState: "",
+  businessPincode: "",
+  businessArea: "",
+  businessTaluka: "",
+  businessDistrict: "",
+  businessCountry: "India",
+  category: "",
+  name: "",
+  mobile: "",
+  email: "",
+  amount: "",
+  balanceType: "Credit",
+  paymentTerms: "",
+  creditLimit: "",
+  areaAssignment: "",
+  streetAddress: "",
+  area: "",
+  city: "",
+  taluka: "",
+  district: "",
+  state: "",
+  country: "India",
+  pincode: "",
+  birthday: "",
+  anniversary: "",
+  partyType: "",
+  transportMode: "",
+  deliveryAt: "",
+  customerStatus: "Active",
+};
+
+function mergeOption(list, value, labelForValue) {
+  const v = String(value || "").trim();
+  if (!v) return list;
+  if (list.some((o) => o.value === v)) return list;
+  const label =
+    typeof labelForValue === "function"
+      ? labelForValue(v)
+      : labelForValue || v;
+  return [...list, { value: v, label }];
+}
+
+/** GET /accounts/:id returns the document; tolerate `{ account }` if API changes */
+function unwrapAccountResponse(data) {
+  if (!data || typeof data !== "object") return null;
+  if (data._id != null || data.businessName != null) return data;
+  if (data.account && typeof data.account === "object") return data.account;
+  return data;
+}
+
+function mergeFreeTextOption(baseOpts, value) {
+  const v = String(value || "").trim();
+  if (!v) return baseOpts;
+  if (baseOpts.some((o) => o.value === v)) return baseOpts;
+  return [...baseOpts, { value: v, label: v }];
+}
+
+const CreateAccountModal = ({ open, onClose, onSaved, accountId }) => {
+  const isEditMode = Boolean(accountId);
   const fileRef = useRef(null);
   const stateDatalistId = useId();
   const businessStateDatalistId = useId();
@@ -199,42 +381,8 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
   const [quickAddKind, setQuickAddKind] = useState(null);
   const [quickDraft, setQuickDraft] = useState("");
 
-  const [form, setForm] = useState({
-    businessName: "",
-    accountType: "",
-    gst: "",
-    businessStreetAddress: "",
-    businessCity: "",
-    businessState: "",
-    businessPincode: "",
-    businessArea: "",
-    businessTaluka: "",
-    businessDistrict: "",
-    businessCountry: "India",
-    category: "",
-    name: "",
-    mobile: "",
-    email: "",
-    amount: "",
-    balanceType: "Credit",
-    paymentTerms: "",
-    creditLimit: "",
-    areaAssignment: "",
-    streetAddress: "",
-    area: "",
-    city: "",
-    taluka: "",
-    district: "",
-    state: "",
-    country: "India",
-    pincode: "",
-    birthday: "",
-    anniversary: "",
-    partyType: "",
-    transportMode: "",
-    deliveryAt: "",
-    customerStatus: "Active",
-  });
+  const [form, setForm] = useState(() => ({ ...EMPTY_FORM }));
+  const [loadingAccount, setLoadingAccount] = useState(false);
   const [addrErrors, setAddrErrors] = useState({});
   const [businessAddrErrors, setBusinessAddrErrors] = useState({});
 
@@ -242,8 +390,142 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
     if (!open) {
       setPickedFileName("");
       setBusinessAddrErrors({});
+      setLoadingAccount(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    if (!accountId) {
+      setForm({ ...EMPTY_FORM });
+      setAddrErrors({});
+      setBusinessAddrErrors({});
+      setAccountTypeOptions([...DEFAULT_ACCOUNT_TYPE_OPTIONS]);
+      setCategoryOptions([...DEFAULT_CATEGORY_OPTIONS]);
+      setPaymentTermOptions([...DEFAULT_PAYMENT_TERM_OPTIONS]);
+      setAreaOptions([...DEFAULT_AREA_OPTIONS]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoadingAccount(true);
+    (async () => {
+      try {
+        const { data } = await accountsApi.getById(String(accountId));
+        if (cancelled) return;
+        const a = unwrapAccountResponse(data);
+        if (!a) return;
+        setAccountTypeOptions((opts) =>
+          mergeOption(opts, a.accountType, (v) =>
+            DEFAULT_ACCOUNT_TYPE_OPTIONS.find((x) => x.value === v)?.label || v
+          )
+        );
+        setCategoryOptions((opts) =>
+          mergeOption(opts, a.category, (v) => String(v).replace(/_/g, " "))
+        );
+        setPaymentTermOptions((opts) =>
+          mergeOption(opts, a.paymentTerm, (v) => v)
+        );
+        setAreaOptions((opts) =>
+          mergeOption(opts, a.areaAssigment, (v) => v)
+        );
+
+        const pin = String(a.pincode ?? a.pinCode ?? "").replace(/\D/g, "");
+        const rawAmt = Number.parseFloat(
+          String(a.amount ?? "").replace(/,/g, "")
+        );
+        const amt = Number.isFinite(rawAmt) ? String(rawAmt) : "";
+        const bt =
+          String(a.balenceType || "").toLowerCase() === "debit"
+            ? "Debit"
+            : "Credit";
+
+        const bizAddr = parseCommaBusinessAddress(a.address ?? "");
+        const hasDedicatedBusinessFields = [
+          "businessStreetAddress",
+          "businessCity",
+          "businessState",
+          "businessPincode",
+          "businessArea",
+          "businessTaluka",
+          "businessDistrict",
+          "businessCountry",
+        ].some((k) => Object.prototype.hasOwnProperty.call(a, k));
+
+        setForm({
+          ...EMPTY_FORM,
+          businessName: a.businessName ?? "",
+          accountType: a.accountType ?? "",
+          gst: a.gstNumber ?? "",
+          businessStreetAddress: hasDedicatedBusinessFields
+            ? String(a.businessStreetAddress || "")
+            : bizAddr.streetAddress,
+          businessCity: hasDedicatedBusinessFields
+            ? String(a.businessCity || "")
+            : bizAddr.city,
+          businessState: hasDedicatedBusinessFields
+            ? String(a.businessState || "")
+            : bizAddr.state,
+          businessPincode: hasDedicatedBusinessFields
+            ? normalizePincodeInput(a.businessPincode || "")
+            : bizAddr.pincode,
+          businessArea: hasDedicatedBusinessFields
+            ? String(a.businessArea || "")
+            : bizAddr.area,
+          businessTaluka: hasDedicatedBusinessFields
+            ? String(a.businessTaluka || "")
+            : bizAddr.taluka,
+          businessDistrict: hasDedicatedBusinessFields
+            ? String(a.businessDistrict || "")
+            : bizAddr.district,
+          businessCountry: hasDedicatedBusinessFields
+            ? String(a.businessCountry || "India")
+            : bizAddr.country || "India",
+          category: a.category ?? "",
+          name: a.name ?? "",
+          mobile: a.mobileNumber ?? "",
+          email: a.email ?? "",
+          amount: amt,
+          balanceType: bt,
+          paymentTerms: a.paymentTerm ?? "",
+          creditLimit:
+            a.creditLimit != null && Number.isFinite(Number(a.creditLimit))
+              ? String(a.creditLimit)
+              : "",
+          areaAssignment: a.areaAssigment ?? "",
+          streetAddress: a.streetAddress ?? a.street ?? "",
+          area: a.area ?? "",
+          city: a.city ?? "",
+          taluka: a.taluka ?? "",
+          district: a.district ?? "",
+          state: a.state ?? "",
+          country: a.country || "India",
+          pincode: pin,
+          birthday: a.birthday ? String(a.birthday).slice(0, 10) : "",
+          anniversary: a.anniversary ? String(a.anniversary).slice(0, 10) : "",
+          partyType: a.partyType ?? "",
+          transportMode: a.transportMode ?? "",
+          deliveryAt: a.deliveryAt ?? "",
+          customerStatus:
+            String(a.customerStatus) === "Inactive" ? "Inactive" : "Active",
+        });
+        setAddrErrors({});
+        setBusinessAddrErrors({});
+      } catch (e) {
+        if (!cancelled) {
+          toast.error(getApiErrorMessage(e, "Could not load account"));
+          onClose?.();
+        }
+      } finally {
+        if (!cancelled) setLoadingAccount(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, accountId, onClose]);
 
   const partyTypeList = useMemo(
     () => readStringList("JITOX_PARTY_TYPES", DEFAULT_PARTY_TYPES),
@@ -253,8 +535,14 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
     () => readStringList("JITOX_TRANSPORT_OPTIONS", DEFAULT_TRANSPORT),
     [open, optionListRev]
   );
-  const partyTypeOptions = useMemo(() => toOptions(partyTypeList), [partyTypeList]);
-  const transportOptions = useMemo(() => toOptions(transportList), [transportList]);
+  const partyTypeOptions = useMemo(
+    () => mergeFreeTextOption(toOptions(partyTypeList), form.partyType),
+    [partyTypeList, form.partyType]
+  );
+  const transportOptions = useMemo(
+    () => mergeFreeTextOption(toOptions(transportList), form.transportMode),
+    [transportList, form.transportMode]
+  );
 
   const openQuickAdd = useCallback((kind) => {
     setQuickAddKind(kind);
@@ -415,8 +703,15 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
       form.businessTaluka,
       form.businessDistrict,
     ].some((x) => String(x || "").trim());
+    const legacyBizSingleLine =
+      isEditMode &&
+      String(form.businessStreetAddress || "").trim() &&
+      !String(form.businessCity || "").trim() &&
+      !String(form.businessState || "").trim() &&
+      !String(form.businessPincode || "").trim();
+
     const be = {};
-    if (bizAny) {
+    if (bizAny && !(legacyBizSingleLine && isEditMode)) {
       if (!String(form.businessStreetAddress || "").trim()) {
         be.businessStreetAddress = "Required";
       }
@@ -443,16 +738,7 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
       return;
     }
 
-    const fd = new FormData();
-    fd.append("businessName", String(form.businessName).trim());
-    fd.append("accountType", form.accountType);
-    fd.append("name", String(form.name).trim());
-    fd.append("email", String(form.email).trim());
-    fd.append("mobileNumber", String(form.mobile).trim());
-    fd.append("amount", String(amountNum));
-    fd.append("balenceType", form.balanceType);
-    if (form.gst) fd.append("gstNumber", form.gst.trim());
-    const composedBusinessAddress = buildCommaAddress({
+    const composedFromStructured = buildCommaAddress({
       streetAddress: form.businessStreetAddress,
       area: form.businessArea,
       city: form.businessCity,
@@ -462,86 +748,142 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
       country: form.businessCountry,
       pincode: form.businessPincode,
     });
-    if (composedBusinessAddress)
-      fd.append("address", composedBusinessAddress);
-    if (form.category) fd.append("category", form.category);
-    if (form.paymentTerms)
-      fd.append("paymentTerm", String(form.paymentTerms));
-    if (form.areaAssignment)
-      fd.append("areaAssigment", String(form.areaAssignment));
-    const cl = parseFloat(String(form.creditLimit));
-    if (Number.isFinite(cl)) fd.append("creditLimit", String(cl));
-    fd.append("streetAddress", String(form.streetAddress).trim());
-    fd.append("area", String(form.area || "").trim());
-    fd.append("city", String(form.city).trim());
-    fd.append("taluka", String(form.taluka || "").trim());
-    fd.append("district", String(form.district || "").trim());
-    fd.append("state", String(form.state).trim());
-    fd.append("country", String(form.country || "India").trim());
-    fd.append("pincode", pin);
-    fd.append("pinCode", pin);
-    if (form.birthday) fd.append("birthday", String(form.birthday).trim());
-    if (form.anniversary)
-      fd.append("anniversary", String(form.anniversary).trim());
-    if (form.partyType) fd.append("partyType", String(form.partyType).trim());
-    if (form.transportMode)
-      fd.append("transportMode", String(form.transportMode).trim());
-    if (form.deliveryAt)
-      fd.append("deliveryAt", String(form.deliveryAt).trim());
-    if (form.customerStatus)
-      fd.append("customerStatus", String(form.customerStatus).trim());
+    const composedBusinessAddress =
+      isEditMode && legacyBizSingleLine
+        ? String(form.businessStreetAddress || "").trim()
+        : composedFromStructured;
 
-    const file = fileRef.current?.files?.[0];
-    if (file) fd.append("documentUpload", file);
+    const cl = parseFloat(String(form.creditLimit));
 
     setSaving(true);
     try {
-      await accountsApi.create(fd);
-      toast.success("Account created");
+      if (isEditMode) {
+        const creditLimitVal = Number.isFinite(cl) ? cl : null;
+        const body = {
+          businessName: String(form.businessName).trim(),
+          accountType: form.accountType,
+          name: String(form.name).trim(),
+          email: String(form.email).trim(),
+          mobileNumber: String(form.mobile).trim(),
+          amount: amountNum,
+          balenceType: form.balanceType,
+          gstNumber: String(form.gst || "").trim(),
+          category: String(form.category || "").trim(),
+          paymentTerm: String(form.paymentTerms || "").trim(),
+          areaAssigment: String(form.areaAssignment || "").trim(),
+          creditLimit: creditLimitVal,
+          streetAddress: String(form.streetAddress).trim(),
+          area: String(form.area || "").trim(),
+          city: String(form.city).trim(),
+          taluka: String(form.taluka || "").trim(),
+          district: String(form.district || "").trim(),
+          state: String(form.state).trim(),
+          country: String(form.country || "India").trim(),
+          pincode: pin,
+          pinCode: pin,
+          partyType: String(form.partyType || "").trim(),
+          transportMode: String(form.transportMode || "").trim(),
+          deliveryAt: String(form.deliveryAt || "").trim(),
+          customerStatus:
+            form.customerStatus === "Inactive" ? "Inactive" : "Active",
+          birthday: String(form.birthday || "").trim(),
+          anniversary: String(form.anniversary || "").trim(),
+          address: composedBusinessAddress || "",
+          businessStreetAddress: String(form.businessStreetAddress || "").trim(),
+          businessArea: String(form.businessArea || "").trim(),
+          businessCity: String(form.businessCity || "").trim(),
+          businessTaluka: String(form.businessTaluka || "").trim(),
+          businessDistrict: String(form.businessDistrict || "").trim(),
+          businessState: String(form.businessState || "").trim(),
+          businessPincode: String(form.businessPincode || "").replace(/\D/g, ""),
+          businessCountry: String(form.businessCountry || "India").trim(),
+        };
+
+        await accountsApi.update(String(accountId), body);
+        toast.success("Account updated");
+      } else {
+        const fd = new FormData();
+        fd.append("businessName", String(form.businessName).trim());
+        fd.append("accountType", form.accountType);
+        fd.append("name", String(form.name).trim());
+        fd.append("email", String(form.email).trim());
+        fd.append("mobileNumber", String(form.mobile).trim());
+        fd.append("amount", String(amountNum));
+        fd.append("balenceType", form.balanceType);
+        if (form.gst) fd.append("gstNumber", form.gst.trim());
+        if (composedBusinessAddress)
+          fd.append("address", composedBusinessAddress);
+        fd.append(
+          "businessStreetAddress",
+          String(form.businessStreetAddress || "").trim()
+        );
+        fd.append("businessArea", String(form.businessArea || "").trim());
+        fd.append("businessCity", String(form.businessCity || "").trim());
+        fd.append("businessTaluka", String(form.businessTaluka || "").trim());
+        fd.append(
+          "businessDistrict",
+          String(form.businessDistrict || "").trim()
+        );
+        fd.append("businessState", String(form.businessState || "").trim());
+        fd.append(
+          "businessPincode",
+          String(form.businessPincode || "").replace(/\D/g, "")
+        );
+        fd.append(
+          "businessCountry",
+          String(form.businessCountry || "India").trim()
+        );
+        if (form.category) fd.append("category", form.category);
+        if (form.paymentTerms)
+          fd.append("paymentTerm", String(form.paymentTerms));
+        if (form.areaAssignment)
+          fd.append("areaAssigment", String(form.areaAssignment));
+        if (Number.isFinite(cl)) fd.append("creditLimit", String(cl));
+        fd.append("streetAddress", String(form.streetAddress).trim());
+        fd.append("area", String(form.area || "").trim());
+        fd.append("city", String(form.city).trim());
+        fd.append("taluka", String(form.taluka || "").trim());
+        fd.append("district", String(form.district || "").trim());
+        fd.append("state", String(form.state).trim());
+        fd.append("country", String(form.country || "India").trim());
+        fd.append("pincode", pin);
+        fd.append("pinCode", pin);
+        if (form.birthday)
+          fd.append("birthday", String(form.birthday).trim());
+        if (form.anniversary)
+          fd.append("anniversary", String(form.anniversary).trim());
+        if (form.partyType)
+          fd.append("partyType", String(form.partyType).trim());
+        if (form.transportMode)
+          fd.append("transportMode", String(form.transportMode).trim());
+        if (form.deliveryAt)
+          fd.append("deliveryAt", String(form.deliveryAt).trim());
+        if (form.customerStatus)
+          fd.append("customerStatus", String(form.customerStatus).trim());
+
+        const file = fileRef.current?.files?.[0];
+        if (file) fd.append("documentUpload", file);
+
+        await accountsApi.create(fd);
+        toast.success("Account created");
+        if (fileRef.current) fileRef.current.value = "";
+        setPickedFileName("");
+      }
+
       onSaved?.();
       onClose?.();
       setAddrErrors({});
       setBusinessAddrErrors({});
-      setForm({
-        businessName: "",
-        accountType: "",
-        gst: "",
-        businessStreetAddress: "",
-        businessCity: "",
-        businessState: "",
-        businessPincode: "",
-        businessArea: "",
-        businessTaluka: "",
-        businessDistrict: "",
-        businessCountry: "India",
-        category: "",
-        name: "",
-        mobile: "",
-        email: "",
-        amount: "",
-        balanceType: "Credit",
-        paymentTerms: "",
-        creditLimit: "",
-        areaAssignment: "",
-        streetAddress: "",
-        area: "",
-        city: "",
-        taluka: "",
-        district: "",
-        state: "",
-        country: "India",
-        pincode: "",
-        birthday: "",
-        anniversary: "",
-        partyType: "",
-        transportMode: "",
-        deliveryAt: "",
-        customerStatus: "Active",
-      });
-      if (fileRef.current) fileRef.current.value = "";
-      setPickedFileName("");
+      if (!isEditMode) {
+        setForm({ ...EMPTY_FORM });
+      }
     } catch (e) {
-      toast.error(getApiErrorMessage(e, "Could not create account"));
+      toast.error(
+        getApiErrorMessage(
+          e,
+          isEditMode ? "Could not update account" : "Could not create account"
+        )
+      );
     } finally {
       setSaving(false);
     }
@@ -551,7 +893,7 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
     <CommonModal
       open={open}
       onClose={onClose}
-      title="Create Account"
+      title={isEditMode ? "Edit Account" : "Create Account"}
       size="xl"
       shellClassName="!p-1 sm:!p-2"
       className="!max-h-[90vh]"
@@ -567,20 +909,35 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
           size="md"
           onClick={onClose}
           className="min-w-[8rem] font-semibold"
-          disabled={saving}
+          disabled={saving || loadingAccount}
         />,
         <Button
           key="save"
-          label={saving ? "Saving…" : "Save"}
+          label={
+            saving
+              ? isEditMode
+                ? "Updating…"
+                : "Saving…"
+              : isEditMode
+                ? "Update"
+                : "Save"
+          }
           variant="primary"
           size="md"
           onClick={handleSubmit}
           className="min-w-[8rem] font-semibold !text-white hover:!text-white dark:!text-white dark:hover:!text-white"
-          disabled={saving}
+          disabled={saving || loadingAccount}
         />,
       ]}
     >
-      <form className="flex min-w-0 flex-col gap-2.5 text-[12px]">
+      <form className="relative flex min-w-0 flex-col gap-2.5 text-[12px]">
+        {loadingAccount ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-900/70">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              Loading account…
+            </span>
+          </div>
+        ) : null}
         <input
           ref={fileRef}
           type="file"
@@ -972,33 +1329,39 @@ const CreateAccountModal = ({ open, onClose, onSaved }) => {
 
         <FormSection
           title="Documents upload & additional info"
-          hint="PDF, JPG"
+          hint={isEditMode ? undefined : "PDF, JPG"}
           book
         >
           <div className="flex min-w-0 flex-col gap-2.5">
             <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-2 sm:items-end">
-              <div>
-                <span className="mb-1 block text-[11px] font-semibold tracking-wide text-slate-800 dark:text-slate-200">
-                  Documents upload
-                </span>
-                <div className="flex min-h-9 items-center gap-2 rounded-md border border-dashed border-light-border bg-slate-50/80 px-2 py-1 dark:border-slate-600 dark:bg-slate-800/90">
-                  <Button
-                    type="button"
-                    label="Upload"
-                    variant="outline"
-                    size="sm"
-                    icon={Upload}
-                    className="min-h-8 shrink-0 border-light-border bg-white px-2 py-1 text-[11px] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-                    onClick={() => fileRef.current?.click()}
-                  />
-                  <span
-                    className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400"
-                    title={pickedFileName || undefined}
-                  >
-                    {pickedFileName || "Choose file"}
+              {!isEditMode ? (
+                <div>
+                  <span className="mb-1 block text-[11px] font-semibold tracking-wide text-slate-800 dark:text-slate-200">
+                    Documents upload
                   </span>
+                  <div className="flex min-h-9 items-center gap-2 rounded-md border border-dashed border-light-border bg-slate-50/80 px-2 py-1 dark:border-slate-600 dark:bg-slate-800/90">
+                    <Button
+                      type="button"
+                      label="Upload"
+                      variant="outline"
+                      size="sm"
+                      icon={Upload}
+                      className="min-h-8 shrink-0 border-light-border bg-white px-2 py-1 text-[11px] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                      onClick={() => fileRef.current?.click()}
+                    />
+                    <span
+                      className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400"
+                      title={pickedFileName || undefined}
+                    >
+                      {pickedFileName || "Choose file"}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                  Document upload is available when creating an account.
+                </p>
+              )}
               <InputField
                 dense
                 label="Credit Limit"

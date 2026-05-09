@@ -3,7 +3,9 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Card, InputField, CommonDropdown, DateInput } from "../../../components/ui/CommanUI";
@@ -85,6 +87,23 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
 
   const { data: meta, isError: metaError } = usePurchaseFormMeta();
+  const nextVoucherAppliedRef = useRef(false);
+  /** Snapshot of ship-to from API prefill / last edit while “different ship” is on — survives toggling the checkbox off/on. */
+  const persistedShipToRef = useRef("");
+  /**
+   * Mirrors “Different ship address” immediately (before React re-render). gatherPayload reads this
+   * so Save after toggling the checkbox cannot snapshot stale shipDifferent=false.
+   */
+  const shipDifferentLiveRef = useRef(false);
+
+  const setShipDifferentLive = useCallback((next) => {
+    setShipDifferent((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      const b = Boolean(resolved);
+      shipDifferentLiveRef.current = b;
+      return b;
+    });
+  }, []);
 
   useEffect(() => {
     if (metaError) {
@@ -93,6 +112,17 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       );
     }
   }, [metaError]);
+
+  /** Apply next free voucher no. from API once (avoids duplicate `V001` on every new voucher). */
+  useEffect(() => {
+    if (prefill?.voucherNo != null && String(prefill.voucherNo).trim() !== "")
+      return;
+    const next = meta?.nextPurchaseVoucherNo;
+    if (typeof next !== "string" || !next.trim()) return;
+    if (nextVoucherAppliedRef.current) return;
+    setVoucherNo(next.trim());
+    nextVoucherAppliedRef.current = true;
+  }, [meta?.nextPurchaseVoucherNo, prefill]);
 
   const dropdownOptions = useMemo(() => {
     if (!meta) return emptyMeta;
@@ -125,14 +155,45 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     return m;
   }, [dropdownOptions.products]);
 
-  useEffect(() => {
+  /** Layout phase so bill/ship/checkbox state exists before the passive ship-sync effect runs (avoids wiping ship on edit). */
+  useLayoutEffect(() => {
     if (!prefill) return;
     if (prefill.partyName != null) setPartyName(prefill.partyName);
     if (prefill.purchaseDate) setPurchaseDate(prefill.purchaseDate);
     if (prefill.voucherNo) setVoucherNo(prefill.voucherNo);
     if (prefill.narration != null) setNarration(prefill.narration);
     if (prefill.internalNotes != null) setInternalNotes(prefill.internalNotes);
+    if (prefill.transporter != null) setTransporter(prefill.transporter);
+    if (prefill.deliveryAt != null) setDeliveryAt(prefill.deliveryAt);
+    if (prefill.orderBy != null) setOrderBy(prefill.orderBy);
+    if (prefill.shipDifferent != null) {
+      const sd = Boolean(prefill.shipDifferent);
+      shipDifferentLiveRef.current = sd;
+      setShipDifferent(sd);
+    }
+    if (prefill.billTo != null) setBillTo(prefill.billTo);
+    if (prefill.shipTo != null) setShipTo(prefill.shipTo);
+    if (prefill.termsPayment != null) setTermsPayment(prefill.termsPayment);
+    if (prefill.gstRate != null && String(prefill.gstRate).trim() !== "") {
+      setGstRate(prefill.gstRate);
+    }
+    if (prefill.stockToggle != null) setStockToggle(prefill.stockToggle);
+    if (prefill.invoicePrefix != null) setInvoicePrefix(prefill.invoicePrefix);
+    if (prefill.invoiceNumber != null) setInvoiceNumber(prefill.invoiceNumber);
+    if (prefill.originalInvNo != null) setOriginalInvNo(prefill.originalInvNo);
+    if (prefill.ewayBill != null) setEwayBill(prefill.ewayBill);
+    if (prefill.termsText != null) setTermsText(prefill.termsText);
+    if (Array.isArray(prefill.productRows) && prefill.productRows.length > 0) {
+      setProductRows(prefill.productRows);
+    }
+    persistedShipToRef.current = String(prefill.shipTo ?? "");
   }, [prefill]);
+
+  useEffect(() => {
+    if (shipDifferent) {
+      persistedShipToRef.current = String(shipTo ?? "");
+    }
+  }, [shipTo, shipDifferent]);
 
   useEffect(() => {
     if (!shipDifferent) {
@@ -174,17 +235,34 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
           const rateStr =
             row.rate && String(row.rate).trim()
               ? row.rate
-              : p.defaultRate
+              : p.defaultRate != null && p.defaultRate !== ""
                 ? String(p.defaultRate)
                 : "";
           return {
             ...row,
             product: value,
-            hsn: p.hsn || row.hsn || "",
-            group: p.group || row.group || "",
-            category: p.category || row.category || "",
-            unit: p.unit || row.unit || "",
+            hsn: p.hsn != null && String(p.hsn).trim() ? String(p.hsn) : "",
+            group: p.group != null && String(p.group).trim() ? String(p.group) : "",
+            category:
+              p.category != null && String(p.category).trim() ? String(p.category) : "",
+            unit: p.unit != null && String(p.unit).trim() ? String(p.unit) : "",
             rate: rateStr,
+            batch:
+              p.batchNo != null && String(p.batchNo).trim() !== ""
+                ? String(p.batchNo)
+                : "",
+            mrp:
+              p.mrpPerUnit != null && String(p.mrpPerUnit).trim() !== ""
+                ? String(p.mrpPerUnit)
+                : "",
+            qty:
+              p.quantity != null && String(p.quantity).trim() !== ""
+                ? String(p.quantity)
+                : "",
+            mfgDate:
+              p.mfgDt != null && String(p.mfgDt).trim() !== "" ? String(p.mfgDt) : "",
+            expDate:
+              p.expDt != null && String(p.expDt).trim() !== "" ? String(p.expDt) : "",
           };
         })
       );
@@ -248,8 +326,8 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       deliveryAt,
       orderBy,
       billTo,
-      shipTo: shipDifferent ? shipTo : billTo,
-      shipDifferent,
+      shipTo,
+      shipDifferent: shipDifferentLiveRef.current,
       termsPayment,
       gstRate,
       productRows,
@@ -274,7 +352,6 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     orderBy,
     billTo,
     shipTo,
-    shipDifferent,
     termsPayment,
     gstRate,
     productRows,
@@ -307,9 +384,10 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
         billTo={billTo}
         setBillTo={setBillTo}
         shipDifferent={shipDifferent}
-        setShipDifferent={setShipDifferent}
+        setShipDifferent={setShipDifferentLive}
         shipTo={shipTo}
         setShipTo={setShipTo}
+        persistedShipToRef={persistedShipToRef}
         purchaseDate={purchaseDate}
         handleDateChange={handleDateChange}
         invoicePrefix={invoicePrefix}
@@ -472,9 +550,15 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
                 checked={shipDifferent}
                 onChange={(e) => {
                   const on = e.target.checked;
-                  setShipDifferent(on);
-                  if (!on) setShipTo(billTo);
-                  else setShipTo((s) => s || billTo);
+                  setShipDifferentLive(on);
+                  if (!on) {
+                    setShipTo(billTo);
+                  } else {
+                    const snap = persistedShipToRef.current;
+                    setShipTo(
+                      String(snap ?? "").trim() ? snap : billTo
+                    );
+                  }
                 }}
               />
               Ship to is different from bill to

@@ -57,37 +57,57 @@ const PerformanceReportTab = () => {
 
   return (
     <div className="ds-stack-major min-w-0">
+      <div className="flex w-full min-w-0 flex-row items-center justify-between gap-2">
+        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-0.5 rounded-lg bg-slate-100/90 p-0.5 whitespace-nowrap dark:bg-slate-800/80">
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            My Data
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            User (10)
+          </button>
+        </div>
+
+        <div className="relative shrink-0 self-end lg:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsExportOpen(!isExportOpen)}
+            className="rounded-lg border border-light-border bg-white p-1.5 shadow-sm transition-colors hover:bg-gray-50 sm:p-2 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
+            aria-label="Download report"
+          >
+            <Download size={16} className="text-dark sm:size-[18px]" />
+          </button>
+          {isExportOpen && (
+            <div className="absolute right-0 top-10 z-50 w-24 animate-in rounded-xl border border-light-border bg-white py-1.5 shadow-xl fade-in slide-in-from-top-2 duration-200 sm:top-12 sm:w-28 sm:py-2 dark:border-slate-600 dark:bg-slate-900">
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 text-right text-xs font-semibold text-dark hover:bg-gray-50 sm:px-4 sm:py-2 sm:text-sm dark:hover:bg-slate-800"
+                onClick={exportPerformancePdf}
+              >
+                PDF
+              </button>
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 text-right text-xs font-semibold text-dark hover:bg-gray-50 sm:px-4 sm:py-2 sm:text-sm dark:hover:bg-slate-800"
+                onClick={exportPerformanceExcel}
+              >
+                Excel
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-4">
         {/* Left Performance Card */}
         <div className="relative overflow-visible rounded-2xl jitox-panel jitox-panel--shadow p-3 sm:p-4 lg:col-span-4 flex flex-col gap-3 sm:gap-4">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2">
             <h3 className="text-base font-bold leading-tight text-dark sm:text-lg">Performance Report</h3>
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setIsExportOpen(!isExportOpen)}
-                className="rounded-lg border border-light-border bg-white p-1.5 shadow-sm transition-colors hover:bg-gray-50 sm:p-2 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
-              >
-                <Download size={16} className="text-dark sm:size-[18px]" />
-              </button>
-              {isExportOpen && (
-                <div className="absolute right-0 top-10 z-50 w-24 animate-in rounded-xl border border-light-border bg-white py-1.5 shadow-xl fade-in slide-in-from-top-2 duration-200 sm:top-12 sm:w-28 sm:py-2 dark:border-slate-600 dark:bg-slate-900">
-                  <button
-                    type="button"
-                    className="w-full px-3 py-1.5 text-right text-xs font-semibold text-dark hover:bg-gray-50 sm:px-4 sm:py-2 sm:text-sm dark:hover:bg-slate-800"
-                    onClick={exportPerformancePdf}
-                  >
-                    PDF
-                  </button>
-                  <button
-                    type="button"
-                    className="w-full px-3 py-1.5 text-right text-xs font-semibold text-dark hover:bg-gray-50 sm:px-4 sm:py-2 sm:text-sm dark:hover:bg-slate-800"
-                    onClick={exportPerformanceExcel}
-                  >
-                    Excel
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
           <div className="flex w-fit bg-[#F8F9FE] p-1 rounded-lg dark:bg-slate-800/80">
             {["Month", "Week"].map((f) => (

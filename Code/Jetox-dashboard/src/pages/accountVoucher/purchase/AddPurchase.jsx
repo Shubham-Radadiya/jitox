@@ -75,14 +75,19 @@ const AddPurchase = ({ formType = "purchase" }) => {
                 return;
               }
               try {
-                await purchaseVouchersApi.create(body);
+                const res = await purchaseVouchersApi.create(body);
+                const d = res?.data;
+                const savedNo =
+                  d && typeof d === "object"
+                    ? String(d.voucherNo ?? d.data?.voucherNo ?? body.voucherNo)
+                    : String(body.voucherNo);
                 await queryClient.invalidateQueries({
                   queryKey: ["voucher-list", "purchase"],
                 });
                 await queryClient.invalidateQueries({
                   queryKey: ["purchase-form-meta"],
                 });
-                toast.success(`Saved ${body.voucherNo}.`);
+                toast.success(`Saved ${savedNo}.`);
                 navigate("/dashboard/accounting-voucher/purchase");
               } catch (e) {
                 toast.error(getApiErrorMessage(e, "Could not save purchase voucher"));

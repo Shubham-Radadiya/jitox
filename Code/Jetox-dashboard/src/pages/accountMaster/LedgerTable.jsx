@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { useLocation } from "react-router-dom";
 import { DateRangePicker, CommonModal } from "../../components/ui/CommanUI";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { IoEyeOutline } from "react-icons/io5";
@@ -10,16 +11,45 @@ import { TbMailFilled } from "react-icons/tb";
 import { TiPrinter } from "react-icons/ti";
 import { FcPrint } from "react-icons/fc";
 import DataTable from "../../components/ui/table/DataTable";
-import { buildStandalonePrintableHtml, downloadHtmlDocumentAsPdf } from "../../utils/printAndExport";
-import { dayBooksApi } from "../../services/api";
+import {
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
+} from "../../utils/printAndExport";
+import {
+  accountsApi,
+  paymentVouchersApi,
+  receiptVouchersApi,
+  journalVouchersApi,
+  purchaseVouchersApi,
+  purchaseReturnVouchersApi,
+  expenseVouchersApi,
+  cashVouchersApi,
+} from "../../services/api";
 import { getApiErrorMessage, isEmptyListNotFound } from "../../utils/apiError";
-import { mapDayBooksToLedgerRows } from "../../utils/ledgerRowMapper";
+import {
+  accountOpeningMeta,
+  buildPartyTransactionEntries,
+  normalizeList,
+} from "../../utils/partyLedgerTx";
+import { fmtRupee } from "../../utils/voucherRowMappers";
 
 const LEDGER_TITLE = "Day book ledger";
 
-function docInDateRange(doc, dateRange) {
+function toIsoDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function deriveAccountOpeningDate(account) {
+  return toIsoDate(account?.createdAt);
+}
+
+function inDateRange(dateIso, dateRange) {
   if (!dateRange?.[0] || !dateRange?.[1]) return true;
-  const ts = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
+  if (!dateIso) return false;
+  const ts = new Date(dateIso).getTime();
   const start = new Date(dateRange[0]);
   start.setHours(0, 0, 0, 0);
   const end = new Date(dateRange[1]);
@@ -28,21 +58,51 @@ function docInDateRange(doc, dateRange) {
 }
 
 const LedgerTable = () => {
+  const location = useLocation();
+  const accountId = location.state?.accountId ? String(location.state.accountId) : "";
   const [dateRange, setDateRange] = useState(null);
   const [selectedRows, setSelectedRows] = useState([]);
   const [viewRow, setViewRow] = useState(null);
 
   const {
-    data: rawDayBooks = [],
+    data: ledgerSource = null,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ["dayBooks", "all"],
+    queryKey: ["account-ledger", accountId],
+    enabled: Boolean(accountId),
     queryFn: async () => {
       try {
-        const { data } = await dayBooksApi.getAll({});
-        return Array.isArray(data) ? data : [];
+        const [
+          { data: account },
+          { data: paymentRes },
+          { data: receiptRes },
+          { data: journalRes },
+          { data: purchaseRes },
+          { data: purchaseReturnRes },
+          { data: expenseRes },
+          { data: cashRes },
+        ] = await Promise.all([
+          accountsApi.getById(accountId),
+          paymentVouchersApi.getAll({}),
+          receiptVouchersApi.getAll({}),
+          journalVouchersApi.getAll({}),
+          purchaseVouchersApi.getAll({}),
+          purchaseReturnVouchersApi.getAll({}),
+          expenseVouchersApi.getAll({}),
+          cashVouchersApi.getAll({}),
+        ]);
+        return {
+          account: account || {},
+          payments: normalizeList(paymentRes),
+          receipts: normalizeList(receiptRes),
+          journals: normalizeList(journalRes),
+          purchases: normalizeList(purchaseRes),
+          purchaseReturns: normalizeList(purchaseReturnRes),
+          expenses: normalizeList(expenseRes),
+          cashVouchers: normalizeList(cashRes),
+        };
       } catch (e) {
         if (isEmptyListNotFound(e)) return [];
         throw e;
@@ -51,20 +111,86 @@ const LedgerTable = () => {
   });
 
   useEffect(() => {
+    if (!accountId) {
+      toast.error("Open ledger from Account Master actions.");
+      return;
+    }
     if (isError && error) {
       toast.error(getApiErrorMessage(error, "Could not load ledger"));
     }
-  }, [isError, error]);
+  }, [isError, error, accountId]);
 
   const data = useMemo(() => {
-    const filtered = rawDayBooks.filter((d) => docInDateRange(d, dateRange));
-    const sorted = [...filtered].sort((a, b) => {
-      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return ta - tb;
+    if (!ledgerSource || !ledgerSource.account) return [];
+    const account = ledgerSource.account;
+    const openingDateIso = deriveAccountOpeningDate(account);
+    const { openingAmount, openingIsDebit } = accountOpeningMeta(account);
+
+    const merged = buildPartyTransactionEntries(account, accountId, ledgerSource)
+      .map((r) => ({
+        _id: r._id,
+        dateIso: r.dateIso,
+        voucherType: r.voucherType,
+        voucherNo: r.voucherNo,
+        particulars: r.particulars,
+        debit: r.debit,
+        credit: r.credit,
+      }))
+      .filter((r) => inDateRange(r.dateIso, dateRange))
+      .sort(
+        (a, b) =>
+          new Date(a.dateIso || 0).getTime() - new Date(b.dateIso || 0).getTime()
+      );
+
+    const openingRow =
+      openingAmount > 0
+        ? {
+            _id: `opening-${accountId}`,
+            Date: openingDateIso
+              ? new Date(openingDateIso)
+                  .toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "2-digit",
+                  })
+                  .replace(/ /g, "-")
+              : "—",
+            "Voucher Type": "Opening",
+            "Voucher No": "—",
+            Particulars: "Opening balance",
+            "Debit ₹": openingIsDebit ? fmtRupee(openingAmount) : "—",
+            "Credit ₹": openingIsDebit ? "—" : fmtRupee(openingAmount),
+          }
+        : null;
+
+    let running = openingAmount > 0 ? (openingIsDebit ? openingAmount : -openingAmount) : 0;
+    const txRows = merged.map((r) => {
+      running += r.debit - r.credit;
+      const abs = Math.abs(running);
+      return {
+        _id: r._id,
+        Date: r.dateIso
+          ? new Date(r.dateIso)
+              .toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "2-digit",
+              })
+              .replace(/ /g, "-")
+          : "—",
+        "Voucher Type": r.voucherType,
+        "Voucher No": r.voucherNo,
+        Particulars: r.particulars || "—",
+        "Debit ₹": r.debit ? fmtRupee(r.debit) : "—",
+        "Credit ₹": r.credit ? fmtRupee(r.credit) : "—",
+        "Balance ₹": fmtRupee(abs),
+      };
     });
-    return mapDayBooksToLedgerRows(sorted);
-  }, [rawDayBooks, dateRange]);
+
+    if (!openingRow) return txRows;
+    const abs = Math.abs(openingIsDebit ? openingAmount : -openingAmount);
+    return [{ ...openingRow, "Balance ₹": fmtRupee(abs) }, ...txRows];
+  }, [ledgerSource, dateRange, accountId]);
 
   useEffect(() => {
     setSelectedRows([]);
@@ -103,6 +229,11 @@ const LedgerTable = () => {
     return `Closing balance: ${data[data.length - 1]["Balance ₹"]}`;
   }, [data]);
 
+  const ledgerTitle = useMemo(() => {
+    const accountName = ledgerSource?.account?.businessName || "";
+    return accountName ? `${LEDGER_TITLE} — ${accountName}` : LEDGER_TITLE;
+  }, [ledgerSource]);
+
   const printLedgerRows = async (rowsToPrint) => {
     const header =
       "<tr>" +
@@ -130,9 +261,9 @@ const LedgerTable = () => {
         return `<tr>${cells}</tr>`;
       })
       .join("");
-    const bodyHtml = `<p><strong>${LEDGER_TITLE}</strong></p><p>${closingLine}</p>
+    const bodyHtml = `<p><strong>${ledgerTitle}</strong></p><p>${closingLine}</p>
       <table style="border-collapse:collapse;width:100%"><thead>${header}</thead><tbody>${body}</tbody></table>`;
-    const title = `Ledger — ${LEDGER_TITLE}`;
+    const title = `Ledger — ${ledgerTitle}`;
     const fullHtml = buildStandalonePrintableHtml(title, bodyHtml, {
       bodyPaddingPx: 10,
       bodyFontSizePx: 12,
@@ -149,7 +280,7 @@ const LedgerTable = () => {
   };
 
   const renderLedgerActions = (row) => (
-    <td className="px-3 py-2.5 align-middle border-b border-light-border dark:border-slate-700">
+    <td className="px-1.5 py-1.5 align-middle border-b border-light-border dark:border-slate-700">
       <div className="flex items-center justify-center gap-2">
         <button
           type="button"
@@ -181,7 +312,9 @@ const LedgerTable = () => {
     <DashboardLayout>
       <div className="flex flex-col gap-3 2xl:gap-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
-          <div className="text-base font-semibold text-dark sm:text-lg">{LEDGER_TITLE}</div>
+          <div className="text-base font-semibold text-dark sm:text-lg">
+            {ledgerTitle}
+          </div>
 
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
             <div className="text-sm font-semibold text-blue sm:text-base">{closingLine}</div>
@@ -206,7 +339,7 @@ const LedgerTable = () => {
                 className="flex flex-1 cursor-pointer items-center justify-center border-r border-light-border p-2 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800 sm:flex-none"
                 onClick={() => {
                   const text = encodeURIComponent(
-                    `Jitox — ${LEDGER_TITLE}. ${closingLine}`
+                    `Jitox — ${ledgerTitle}. ${closingLine}`
                   );
                   window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
                 }}
@@ -218,7 +351,7 @@ const LedgerTable = () => {
                 title="Email summary"
                 className="flex flex-1 cursor-pointer items-center justify-center border-r border-light-border p-2 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800 sm:flex-none"
                 onClick={() => {
-                  const sub = encodeURIComponent(`Jitox — ${LEDGER_TITLE}`);
+                  const sub = encodeURIComponent(`Jitox — ${ledgerTitle}`);
                   const body = encodeURIComponent(`${closingLine}\n`);
                   window.location.href = `mailto:?subject=${sub}&body=${body}`;
                 }}
@@ -246,7 +379,8 @@ const LedgerTable = () => {
         <DataTable
           columns={columns}
           data={data}
-          loading={isLoading}
+          loading={Boolean(accountId) && isLoading}
+          tableClassName="[&_thead_th]:px-1 [&_thead_th]:py-1 [&_tbody_td]:px-1.5 [&_tbody_td]:py-1.5"
           enableSelect={true}
           selectedRows={selectedRows}
           toggleSelectAll={toggleSelectAll}

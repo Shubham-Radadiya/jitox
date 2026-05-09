@@ -89,6 +89,7 @@ export default function InvoicePurchaseModalLayout({
   setShipDifferent,
   shipTo,
   setShipTo,
+  persistedShipToRef,
   purchaseDate,
   handleDateChange,
   invoicePrefix,
@@ -553,7 +554,18 @@ export default function InvoicePurchaseModalLayout({
                   type="checkbox"
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary accent-primary focus:ring-primary"
                   checked={shipDifferent}
-                  onChange={(e) => setShipDifferent(e.target.checked)}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setShipDifferent(on);
+                    if (!on) {
+                      setShipTo(billTo);
+                    } else {
+                      const snap = persistedShipToRef?.current;
+                      setShipTo(
+                        String(snap ?? "").trim() ? snap : billTo
+                      );
+                    }
+                  }}
                 />
                 <span className="text-[13px] font-medium leading-snug text-slate-700 sm:text-[12px] dark:text-slate-300">
                   Different ship address
@@ -679,6 +691,7 @@ export default function InvoicePurchaseModalLayout({
                               formCompact
                               hideAdd
                               searchable
+                              menuPlacement="top"
                               searchPlaceholder="Search item…"
                               options={dropdownOptions.products}
                               value={row.product}

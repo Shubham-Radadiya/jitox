@@ -13,6 +13,8 @@ import {
   CommonModal,
 } from "../../components/ui/CommanUI";
 import {
+  buildStandalonePrintableHtml,
+  downloadHtmlDocumentAsPdf,
   downloadPrintableDocument,
   objectToHtmlTable,
   rowsToHtmlTable,
@@ -27,6 +29,38 @@ function parseInr(val) {
 
 function fmtInr(n) {
   return `₹${Math.round(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+}
+
+/** Read-only field styled like image 2 (label + bordered value box). */
+function AchievementReadOnlyField({ label, children, className = "" }) {
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <p className="mb-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
+      <div className="flex min-h-8 w-full items-center rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold leading-tight text-slate-900 shadow-sm ring-1 ring-slate-900/[0.03] dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.04]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function EligibilityToggle({ on }) {
+  return (
+    <div
+      className={`relative h-6 w-10 shrink-0 rounded-full p-px transition-colors ${
+        on ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+      }`}
+      role="presentation"
+      aria-hidden
+    >
+      <div
+        className={`absolute top-px h-5 w-5 rounded-full bg-white shadow-sm ${
+          on ? "right-px" : "left-px"
+        }`}
+      />
+    </div>
+  );
 }
 
 function PctBar({ pct }) {
@@ -120,21 +154,32 @@ export default function TargetTeamPage() {
     toast.success("Target table downloaded (.html)");
   };
 
-  const downloadDetailReport = () => {
+  const downloadDetailReport = async () => {
     if (!detail) return;
+    const eligible = detail.status === "Achieved";
     const flat = {
       "Target Type": detail.targetType,
       "Target Amount": detail.targetAmt,
       "Actual Achievement": detail.achieved,
       "Achievement %": `${detail.pctAchieved ?? ""}%`,
-      "Incentive eligibility": "Yes",
-      "Incentive paid": detail.incentive,
+      "Incentive eligibility": eligible ? "Yes" : "No",
+      "Incentive paid": `${detail.incentive} (${detail.period})`,
     };
-    downloadPrintableDocument(
-      `Jitox-target-${String(detail.user || "detail").replace(/\s+/g, "-")}`,
-      objectToHtmlTable(flat)
-    );
-    toast.success("Report downloaded (.html)");
+    const title = `Target Achievement — ${detail.user}`;
+    const fullHtml = buildStandalonePrintableHtml(title, objectToHtmlTable(flat), {
+      bodyPaddingPx: 10,
+      bodyFontSizePx: 12,
+      h1FontSizePx: 16,
+      tableCellPaddingPx: 5,
+    });
+    const basename = `Jitox-target-${String(detail.user || "detail").replace(/\s+/g, "-")}`;
+    try {
+      await downloadHtmlDocumentAsPdf(fullHtml, `${basename}.pdf`);
+      toast.success("Report downloaded (.pdf)");
+    } catch (e) {
+      console.error(e);
+      toast.error("PDF export failed. Please try again.");
+    }
   };
 
   const teamFooterTotals = useMemo(() => {
@@ -297,39 +342,69 @@ export default function TargetTeamPage() {
       <CommonModal
         open={Boolean(detail)}
         onClose={() => setDetail(null)}
-        title={detail ? `Target Achievement — ${detail.user}` : ""}
-        width="min(420px, 94vw)"
+        title={detail ? `Target Achievement - ${detail.user}` : ""}
+        width="min(440px, 92vw)"
+        headerClassName="!py-2.5 sm:!py-3"
+        titleClassName="!text-sm font-bold sm:!text-[15px]"
+        bodyClassName="!px-3 !pb-3 !pt-2 sm:!px-4 sm:!pb-4 sm:!pt-3"
+        footerClassName="!justify-stretch border-t border-slate-100 px-3 py-2.5 sm:px-4 dark:border-slate-700"
         footer={[
           <Button
             key="dl"
             label="Download"
             variant="outline"
             size="sm"
+            className="w-full min-h-9 justify-center !border-slate-200 !font-semibold !text-primary hover:!border-primary hover:!bg-primary hover:!text-white dark:!border-slate-600 dark:hover:!border-primary dark:hover:!bg-primary dark:hover:!text-white"
             onClick={downloadDetailReport}
           />,
-          <Button key="cl" label="Close" size="sm" onClick={() => setDetail(null)} />,
         ]}
       >
         {detail && (
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-2">
-              <span className="text-slate-500">Target Type</span>
-              <span className="font-medium text-right">{detail.targetType}</span>
-              <span className="text-slate-500">Target Amount</span>
-              <span className="font-medium text-right tabular-nums">{detail.targetAmt}</span>
-              <span className="text-slate-500">Actual Achievement</span>
-              <span className="font-medium text-right tabular-nums">{detail.achieved}</span>
-              <span className="text-slate-500">Achievement %</span>
-              <span className="font-medium text-right tabular-nums">{detail.pctAchieved}%</span>
+          <div className="flex flex-col gap-3 text-[13px]">
+            <AchievementReadOnlyField label="Target Type">
+              {detail.targetType}
+            </AchievementReadOnlyField>
+
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
+              <AchievementReadOnlyField label="Target Amount">
+                <span className="tabular-nums">{detail.targetAmt}</span>
+              </AchievementReadOnlyField>
+              <AchievementReadOnlyField label="Actual Achievement">
+                <span className="tabular-nums">{detail.achieved}</span>
+              </AchievementReadOnlyField>
+              <AchievementReadOnlyField label="Achievement %">
+                <span className="tabular-nums">{detail.pctAchieved}%</span>
+              </AchievementReadOnlyField>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-700">
-              <span className="text-slate-600">Incentive eligibility</span>
-              <span className="text-emerald-600 font-medium">Yes</span>
+
+            <div className="border-t border-slate-100 pt-3 dark:border-slate-700">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Incentive Eligibility
+                </span>
+                <div className="flex items-center gap-2 sm:justify-end">
+                  <span
+                    className={`text-xs font-semibold sm:text-[13px] ${
+                      detail.status === "Achieved"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-slate-500 dark:text-slate-400"
+                    }`}
+                  >
+                    {detail.status === "Achieved" ? "Yes" : "No"}
+                  </span>
+                  <EligibilityToggle on={detail.status === "Achieved"} />
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-slate-500 block text-xs mb-1">Incentive paid</span>
-              <span className="tabular-nums">{detail.incentive} (On 28 Jul 2025)</span>
-            </div>
+
+            <AchievementReadOnlyField label="Incentive paid">
+              <span className="tabular-nums">
+                {detail.incentive}{" "}
+                <span className="font-medium text-slate-600 dark:text-slate-300">
+                  (On {detail.period})
+                </span>
+              </span>
+            </AchievementReadOnlyField>
           </div>
         )}
       </CommonModal>

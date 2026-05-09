@@ -18,9 +18,8 @@ import {
 } from "../../utils/productMappers";
 import { TABLE_ACTION_ICON_BTN, tableFooterTdClasses } from "../../utils/tableUi";
 import {
-  buildStandalonePrintableHtml,
+  buildPriceListStandaloneHtml,
   downloadHtmlDocumentAsPdf,
-  rowsToHtmlTable,
 } from "../../utils/printAndExport";
 
 const ProductIndex = () => {
@@ -80,17 +79,13 @@ const ProductIndex = () => {
   });
 
   const exportPriceListDocument = async () => {
-    if (!priceRows.length) {
+    if (!rawProducts.length) {
       toast.error("No price rows to export");
       return;
     }
     try {
-      const cols = priceColumns.filter((c) => c !== "Actions");
       const title = `Jitox-price-list-${new Date().toISOString().slice(0, 10)}`;
-      const html = buildStandalonePrintableHtml(
-        title,
-        rowsToHtmlTable(cols, priceRows)
-      );
+      const html = buildPriceListStandaloneHtml(title, rawProducts);
       await downloadHtmlDocumentAsPdf(html, `${title}.pdf`);
       toast.success("Price list exported as PDF");
     } catch (e) {

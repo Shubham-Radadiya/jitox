@@ -38,6 +38,97 @@ const DEFAULT_GROUP_OPTIONS = [
   { value: "grp2", label: "Group 2" },
 ];
 
+const DEFAULT_GST_RATE_OPTIONS = [
+  { value: "5", label: "5%" },
+  { value: "12", label: "12%" },
+  { value: "18", label: "18%" },
+];
+
+const DEFAULT_UNITS_OPTIONS = [
+  { value: "kg", label: "KG" },
+  { value: "ltr", label: "Litre" },
+];
+
+const DEFAULT_ALTERNATE_UNITS_OPTIONS = [
+  { value: "gm", label: "Gram" },
+  { value: "ml", label: "ML" },
+];
+
+const DEFAULT_PACKING_STYLE_OPTIONS = [
+  { value: "box", label: "Box" },
+  { value: "bag", label: "Bag" },
+];
+
+const DEFAULT_PACKAGING_OPTIONS = [
+  { value: "Bag", label: "Bag" },
+  { value: "Box", label: "Box" },
+  { value: "Carton", label: "Carton" },
+  { value: "Drum", label: "Drum" },
+  { value: "Loose", label: "Loose" },
+];
+
+/** Persist user-added dropdown rows across modal opens (browser localStorage). */
+const OPTION_KEYS = {
+  category: "jitox_product_dropdown_extras_category_v1",
+  group: "jitox_product_dropdown_extras_group_v1",
+  gstRate: "jitox_product_dropdown_extras_gstRate_v1",
+  units: "jitox_product_dropdown_extras_units_v1",
+  alternateUnits: "jitox_product_dropdown_extras_alternateUnits_v1",
+  packingStyle: "jitox_product_dropdown_extras_packingStyle_v1",
+  packaging: "jitox_product_dropdown_extras_packaging_v1",
+};
+
+function readStoredExtras(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p)) return [];
+    return p
+      .filter(
+        (x) =>
+          x &&
+          typeof x === "object" &&
+          String(x.value ?? "").length &&
+          String(x.label ?? "").length
+      )
+      .map((x) => ({
+        value: String(x.value),
+        label: String(x.label ?? x.value),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredExtras(key, extras) {
+  try {
+    localStorage.setItem(key, JSON.stringify(extras));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+/** Defaults first, then stored extras whose `value` is not already in defaults. */
+function mergeDefaultAndStoredExtras(defaults, storedExtras) {
+  const base = [...defaults];
+  const seen = new Set(defaults.map((d) => String(d.value)));
+  for (const o of storedExtras) {
+    const v = String(o.value);
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    base.push({ value: v, label: String(o.label ?? v) });
+  }
+  return base;
+}
+
+/** Save only options not in built-in defaults so code updates to defaults still apply. */
+function persistFullOptions(key, defaults, fullOptions) {
+  const defVals = new Set(defaults.map((d) => String(d.value)));
+  const extras = fullOptions.filter((o) => !defVals.has(String(o.value)));
+  writeStoredExtras(key, extras);
+}
+
 /** Green section titles — same font size as dense `FormSection`, bold forced. */
 const ADD_PRODUCT_SECTION_TITLE_CLASS =
   "!font-bold !text-primary dark:!text-emerald-400";
@@ -57,7 +148,23 @@ const AddProductModal = ({
   const [saving, setSaving] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORY_OPTIONS);
   const [groupOptions, setGroupOptions] = useState(DEFAULT_GROUP_OPTIONS);
+  const [gstRateOptions, setGstRateOptions] = useState(DEFAULT_GST_RATE_OPTIONS);
+  const [unitsOptions, setUnitsOptions] = useState(DEFAULT_UNITS_OPTIONS);
+  const [alternateUnitsOptions, setAlternateUnitsOptions] = useState(
+    DEFAULT_ALTERNATE_UNITS_OPTIONS
+  );
+  const [packingStyleOptions, setPackingStyleOptions] = useState(
+    DEFAULT_PACKING_STYLE_OPTIONS
+  );
+  const [packagingOptions, setPackagingOptions] = useState(DEFAULT_PACKAGING_OPTIONS);
+
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGstRateDraft, setNewGstRateDraft] = useState("");
+  const [newUnitsName, setNewUnitsName] = useState("");
+  const [newAlternateUnitsName, setNewAlternateUnitsName] = useState("");
+  const [newPackingStyleName, setNewPackingStyleName] = useState("");
+  const [newPackagingName, setNewPackagingName] = useState("");
   const [form, setForm] = useState(() => createEmptyProductForm());
 
   const isView = mode === "view";
@@ -65,19 +172,74 @@ const AddProductModal = ({
 
   useEffect(() => {
     if (!open) return;
+
+    const categoryBase = mergeDefaultAndStoredExtras(
+      DEFAULT_CATEGORY_OPTIONS,
+      readStoredExtras(OPTION_KEYS.category)
+    );
+    const groupBase = mergeDefaultAndStoredExtras(
+      DEFAULT_GROUP_OPTIONS,
+      readStoredExtras(OPTION_KEYS.group)
+    );
+    const gstBase = mergeDefaultAndStoredExtras(
+      DEFAULT_GST_RATE_OPTIONS,
+      readStoredExtras(OPTION_KEYS.gstRate)
+    );
+    const unitsBase = mergeDefaultAndStoredExtras(
+      DEFAULT_UNITS_OPTIONS,
+      readStoredExtras(OPTION_KEYS.units)
+    );
+    const alternateBase = mergeDefaultAndStoredExtras(
+      DEFAULT_ALTERNATE_UNITS_OPTIONS,
+      readStoredExtras(OPTION_KEYS.alternateUnits)
+    );
+    const packingStyleBase = mergeDefaultAndStoredExtras(
+      DEFAULT_PACKING_STYLE_OPTIONS,
+      readStoredExtras(OPTION_KEYS.packingStyle)
+    );
+    const packagingBase = mergeDefaultAndStoredExtras(
+      DEFAULT_PACKAGING_OPTIONS,
+      readStoredExtras(OPTION_KEYS.packaging)
+    );
+
     if (!product) {
       setForm(createEmptyProductForm());
-      setCategoryOptions(DEFAULT_CATEGORY_OPTIONS);
-      setGroupOptions(DEFAULT_GROUP_OPTIONS);
+      setCategoryOptions(categoryBase);
+      setGroupOptions(groupBase);
+      setGstRateOptions(gstBase);
+      setUnitsOptions(unitsBase);
+      setAlternateUnitsOptions(alternateBase);
+      setPackingStyleOptions(packingStyleBase);
+      setPackagingOptions(packagingBase);
       return;
     }
+
     const next = mapApiProductToForm(product);
     setForm(next);
-    setCategoryOptions((prev) =>
-      mergeDropdownOption(prev, next.category, next.category)
+    setCategoryOptions(
+      mergeDropdownOption(categoryBase, next.category, next.category)
     );
-    setGroupOptions((prev) =>
-      mergeDropdownOption(prev, next.group, next.group)
+    setGroupOptions(mergeDropdownOption(groupBase, next.group, next.group));
+    setGstRateOptions(
+      next.gstRate
+        ? mergeDropdownOption(gstBase, next.gstRate, `${next.gstRate}%`)
+        : gstBase
+    );
+    setUnitsOptions(
+      mergeDropdownOption(unitsBase, next.units, next.units)
+    );
+    setAlternateUnitsOptions(
+      mergeDropdownOption(alternateBase, next.alternateUnits, next.alternateUnits)
+    );
+    setPackingStyleOptions(
+      mergeDropdownOption(
+        packingStyleBase,
+        next.packingStyle,
+        next.packingStyle
+      )
+    );
+    setPackagingOptions(
+      mergeDropdownOption(packagingBase, next.packagingType, next.packagingType)
     );
   }, [open, product]);
 
@@ -87,6 +249,18 @@ const AddProductModal = ({
   };
 
   const resetCategoryQuickAdd = useCallback(() => setNewCategoryName(""), []);
+  const resetGroupQuickAdd = useCallback(() => setNewGroupName(""), []);
+  const resetGstQuickAdd = useCallback(() => setNewGstRateDraft(""), []);
+  const resetUnitsQuickAdd = useCallback(() => setNewUnitsName(""), []);
+  const resetAlternateUnitsQuickAdd = useCallback(
+    () => setNewAlternateUnitsName(""),
+    []
+  );
+  const resetPackingStyleQuickAdd = useCallback(
+    () => setNewPackingStyleName(""),
+    []
+  );
+  const resetPackagingQuickAdd = useCallback(() => setNewPackagingName(""), []);
 
   const submitNewCategory = useCallback(
     (closeModal) => {
@@ -98,13 +272,191 @@ const AddProductModal = ({
       const value = slugCategory(name);
       setCategoryOptions((opts) => {
         if (opts.some((o) => o.value === value || o.label === name)) return opts;
-        return [...opts, { value, label: name }];
+        const next = [...opts, { value, label: name }];
+        persistFullOptions(
+          OPTION_KEYS.category,
+          DEFAULT_CATEGORY_OPTIONS,
+          next
+        );
+        return next;
       });
       setForm((f) => ({ ...f, category: value }));
       resetCategoryQuickAdd();
       closeModal?.();
     },
     [newCategoryName, resetCategoryQuickAdd]
+  );
+
+  const submitNewGroup = useCallback(
+    (closeModal) => {
+      const name = String(newGroupName || "").trim();
+      if (!name) {
+        toast.error("Enter a group name");
+        return;
+      }
+      const value = slugCategory(name);
+      setGroupOptions((opts) => {
+        if (opts.some((o) => o.value === value || o.label === name)) return opts;
+        const next = [...opts, { value, label: name }];
+        persistFullOptions(OPTION_KEYS.group, DEFAULT_GROUP_OPTIONS, next);
+        return next;
+      });
+      setForm((f) => ({ ...f, group: value }));
+      resetGroupQuickAdd();
+      closeModal?.();
+    },
+    [newGroupName, resetGroupQuickAdd]
+  );
+
+  const submitNewGstRate = useCallback(
+    (closeModal) => {
+      const raw = String(newGstRateDraft || "")
+        .trim()
+        .replace(/%/g, "");
+      if (!raw || !/^\d+(\.\d{1,2})?$/.test(raw)) {
+        toast.error("Enter a valid GST rate (e.g. 28 or 28.5)");
+        return;
+      }
+      const value = raw;
+      const label = `${raw}%`;
+      setGstRateOptions((opts) => {
+        if (opts.some((o) => o.value === value || o.label === label)) return opts;
+        const next = [...opts, { value, label }];
+        persistFullOptions(
+          OPTION_KEYS.gstRate,
+          DEFAULT_GST_RATE_OPTIONS,
+          next
+        );
+        return next;
+      });
+      setForm((f) => ({ ...f, gstRate: value }));
+      resetGstQuickAdd();
+      closeModal?.();
+    },
+    [newGstRateDraft, resetGstQuickAdd]
+  );
+
+  const submitNewUnits = useCallback(
+    (closeModal) => {
+      const name = String(newUnitsName || "").trim();
+      if (!name) {
+        toast.error("Enter a unit name");
+        return;
+      }
+      const value = slugCategory(name);
+      setUnitsOptions((opts) => {
+        if (
+          opts.some(
+            (o) =>
+              o.value === value ||
+              String(o.label).toLowerCase() === name.toLowerCase()
+          )
+        )
+          return opts;
+        const next = [...opts, { value, label: name }];
+        persistFullOptions(OPTION_KEYS.units, DEFAULT_UNITS_OPTIONS, next);
+        return next;
+      });
+      setForm((f) => ({ ...f, units: value }));
+      resetUnitsQuickAdd();
+      closeModal?.();
+    },
+    [newUnitsName, resetUnitsQuickAdd]
+  );
+
+  const submitNewAlternateUnits = useCallback(
+    (closeModal) => {
+      const name = String(newAlternateUnitsName || "").trim();
+      if (!name) {
+        toast.error("Enter alternate unit name");
+        return;
+      }
+      const value = slugCategory(name);
+      setAlternateUnitsOptions((opts) => {
+        if (
+          opts.some(
+            (o) =>
+              o.value === value ||
+              String(o.label).toLowerCase() === name.toLowerCase()
+          )
+        )
+          return opts;
+        const next = [...opts, { value, label: name }];
+        persistFullOptions(
+          OPTION_KEYS.alternateUnits,
+          DEFAULT_ALTERNATE_UNITS_OPTIONS,
+          next
+        );
+        return next;
+      });
+      setForm((f) => ({ ...f, alternateUnits: value }));
+      resetAlternateUnitsQuickAdd();
+      closeModal?.();
+    },
+    [newAlternateUnitsName, resetAlternateUnitsQuickAdd]
+  );
+
+  const submitNewPackingStyle = useCallback(
+    (closeModal) => {
+      const name = String(newPackingStyleName || "").trim();
+      if (!name) {
+        toast.error("Enter packing style");
+        return;
+      }
+      const value = slugCategory(name);
+      setPackingStyleOptions((opts) => {
+        if (
+          opts.some(
+            (o) =>
+              o.value === value ||
+              String(o.label).toLowerCase() === name.toLowerCase()
+          )
+        )
+          return opts;
+        const next = [...opts, { value, label: name }];
+        persistFullOptions(
+          OPTION_KEYS.packingStyle,
+          DEFAULT_PACKING_STYLE_OPTIONS,
+          next
+        );
+        return next;
+      });
+      setForm((f) => ({ ...f, packingStyle: value }));
+      resetPackingStyleQuickAdd();
+      closeModal?.();
+    },
+    [newPackingStyleName, resetPackingStyleQuickAdd]
+  );
+
+  const submitNewPackaging = useCallback(
+    (closeModal) => {
+      const name = String(newPackagingName || "").trim();
+      if (!name) {
+        toast.error("Enter packaging type");
+        return;
+      }
+      setPackagingOptions((opts) => {
+        if (
+          opts.some(
+            (o) =>
+              o.value === name ||
+              String(o.label).toLowerCase() === name.toLowerCase()
+          )
+        )
+          return opts;
+        const next = [...opts, { value: name, label: name }];
+        persistFullOptions(
+          OPTION_KEYS.packaging,
+          DEFAULT_PACKAGING_OPTIONS,
+          next
+        );
+        return next;
+      });
+      setForm((f) => ({ ...f, packagingType: name }));
+      resetPackagingQuickAdd();
+      closeModal?.();
+    },
+    [newPackagingName, resetPackagingQuickAdd]
   );
 
   useEffect(() => {
@@ -337,7 +689,50 @@ const AddProductModal = ({
               options={groupOptions}
               disabled={isReadOnly}
               hideAdd={isReadOnly}
-              addNavigateTo="/dashboard/product"
+              closeOnAdd={false}
+              renderAddModal={({
+                open: groupModalOpen,
+                onClose: closeGroupModal,
+              }) => (
+                <CommonModal
+                  open={groupModalOpen}
+                  onClose={() => {
+                    resetGroupQuickAdd();
+                    closeGroupModal();
+                  }}
+                  title="New group"
+                  size="md"
+                  footer={[
+                    <Button
+                      key="cancel"
+                      label="Cancel"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        resetGroupQuickAdd();
+                        closeGroupModal();
+                      }}
+                    />,
+                    <Button
+                      key="add"
+                      label="Add"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => submitNewGroup(closeGroupModal)}
+                      className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
+                    />,
+                  ]}
+                >
+                  <InputField
+                    label="Group name"
+                    name="newGroupName"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="e.g. Seeds"
+                    inputClassName={ADD_PRODUCT_VALUE_TEXT}
+                  />
+                </CommonModal>
+              )}
             />
 
             <InputField
@@ -366,14 +761,54 @@ const AddProductModal = ({
               value={form.gstRate}
               onChange={(v) => setForm((f) => ({ ...f, gstRate: v }))}
               placeholder="Select or create"
-              options={[
-                { value: "5", label: "5%" },
-                { value: "12", label: "12%" },
-                { value: "18", label: "18%" },
-              ]}
+              options={gstRateOptions}
               disabled={isReadOnly}
               hideAdd={isReadOnly}
-              addNavigateTo="/dashboard/product"
+              closeOnAdd={false}
+              renderAddModal={({
+                open: gstModalOpen,
+                onClose: closeGstModal,
+              }) => (
+                <CommonModal
+                  open={gstModalOpen}
+                  onClose={() => {
+                    resetGstQuickAdd();
+                    closeGstModal();
+                  }}
+                  title="New GST rate"
+                  size="md"
+                  footer={[
+                    <Button
+                      key="cancel"
+                      label="Cancel"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        resetGstQuickAdd();
+                        closeGstModal();
+                      }}
+                    />,
+                    <Button
+                      key="add"
+                      label="Add"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => submitNewGstRate(closeGstModal)}
+                      className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
+                    />,
+                  ]}
+                >
+                  <InputField
+                    label="GST %"
+                    name="newGstRateDraft"
+                    value={newGstRateDraft}
+                    onChange={(e) => setNewGstRateDraft(e.target.value)}
+                    placeholder="e.g. 28"
+                    inputMode="decimal"
+                    inputClassName={ADD_PRODUCT_VALUE_TEXT}
+                  />
+                </CommonModal>
+              )}
             />
 
             <InputField
@@ -392,13 +827,53 @@ const AddProductModal = ({
               value={form.units}
               onChange={(v) => setForm((f) => ({ ...f, units: v }))}
               placeholder="e.g. Ltr, Kg, Nos"
-              options={[
-                { value: "kg", label: "KG" },
-                { value: "ltr", label: "Litre" },
-              ]}
+              options={unitsOptions}
               disabled={isReadOnly}
               hideAdd={isReadOnly}
-              addNavigateTo="/dashboard/product"
+              closeOnAdd={false}
+              renderAddModal={({
+                open: unitsModalOpen,
+                onClose: closeUnitsModal,
+              }) => (
+                <CommonModal
+                  open={unitsModalOpen}
+                  onClose={() => {
+                    resetUnitsQuickAdd();
+                    closeUnitsModal();
+                  }}
+                  title="New unit"
+                  size="md"
+                  footer={[
+                    <Button
+                      key="cancel"
+                      label="Cancel"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        resetUnitsQuickAdd();
+                        closeUnitsModal();
+                      }}
+                    />,
+                    <Button
+                      key="add"
+                      label="Add"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => submitNewUnits(closeUnitsModal)}
+                      className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
+                    />,
+                  ]}
+                >
+                  <InputField
+                    label="Unit name"
+                    name="newUnitsName"
+                    value={newUnitsName}
+                    onChange={(e) => setNewUnitsName(e.target.value)}
+                    placeholder="e.g. Nos, Bag"
+                    inputClassName={ADD_PRODUCT_VALUE_TEXT}
+                  />
+                </CommonModal>
+              )}
             />
 
             <CommonDropdown
@@ -407,13 +882,53 @@ const AddProductModal = ({
               value={form.alternateUnits}
               onChange={(v) => setForm((f) => ({ ...f, alternateUnits: v }))}
               placeholder="Alternate unit"
-              options={[
-                { value: "gm", label: "Gram" },
-                { value: "ml", label: "ML" },
-              ]}
+              options={alternateUnitsOptions}
               disabled={isReadOnly}
               hideAdd={isReadOnly}
-              addNavigateTo="/dashboard/product"
+              closeOnAdd={false}
+              renderAddModal={({
+                open: altModalOpen,
+                onClose: closeAltModal,
+              }) => (
+                <CommonModal
+                  open={altModalOpen}
+                  onClose={() => {
+                    resetAlternateUnitsQuickAdd();
+                    closeAltModal();
+                  }}
+                  title="New alternate unit"
+                  size="md"
+                  footer={[
+                    <Button
+                      key="cancel"
+                      label="Cancel"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        resetAlternateUnitsQuickAdd();
+                        closeAltModal();
+                      }}
+                    />,
+                    <Button
+                      key="add"
+                      label="Add"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => submitNewAlternateUnits(closeAltModal)}
+                      className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
+                    />,
+                  ]}
+                >
+                  <InputField
+                    label="Alternate unit name"
+                    name="newAlternateUnitsName"
+                    value={newAlternateUnitsName}
+                    onChange={(e) => setNewAlternateUnitsName(e.target.value)}
+                    placeholder="e.g. Dozen"
+                    inputClassName={ADD_PRODUCT_VALUE_TEXT}
+                  />
+                </CommonModal>
+              )}
             />
 
             <CommonDropdown
@@ -422,13 +937,53 @@ const AddProductModal = ({
               value={form.packingStyle}
               onChange={(v) => setForm((f) => ({ ...f, packingStyle: v }))}
               placeholder="Select or create"
-              options={[
-                { value: "box", label: "Box" },
-                { value: "bag", label: "Bag" },
-              ]}
+              options={packingStyleOptions}
               disabled={isReadOnly}
               hideAdd={isReadOnly}
-              addNavigateTo="/dashboard/product"
+              closeOnAdd={false}
+              renderAddModal={({
+                open: psModalOpen,
+                onClose: closePsModal,
+              }) => (
+                <CommonModal
+                  open={psModalOpen}
+                  onClose={() => {
+                    resetPackingStyleQuickAdd();
+                    closePsModal();
+                  }}
+                  title="New packing style"
+                  size="md"
+                  footer={[
+                    <Button
+                      key="cancel"
+                      label="Cancel"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        resetPackingStyleQuickAdd();
+                        closePsModal();
+                      }}
+                    />,
+                    <Button
+                      key="add"
+                      label="Add"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => submitNewPackingStyle(closePsModal)}
+                      className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
+                    />,
+                  ]}
+                >
+                  <InputField
+                    label="Packing style"
+                    name="newPackingStyleName"
+                    value={newPackingStyleName}
+                    onChange={(e) => setNewPackingStyleName(e.target.value)}
+                    placeholder="e.g. Pallet"
+                    inputClassName={ADD_PRODUCT_VALUE_TEXT}
+                  />
+                </CommonModal>
+              )}
             />
 
             <CommonDropdown
@@ -437,16 +992,53 @@ const AddProductModal = ({
               value={form.packagingType}
               onChange={(v) => setForm((f) => ({ ...f, packagingType: v }))}
               placeholder="Bag, box, etc."
-              options={[
-                { value: "Bag", label: "Bag" },
-                { value: "Box", label: "Box" },
-                { value: "Carton", label: "Carton" },
-                { value: "Drum", label: "Drum" },
-                { value: "Loose", label: "Loose" },
-              ]}
+              options={packagingOptions}
               disabled={isReadOnly}
               hideAdd={isReadOnly}
-              addNavigateTo="/dashboard/product"
+              closeOnAdd={false}
+              renderAddModal={({
+                open: pkgModalOpen,
+                onClose: closePkgModal,
+              }) => (
+                <CommonModal
+                  open={pkgModalOpen}
+                  onClose={() => {
+                    resetPackagingQuickAdd();
+                    closePkgModal();
+                  }}
+                  title="New packaging"
+                  size="md"
+                  footer={[
+                    <Button
+                      key="cancel"
+                      label="Cancel"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        resetPackagingQuickAdd();
+                        closePkgModal();
+                      }}
+                    />,
+                    <Button
+                      key="add"
+                      label="Add"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => submitNewPackaging(closePkgModal)}
+                      className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
+                    />,
+                  ]}
+                >
+                  <InputField
+                    label="Packaging type"
+                    name="newPackagingName"
+                    value={newPackagingName}
+                    onChange={(e) => setNewPackagingName(e.target.value)}
+                    placeholder="e.g. Crate"
+                    inputClassName={ADD_PRODUCT_VALUE_TEXT}
+                  />
+                </CommonModal>
+              )}
             />
 
             <InputField

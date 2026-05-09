@@ -234,7 +234,7 @@ export function reportOrderTdClasses(columnKey) {
 /** <th> classes: hierarchy + alignment */
 export function tableThClasses(columnKey) {
   return [
-    "px-2 py-2 text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200",
+    "px-1 py-0.5 text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200",
     TABLE_CELL_BORDER,
     "bg-slate-100 dark:bg-slate-800/90",
     getTableCellAlignClass(columnKey),

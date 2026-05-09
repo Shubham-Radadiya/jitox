@@ -45,6 +45,11 @@ export function purchasePayloadToCreateBody(payload) {
         category: row.category || "",
         unit: row.unit || "Nos",
         subtotal,
+        hsn: String(row.hsn ?? "").trim(),
+        batch: String(row.batch ?? "").trim(),
+        expDate: String(row.expDate ?? "").trim(),
+        mfgDate: String(row.mfgDate ?? "").trim(),
+        mrp: String(row.mrp ?? "").trim(),
       };
     });
 
@@ -62,6 +67,15 @@ export function purchasePayloadToCreateBody(payload) {
   const totalAmount =
     lineTaxableTotal + (Number.isFinite(gstAmount) ? gstAmount : 0);
 
+  const billTo = String(payload.billTo ?? "").trim();
+  const shipRaw = String(payload.shipTo ?? "").trim();
+  const sd =
+    typeof payload.shipDifferent === "boolean"
+      ? payload.shipDifferent
+      : String(payload.shipDifferent || "").toLowerCase() === "true";
+  /** Persist full billing + shipping lines; legacy single field follows ship when different else bill. */
+  const shipStored = sd ? shipRaw : billTo;
+
   return {
     partyName: String(payload.partyName || "").trim(),
     voucherNo: String(payload.voucherNo || "").trim(),
@@ -69,9 +83,12 @@ export function purchasePayloadToCreateBody(payload) {
     transportDetails: String(payload.transporter || "").trim(),
     deliveryAt: String(payload.deliveryAt || "").trim(),
     orderby: String(payload.orderBy || "").trim(),
-    shipToAndBillTo: String(
-      payload.shipDifferent ? payload.shipTo || "" : payload.billTo || ""
-    ).trim(),
+    shipToAndBillTo: shipStored,
+    billTo,
+    shipTo: shipStored,
+    shipDifferent: sd,
+    narration: String(payload.narration || "").trim(),
+    termsAndConditions: String(payload.termsText || "").trim(),
     items,
     gstAmount,
     totalAmount,

@@ -1,5 +1,5 @@
 import React from "react";
-import { CommonModal, Button } from "../../components/ui/CommanUI";
+import { CommonModal } from "../../components/ui/CommanUI";
 import { AddressDisplay } from "../../components/address/AddressDisplay";
 import { addressFromUser } from "../../utils/addressFormat";
 import dayjs from "dayjs";
@@ -54,14 +54,10 @@ const ViewUserModal = ({ open, onClose, user, permissionSummary }) => {
       onClose={onClose}
       title="User overview"
       width="min(420px, 90vw)"
-      bodyClassName="px-2.5 sm:px-5 pb-3 sm:pb-8 pt-2 sm:pt-4"
-      footerClassName="!px-3 !py-2.5 sm:!px-6"
-      footer={[
-        <Button key="close" label="Close" variant="outline" size="sm" onClick={onClose} />,
-      ]}
+      bodyClassName="!px-3 sm:!px-5 !pb-3 sm:!pb-5 !pt-2 sm:!pt-3"
     >
-      <div className="overflow-hidden rounded-xl jitox-panel jitox-panel--shadow">
-        <div className="flex flex-wrap items-center gap-2.5 border-b border-light-border bg-headBg px-2.5 py-2.5 sm:gap-4 sm:px-5 sm:py-4 dark:border-slate-700 dark:bg-slate-800/60">
+      <div className="overflow-hidden rounded-xl border border-light-border bg-white dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-light-border bg-slate-50 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4 dark:border-slate-700 dark:bg-slate-800/60">
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-light-border bg-white sm:h-16 sm:w-16 sm:rounded-xl dark:border-slate-600 dark:bg-slate-900">
               {user.image ? (
@@ -72,9 +68,9 @@ const ViewUserModal = ({ open, onClose, user, permissionSummary }) => {
                 </div>
               )}
             </div>
-            <div className="min-w-0 flex flex-col gap-0">
-              <p className="truncate text-base font-bold leading-snug text-dark sm:text-lg">{displayName}</p>
-              <p className="truncate text-xs leading-tight text-light sm:text-sm">{role}</p>
+            <div className="min-w-0 flex flex-col gap-0.5">
+              <p className="truncate text-base font-semibold leading-snug text-dark sm:text-lg dark:text-slate-100">{displayName}</p>
+              <p className="truncate text-xs leading-tight text-slate-500 sm:text-sm dark:text-slate-400">{role}</p>
             </div>
           </div>
           <span
@@ -88,7 +84,7 @@ const ViewUserModal = ({ open, onClose, user, permissionSummary }) => {
           </span>
         </div>
 
-        <div className="space-y-3.5 px-2.5 py-2.5 sm:space-y-6 sm:px-6 sm:py-5">
+        <div className="space-y-3 px-3 py-3 sm:space-y-4 sm:px-5 sm:py-4">
           <section className="space-y-0">
             <SectionTitle>Contact</SectionTitle>
             <div className="pt-1">
@@ -106,7 +102,7 @@ const ViewUserModal = ({ open, onClose, user, permissionSummary }) => {
               <Row label="Region">{user.Region || user.regine}</Row>
               <Row label="Area">{user.Area || user.assignedAreas}</Row>
             </div>
-            <div className="mt-2.5 rounded-lg border border-dashed border-light-border bg-gray-50/90 px-2.5 py-2.5 sm:mt-3 sm:px-3 sm:py-3 dark:border-slate-600 dark:bg-slate-800/40">
+            <div className="mt-2 rounded-lg border border-light-border bg-slate-50/80 px-2.5 py-2.5 sm:mt-2.5 sm:px-3 sm:py-3 dark:border-slate-600 dark:bg-slate-800/40">
               <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-light">
                 Full address
               </span>
@@ -128,7 +124,7 @@ const ViewUserModal = ({ open, onClose, user, permissionSummary }) => {
 
           <section className="space-y-0">
             <SectionTitle>Module access</SectionTitle>
-            <p className="pt-3 text-sm leading-relaxed text-dark dark:text-slate-200">{accessText}</p>
+            <p className="pt-2 text-sm leading-relaxed text-dark dark:text-slate-200">{accessText}</p>
           </section>
         </div>
       </div>

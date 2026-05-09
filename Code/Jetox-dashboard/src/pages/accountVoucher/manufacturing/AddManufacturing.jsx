@@ -150,29 +150,31 @@ const AddManufacturing = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-3 2xl:gap-4 bg-white">
-        <div className="text-lg font-semibold ">Manufacturing Start</div>
+      <div className="flex flex-col gap-3 text-slate-900 dark:text-slate-100 2xl:gap-4">
+        <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Manufacturing Start
+        </div>
 
-        <div className="flex flex-col gap-3 2xl:gap-4 2xl:max-h-[calc(100vh-15rem)] max-h-[calc(100vh-13rem)] overflow-auto scrollbar-hide">
-          <div className="flex gap-4 items-center">
-            <div className="flex-1">
+        <div className="flex flex-col gap-3 xl:max-h-[calc(100vh-15rem)] xl:overflow-auto xl:scrollbar-hide 2xl:gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-4">
+            <div className="min-w-0">
               <InputField label="Voucher No" value="Auto" readOnly />
             </div>
-            <div className="flex-1">
+            <div className="min-w-0">
               <InputField
                 label="Batch Code"
                 value={batchCode}
                 onChange={(e) => setBatchCode(e.target.value)}
               />
             </div>
-            <div className="flex-1">
+            <div className="min-w-0">
               <DateInput
                 label="Mfg Date"
                 value={mfgDate}
                 onChange={(e) => setMfgDate(e.target.value)}
               />
             </div>
-            <div className="flex-1">
+            <div className="min-w-0">
               <DateInput
                 label="Exp Date"
                 value={expDate}
@@ -181,8 +183,8 @@ const AddManufacturing = () => {
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <div className="flex-1">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:gap-4">
+            <div className="min-w-0">
               <CommonDropdown
                 label="Select Finished Product"
                 options={productOptions}
@@ -191,7 +193,7 @@ const AddManufacturing = () => {
                 onChange={setProduct}
               />
             </div>
-            <div className="flex-1">
+            <div className="min-w-0">
               <InputField
                 label="Quantity to Produce"
                 value={quantityToProduce}
@@ -203,26 +205,26 @@ const AddManufacturing = () => {
 
           {/* Raw Materials Table */}
           <div className="space-y-2">
-            <div className="text-base font-semibold">
+            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Auto-List Raw Materials
             </div>
-            <div className="w-full min-w-0 overflow-x-auto rounded border border-light-border">
+            <div className="w-full min-w-0 overflow-x-auto rounded border border-light-border dark:border-slate-600 dark:bg-slate-900">
               <table className="w-full min-w-full table-auto border-collapse text-sm">
                 <thead>
-                  <tr className="bg-gray-100 border-b border-light-border">
-                    <th className="w-[32%] min-w-0 px-3 py-2.5 text-left align-middle font-medium sm:px-4">
+                  <tr className="bg-gray-100 border-b border-light-border dark:border-slate-600 dark:bg-slate-800">
+                    <th className="w-[32%] min-w-0 px-3 py-2.5 text-left align-middle font-medium text-slate-700 dark:text-slate-200 sm:px-4">
                       Raw Materials ({rawMaterials.length})
                     </th>
-                    <th className="w-[20%] min-w-0 px-3 py-2.5 text-left align-middle font-medium sm:px-4">
+                    <th className="w-[20%] min-w-0 px-3 py-2.5 text-left align-middle font-medium text-slate-700 dark:text-slate-200 sm:px-4">
                       Required Qty (auto)
                     </th>
-                    <th className="w-[14%] min-w-0 px-3 py-2.5 text-left align-middle font-medium sm:px-4">
+                    <th className="w-[14%] min-w-0 px-3 py-2.5 text-left align-middle font-medium text-slate-700 dark:text-slate-200 sm:px-4">
                       Rate/Unit (Editable)
                     </th>
-                    <th className="w-[18%] min-w-0 px-3 py-2.5 text-right align-middle font-medium tabular-nums sm:px-4">
+                    <th className="w-[18%] min-w-0 px-3 py-2.5 text-right align-middle font-medium tabular-nums text-slate-700 dark:text-slate-200 sm:px-4">
                       Subtotal (Auto)
                     </th>
-                    <th className="w-[96px] min-w-[96px] max-w-[96px] px-2 py-2.5 text-center align-middle font-medium">
+                    <th className="w-[96px] min-w-[96px] max-w-[96px] px-2 py-2.5 text-center align-middle font-medium text-slate-700 dark:text-slate-200">
                       Action
                     </th>
                   </tr>
@@ -235,7 +237,7 @@ const AddManufacturing = () => {
                     return (
                       <tr
                         key={row.id}
-                        className="border-b border-light-border transition-colors duration-200 hover:bg-emerald-50/30"
+                        className="border-b border-light-border transition-colors duration-200 hover:bg-emerald-50/30 dark:border-slate-700 dark:hover:bg-slate-800/50"
                       >
                         <td className="min-w-0 px-3 py-3 align-middle sm:px-4">
                           {isEditing ? (
@@ -338,7 +340,7 @@ const AddManufacturing = () => {
                   })}
 
                   {isAddingNewRow && (
-                    <tr className="border-b border-light-border">
+                    <tr className="border-b border-light-border dark:border-slate-700">
                       <td className="min-w-0 px-3 py-3 align-middle sm:px-4">
                         <input
                           type="text"
@@ -413,7 +415,7 @@ const AddManufacturing = () => {
                     </tr>
                   )}
 
-                  <tr className="border-b border-light-border">
+                  <tr className="border-b border-light-border dark:border-slate-700">
                     <td colSpan={5} className="px-3 py-3 sm:px-4">
                       <button
                         type="button"
@@ -427,7 +429,7 @@ const AddManufacturing = () => {
                   </tr>
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-light-border bg-gray-100">
+                  <tr className="border-t border-light-border bg-gray-100 dark:border-slate-600 dark:bg-slate-800">
                     <td
                       className="px-3 py-3 text-left align-middle font-semibold sm:px-4"
                       colSpan={3}
@@ -458,11 +460,11 @@ const AddManufacturing = () => {
 
           {/* Additional Cost Table */}
           <div className="flex flex-col gap-3">
-            <div className="font-semibold text-base">Additional Cost</div>
-            <div className="w-full min-w-0 overflow-x-auto rounded border border-light-border">
+            <div className="font-semibold text-base text-slate-900 dark:text-slate-100">Additional Cost</div>
+            <div className="w-full min-w-0 overflow-x-auto rounded border border-light-border dark:border-slate-600 dark:bg-slate-900">
               <table className="w-full min-w-full table-auto border-collapse text-sm">
-                <thead className="bg-headBg">
-                  <tr className="border-b border-light-border">
+                <thead className="bg-headBg dark:bg-slate-800">
+                  <tr className="border-b border-light-border dark:border-slate-600">
                     <th className="w-[28%] min-w-0 px-3 py-2.5 text-left align-middle sm:px-4">
                       Account
                     </th>
@@ -488,7 +490,7 @@ const AddManufacturing = () => {
                     return (
                       <tr
                         key={row.id}
-                        className="border-b border-light-border transition-colors duration-200 hover:bg-emerald-50/30"
+                        className="border-b border-light-border transition-colors duration-200 hover:bg-emerald-50/30 dark:border-slate-700 dark:hover:bg-slate-800/50"
                       >
                         <td className="min-w-0 px-3 py-3 align-middle sm:px-4">
                           {isEditing ? (
@@ -614,7 +616,7 @@ const AddManufacturing = () => {
                   })}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-light-border bg-headBg">
+                  <tr className="border-t border-light-border bg-headBg dark:border-slate-600 dark:bg-slate-800">
                     <td
                       className="px-3 py-3 text-left align-middle font-semibold sm:px-4"
                       colSpan={3}
@@ -634,51 +636,47 @@ const AddManufacturing = () => {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-sm">Narration / Remark</label>
+            <label className="text-sm text-slate-700 dark:text-slate-300">Narration / Remark</label>
             <textarea
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               placeholder="Textarea"
               rows={4}
-              className="w-full border border-light-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary focus:outline-none resize-none"
+              className="w-full border border-light-border rounded-lg px-3 py-2 text-sm text-slate-900 focus:ring-1 focus:ring-primary focus:outline-none resize-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
 
           <Card title="Total & Landing Cost">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span>Raw Material Total</span>
-                  <strong>{formatCurrency(materialTotal)}</strong>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Additional Cost</span>
-                  <strong>{formatCurrency(additionalTotal)}</strong>
-                </div>
-                <div className="flex items-center justify-between border-t border-light-border pt-2">
-                  <span className=" font-semibold">Grand Total</span>
-                  <strong>{formatCurrency(landingCost)}</strong>
-                </div>
+            <div className="grid grid-cols-1 gap-1.5 text-sm sm:text-[15px]">
+              <div className="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:gap-x-2">
+                <span className="whitespace-nowrap">Raw Material Total:</span>
+                <strong className="break-words">{formatCurrency(materialTotal)}</strong>
               </div>
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span>Quantity Produced</span>
-                  <strong>
-                    {quantityToProduce} {unit}
-                  </strong>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Landing Cost/Unit</span>
-                  <strong>
-                    {formatCurrency(perUnitLandingCost)} per {unit}
-                  </strong>
-                </div>
+              <div className="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:gap-x-2">
+                <span className="whitespace-nowrap">Additional Cost:</span>
+                <strong className="break-words">{formatCurrency(additionalTotal)}</strong>
+              </div>
+              <div className="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:gap-x-2">
+                <span className="whitespace-nowrap">Grand Total:</span>
+                <strong className="break-words">{formatCurrency(landingCost)}</strong>
+              </div>
+              <div className="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:gap-x-2">
+                <span className="whitespace-nowrap">Quantity Produced:</span>
+                <strong className="break-words">
+                  {quantityToProduce} {unit}
+                </strong>
+              </div>
+              <div className="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:gap-x-2">
+                <span className="whitespace-nowrap">Landing Cost/Unit:</span>
+                <strong className="break-words">
+                  {formatCurrency(perUnitLandingCost)} per {unit}
+                </strong>
               </div>
             </div>
           </Card>
         </div>
 
-        <div className="flex items-center justify-end gap-4 pt-4 border-t border-light-border">
+        <div className="flex flex-col-reverse gap-2 border-t border-light-border pt-4 sm:flex-row sm:items-center sm:justify-end sm:gap-4 dark:border-slate-700">
           <Button
             label="Cancel"
             variant="outline"

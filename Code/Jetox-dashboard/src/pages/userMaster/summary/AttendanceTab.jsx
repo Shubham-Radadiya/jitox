@@ -3,14 +3,30 @@ import { createPortal } from "react-dom";
 import DataTable from "../../../components/ui/table/DataTable";
 import { CommonModal, Button } from "../../../components/ui/CommanUI";
 import { HiOutlineDotsVertical } from "react-icons/hi";
-import { Clock, Edit3, Eye, FileText } from "lucide-react";
+import { Clock, Edit3, Eye, FileText, CalendarDays, Plus, X } from "lucide-react";
 import { tableTdClasses } from "../../../utils/tableUi";
 
 const AttendanceTab = () => {
   const [activeMenu, setActiveMenu] = useState(null);
   const [isTimesheetOpen, setIsTimesheetOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState("");
+  const [columnPopup, setColumnPopup] = useState(null);
+  const [visibleColumns, setVisibleColumns] = useState(
+    () =>
+      new Set([
+        "Date",
+        "Attendance Status",
+        "Clock In",
+        "Clock Out",
+        "Total Time",
+        "Break Time",
+        "Productive Hour",
+      ])
+  );
   const menuRef = useRef(null);
   const menuTriggerRef = useRef(null);
+  const columnPopupRef = useRef(null);
+  const columnTriggerRef = useRef(null);
 
   const stats = [
     { label: "Total Hours Worked", value: "170 H : 19 M : 57 S", color: "blue" },
@@ -21,7 +37,7 @@ const AttendanceTab = () => {
     { label: "Early Out", value: "1", color: "black" },
   ];
 
-  const columns = [
+  const baseColumns = [
     "Date",
     "Attendance Status",
     "Clock In",
@@ -29,7 +45,6 @@ const AttendanceTab = () => {
     "Total Time",
     "Break Time",
     "Productive Hour",
-    "Actions",
   ];
 
   const data = useMemo(
@@ -66,12 +81,69 @@ const AttendanceTab = () => {
     []
   );
 
+  const dateOptions = useMemo(() => {
+    const seen = new Set(data.map((row) => String(row.Date || "").trim()).filter(Boolean));
+    return [...seen].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [data]);
+
+  const filteredData = useMemo(() => {
+    return data.filter((row) => {
+      if (dateFilter && String(row.Date) !== dateFilter) return false;
+      return true;
+    });
+  }, [data, dateFilter]);
+
+  const columns = useMemo(() => {
+    const dynamic = baseColumns.filter((col) => visibleColumns.has(col));
+    return [
+      ...dynamic,
+      {
+        key: "Actions",
+        label: (
+          <button
+            type="button"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            aria-label="Add columns"
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              columnTriggerRef.current = e.currentTarget;
+              setColumnPopup((prev) => {
+                if (prev) {
+                  columnTriggerRef.current = null;
+                  return null;
+                }
+                return {
+                  open: true,
+                };
+              });
+            }}
+          >
+            <Plus size={16} />
+          </button>
+        ),
+      },
+    ];
+  }, [visibleColumns]);
+
+  const toggleVisibleColumn = (col) => {
+    setVisibleColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(col)) next.delete(col);
+      else next.add(col);
+      return next;
+    });
+  };
+
   useEffect(() => {
     const handlePointerDown = (event) => {
       const t = event.target;
       if (menuRef.current?.contains(t)) return;
       if (menuTriggerRef.current?.contains(t)) return;
+      if (columnPopupRef.current?.contains(t)) return;
+      if (columnTriggerRef.current?.contains(t)) return;
       setActiveMenu(null);
+      setColumnPopup(null);
     };
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
@@ -162,6 +234,45 @@ const AttendanceTab = () => {
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-0.5 rounded-lg bg-slate-100/90 p-0.5 whitespace-nowrap dark:bg-slate-800/80">
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            My Data
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            User (10)
+          </button>
+        </div>
+
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
+          <div className="relative w-full sm:w-44">
+            <CalendarDays
+              size={14}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <select
+              className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              aria-label="Filter by date"
+            >
+              <option value="">Date</option>
+              {dateOptions.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-6">
         {stats.map((s, i) => (
           <div
@@ -197,7 +308,7 @@ const AttendanceTab = () => {
       <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-900/4 dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)] dark:ring-white/6">
         <DataTable
           columns={columns}
-          data={data}
+          data={filteredData}
           renderRowCell={renderRowCell}
           renderAction={renderAction}
           allCellsLeft
@@ -256,6 +367,48 @@ const AttendanceTab = () => {
               />
               View
             </button>
+          </div>,
+          document.body
+        )}
+
+      {columnPopup &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-200 flex items-center justify-center bg-slate-900/30 p-3 sm:p-4">
+            <div
+              ref={columnPopupRef}
+              className="w-full max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-600 dark:bg-slate-900"
+            >
+              <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-600">
+                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Add Column
+                </span>
+                <button
+                  type="button"
+                  className="rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                  aria-label="Close column popup"
+                  onClick={() => setColumnPopup(null)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-y-auto px-3 py-2 max-h-[calc(100vh-10rem)]">
+                {baseColumns.map((col) => (
+                  <label
+                    key={col}
+                    className="flex cursor-pointer items-center gap-2 py-1.5 text-sm text-slate-800 dark:text-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 accent-green-600 focus:ring-2 focus:ring-green-500 dark:border-slate-600 dark:bg-slate-900 dark:accent-green-500"
+                      checked={visibleColumns.has(col)}
+                      onChange={() => toggleVisibleColumn(col)}
+                    />
+                    <span>{col}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>,
           document.body
         )}

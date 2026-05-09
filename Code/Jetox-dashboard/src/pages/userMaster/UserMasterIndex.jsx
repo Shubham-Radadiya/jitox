@@ -6,7 +6,7 @@ import nodataImg from "../../assets/nodata.png";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import DataTable from "../../components/ui/table/DataTable";
 import { Button } from "../../components/ui/CommanUI";
-import { Calendar, Plus, X } from "lucide-react";
+import { Calendar, Plus, Search, User, MapPin, X } from "lucide-react";
 import { IoEyeOutline, IoTrashOutline } from "react-icons/io5";
 import { TbEdit } from "react-icons/tb";
 import { HiOutlineDotsVertical } from "react-icons/hi";
@@ -14,6 +14,7 @@ import AddUserModal from "./AddUserModal";
 import UserAddedSuccessModal from "./UserAddedSuccessModal";
 import ViewUserModal from "./ViewUserModal";
 import EditUserModal from "./EditUserModal";
+import UserUpdatedSuccessModal from "./UserUpdatedSuccessModal";
 import CommonDeleteModal from "../../components/ui/modals/CommonDeleteModal";
 import CommonDeleteSuccessModal from "../../components/ui/modals/CommonDeleteSuccessModal";
 import { userService } from "../../services/user.services";
@@ -72,8 +73,13 @@ const UserMasterIndex = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleteSuccessOpen, setIsDeleteSuccessOpen] = useState(false);
+  const [isEditSuccessOpen, setIsEditSuccessOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [lastAddedUser, setLastAddedUser] = useState(null);
+  const [lastEditSummary, setLastEditSummary] = useState(null);
+  const [searchUser, setSearchUser] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [regionFilter, setRegionFilter] = useState("");
   const navigate = useNavigate();
 
   const baseColumns = [
@@ -141,11 +147,13 @@ const UserMasterIndex = () => {
       const { data } = await userService.getAll();
       const list = (data.users || []).map(mapApiUserToRow);
       setUsers(list);
+      return list;
     } catch (e) {
       const msg =
         e?.response?.data?.message || e?.message || "Failed to load users";
       toast.error(msg);
       setUsers([]);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -176,8 +184,67 @@ const UserMasterIndex = () => {
 
   const handleUpdate = async (userId, payload) => {
     await userService.update(userId, payload);
-    toast.success("User updated");
-    await loadUsers();
+    const previous = selectedUser || {};
+    const refreshed = await loadUsers();
+    const updated =
+      refreshed.find((u) => String(u._id) === String(userId)) || previous;
+
+    const normalized = (v) => String(v ?? "").trim();
+    const pretty = (v) => (normalized(v) ? normalized(v) : "—");
+    const changes = [];
+
+    const prevRegion = previous.Region || "—";
+    const nextRegion = updated.Region || payload.city || "—";
+    if (normalized(prevRegion) !== normalized(nextRegion)) {
+      changes.push({
+        label: "Region",
+        from: pretty(prevRegion),
+        to: pretty(nextRegion),
+      });
+    }
+
+    const prevArea = previous.Area || "—";
+    const nextArea = updated.Area || payload.district || "—";
+    if (normalized(prevArea) !== normalized(nextArea)) {
+      changes.push({
+        label: "Area",
+        from: pretty(prevArea),
+        to: pretty(nextArea),
+      });
+    }
+
+    const prevRole = previous.Role || previous.role || "User";
+    const nextRole = updated.Role || payload.role || "User";
+    if (normalized(prevRole) !== normalized(nextRole)) {
+      changes.push({
+        label: "Role",
+        from: pretty(prevRole),
+        to: pretty(nextRole),
+      });
+    }
+
+    const prevModules = permLabels(
+      previous.permissions,
+      previous.Role || previous.role
+    );
+    const nextModules = permLabels(
+      payload.permissions,
+      payload.role || updated.Role || updated.role
+    );
+    if (normalized(prevModules) !== normalized(nextModules)) {
+      changes.push({
+        label: "Assign Module",
+        from: pretty(prevModules),
+        to: pretty(nextModules),
+      });
+    }
+
+    setSelectedUser(updated);
+    setLastEditSummary({
+      name: updated["User Name"] || previous["User Name"] || payload.firstName || "User",
+      changes,
+    });
+    setIsEditSuccessOpen(true);
   };
 
   const handleDelete = async () => {
@@ -219,6 +286,47 @@ const UserMasterIndex = () => {
     });
     return list;
   }, [visibleColumnKeys, toggleColumnPicker]);
+
+  const roleOptions = useMemo(() => {
+    const seen = new Set();
+    users.forEach((u) => {
+      const v = String(u.Role ?? "").trim();
+      if (v) seen.add(v);
+    });
+    return [...seen].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [users]);
+
+  const regionOptions = useMemo(() => {
+    const seen = new Set();
+    users.forEach((u) => {
+      const v = String(u.Region ?? "").trim();
+      if (v && v !== "-") seen.add(v);
+    });
+    return [...seen].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    let list = users;
+    const q = searchUser.trim().toLowerCase();
+    if (q) {
+      list = list.filter((u) =>
+        String(u["User Name"] ?? "")
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+    if (roleFilter) {
+      list = list.filter((u) => String(u.Role ?? "") === roleFilter);
+    }
+    if (regionFilter) {
+      list = list.filter((u) => String(u.Region ?? "") === regionFilter);
+    }
+    return list;
+  }, [users, searchUser, roleFilter, regionFilter]);
 
   const renderRowCell = (key, value, row) => {
     if (key === "Employee ID") {
@@ -442,29 +550,83 @@ const UserMasterIndex = () => {
             </div>
 
             <div className="flex min-w-0 flex-col gap-2 rounded-xl jitox-panel jitox-panel--shadow p-3 sm:p-4">
-              <div className="flex min-w-0 flex-row items-center justify-between gap-2">
-                <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-dark sm:text-lg">
+              <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <h2 className="min-w-0 shrink-0 truncate text-sm font-semibold text-dark sm:text-base">
                   User List
                 </h2>
-                <Button
-                  type="button"
-                  label="Add users"
-                  {...mergePageAddButton({
-                    size: "sm",
-                    className:
-                      "min-h-8! shrink-0 px-2.5! py-1.5! text-[11px]! gap-1 sm:min-h-10! sm:px-5! sm:py-2! sm:text-[14px]! sm:gap-1.5",
-                  })}
-                  onClick={() => setIsAddModalOpen(true)}
-                />
+                <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:w-auto md:flex-1 md:flex-wrap md:items-center md:justify-end">
+                  <div className="relative min-w-0 sm:col-span-2 md:w-44 md:min-w-0">
+                    <Search
+                      size={14}
+                      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      type="search"
+                      placeholder="Search User"
+                      value={searchUser}
+                      onChange={(e) => setSearchUser(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div className="relative min-w-0 sm:w-full md:w-36">
+                    <User
+                      size={14}
+                      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <select
+                      value={roleFilter}
+                      onChange={(e) => setRoleFilter(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                    >
+                      <option value="">Role</option>
+                      {roleOptions.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="relative min-w-0 sm:w-full md:w-36">
+                    <MapPin
+                      size={14}
+                      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <select
+                      value={regionFilter}
+                      onChange={(e) => setRegionFilter(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-sm text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                    >
+                      <option value="">Region</option>
+                      {regionOptions.map((region) => (
+                        <option key={region} value={region}>
+                          {region}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <Button
+                    type="button"
+                    label="Add users"
+                    {...mergePageAddButton({
+                      size: "sm",
+                      className:
+                        "w-full sm:w-full md:w-auto min-h-9! shrink-0 px-3! py-1.5! text-xs! gap-1 sm:min-h-10! sm:px-4! sm:text-sm!",
+                    })}
+                    onClick={() => setIsAddModalOpen(true)}
+                  />
+                </div>
               </div>
 
               <div className="min-w-0">
                 <DataTable
                   columns={columns}
-                  data={users}
+                  data={filteredUsers}
                   renderRowCell={renderRowCell}
                   renderAction={renderAction}
-                  tableClassName="text-center"
+                  tableClassName="text-center [&_th]:px-1.5 [&_th]:py-1 [&_td]:px-1.5 [&_td]:py-1.5"
                   maxHeight="min(72vh, calc(100dvh - 14rem))"
                   className="shadow-none! sm:shadow-sm!"
                 />
@@ -472,7 +634,7 @@ const UserMasterIndex = () => {
 
               <div className="flex min-w-0 flex-col items-center gap-2 border-t border-slate-100 px-1 pt-2 text-center sm:flex-row sm:items-center sm:justify-between sm:px-2 sm:text-left dark:border-slate-700/80">
                 <div className="text-xs text-light">
-                  Showing 1 - {users.length} of {users.length} results
+                  Showing {filteredUsers.length ? 1 : 0} - {filteredUsers.length} of {filteredUsers.length} results
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
                   <span className="text-xs text-light">Results per page:</span>
@@ -590,12 +752,27 @@ const UserMasterIndex = () => {
           onSave={handleUpdate}
         />
 
+        <UserUpdatedSuccessModal
+          open={isEditSuccessOpen}
+          onClose={() => setIsEditSuccessOpen(false)}
+          summary={lastEditSummary}
+          onViewProfile={() => {
+            setIsEditSuccessOpen(false);
+            if (selectedUser) setIsViewModalOpen(true);
+          }}
+          onEditAgain={() => {
+            setIsEditSuccessOpen(false);
+            if (selectedUser) setIsEditModalOpen(true);
+          }}
+        />
+
         <CommonDeleteModal
           open={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
           itemName={selectedUser?.["User Name"] || selectedUser?.name}
           title="Delete user?"
           message={`Remove ${selectedUser?.Role || "user"} from the system?`}
+          compact
           onDelete={handleDelete}
         />
 

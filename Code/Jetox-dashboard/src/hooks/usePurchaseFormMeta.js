@@ -10,6 +10,7 @@ export const emptyMeta = {
   locations: [],
   transporters: [],
   employees: [],
+  nextPurchaseVoucherNo: null,
   terms: [
     { value: "Cash", label: "Cash" },
     { value: "Credit", label: "Credit" },
@@ -47,6 +48,10 @@ export function usePurchaseFormMeta() {
         employees: Array.isArray(data.employees) ? data.employees : [],
         terms: Array.isArray(data.terms) && data.terms.length ? data.terms : emptyMeta.terms,
         gst: Array.isArray(data.gst) && data.gst.length ? data.gst : emptyMeta.gst,
+        nextPurchaseVoucherNo:
+          typeof data.nextPurchaseVoucherNo === "string"
+            ? data.nextPurchaseVoucherNo
+            : null,
       };
     },
     staleTime: 60_000,

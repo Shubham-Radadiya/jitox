@@ -461,7 +461,7 @@ const VoucherPage = () => {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-3 min-w-0 max-w-full">
-        <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white via-slate-50/60 to-emerald-50/25 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(16,185,129,0.04)] dark:border-slate-700/80 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/30 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
+        <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white via-slate-50/60 to-emerald-50/25 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_4px_12px_rgba(16,185,129,0.04)] dark:border-slate-600/80 dark:bg-slate-900 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/95 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
           <div className="flex flex-col gap-3 p-3 sm:gap-4 sm:p-4 lg:flex-row lg:items-center lg:justify-start lg:gap-2">
             <div className="flex w-full min-w-0 flex-row flex-wrap items-center gap-2.5 sm:gap-3 lg:max-w-[min(100%,28rem)] lg:shrink-0">
               <div className="flex min-w-0 flex-1 flex-row flex-wrap items-center gap-2.5 rounded-xl bg-white/80 p-2 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-800/50 dark:ring-slate-600/50 sm:gap-3">

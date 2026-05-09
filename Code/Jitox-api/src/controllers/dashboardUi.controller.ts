@@ -39,6 +39,39 @@ async function safeDbNumber<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   }
 }
 
+/** `YYYY-MM-DD` for HTML date inputs (purchase invoice line fill). */
+function productDateForHtmlDateInput(d: unknown): string {
+  if (d == null || d === "") return "";
+  const dt = new Date(d as Date);
+  const t = dt.getTime();
+  if (!Number.isFinite(t)) return "";
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Next purchase voucher no. in `V001` form — scans existing `V###` codes only
+ * (matches UI default). Other formats (e.g. prefixed demo IDs) are ignored for sequencing.
+ */
+async function computeNextPurchaseVoucherNo(): Promise<string> {
+  const docs = await PurchaseVoucher.find().select("voucherNo").lean();
+  let max = 0;
+  const re = /^V(\d+)$/i;
+  for (const d of docs) {
+    const v = String(d?.voucherNo ?? "").trim();
+    const m = re.exec(v);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n)) max = Math.max(max, n);
+    }
+  }
+  const next = max + 1;
+  const width = Math.max(3, String(next).length);
+  return `V${String(next).padStart(width, "0")}`;
+}
+
 async function sumModelField(model: any, field: string): Promise<number> {
   const rows = (await model.aggregate([
     { $group: { _id: null, t: { $sum: { $ifNull: [`$${field}`, 0] } } } },
@@ -398,6 +431,14 @@ export const getPurchaseFormMeta = async (
       hsn: p.hsnCode != null ? String(p.hsnCode) : "",
       gstRate: p.gstRate != null ? String(p.gstRate) : "",
       defaultRate: Number(p.billingRatePerUnit ?? p.rate ?? 0) || 0,
+      batchNo: p.batchNo != null ? String(p.batchNo).trim() : "",
+      mrpPerUnit: p.mrpPerUnit != null ? String(p.mrpPerUnit).trim() : "",
+      quantity:
+        p.quantity != null && Number.isFinite(Number(p.quantity))
+          ? String(p.quantity)
+          : "",
+      mfgDt: productDateForHtmlDateInput(p.mfgDt),
+      expDt: productDateForHtmlDateInput(p.expDt),
     }));
 
     const groupSet = new Set<string>();
@@ -474,6 +515,13 @@ export const getPurchaseFormMeta = async (
       label: `${v}%`,
     }));
 
+    let nextPurchaseVoucherNo = "V001";
+    try {
+      nextPurchaseVoucherNo = await computeNextPurchaseVoucherNo();
+    } catch (e) {
+      console.error("computeNextPurchaseVoucherNo", e);
+    }
+
     sendSuccess(res, {
       parties,
       partyCreditHints,
@@ -485,6 +533,7 @@ export const getPurchaseFormMeta = async (
       employees,
       terms,
       gst,
+      nextPurchaseVoucherNo,
     });
   } catch (e) {
     console.error("getPurchaseFormMeta", e);

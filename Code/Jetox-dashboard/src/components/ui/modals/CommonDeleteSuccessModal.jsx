@@ -8,15 +8,21 @@ import deleteImg from "../../../assets/delete.png";
  */
 const CommonDeleteSuccessModal = ({ open, onClose, title = "Deleted Successfully", message = "The record has been successfully removed from your system." }) => {
   return (
-    <CommonModal open={open} onClose={onClose} width="450px" title="">
-      <div className="flex flex-col items-center text-center p-4">
+    <CommonModal
+      open={open}
+      onClose={onClose}
+      width="min(360px, 90vw)"
+      title=""
+      bodyClassName="px-3 py-3 sm:px-4 sm:py-4"
+    >
+      <div className="flex flex-col items-center text-center">
         {/* Success Illustration */}
-        <div className="mb-6 w-full max-w-[280px]">
+        <div className="mb-3 w-full max-w-[180px] sm:max-w-[200px]">
           <img src={deleteImg} alt="Deleted" className="w-full h-auto object-contain" />
         </div>
 
-        <h2 className="text-xl font-bold text-dark mb-4">{title}</h2>
-        <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+        <h2 className="mb-2 text-lg font-bold text-dark">{title}</h2>
+        <p className="mb-4 text-[13px] leading-relaxed text-gray-500">
           {message}
         </p>
 
@@ -24,7 +30,8 @@ const CommonDeleteSuccessModal = ({ open, onClose, title = "Deleted Successfully
           label="Okay"
           variant="primary"
           onClick={onClose}
-          className="w-full py-3 rounded-xl font-semibold"
+          size="sm"
+          className="w-full rounded-lg font-semibold"
         />
       </div>
     </CommonModal>

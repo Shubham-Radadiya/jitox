@@ -1,7 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import DataTable from "../../../components/ui/table/DataTable";
+import { CalendarDays, MapPin, UserRoundSearch } from "lucide-react";
 
 const VisitLogTab = () => {
+  const [visitIdFilter, setVisitIdFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+
   const columns = [
     "Visit ID",
     "Client Name",
@@ -60,9 +65,112 @@ const VisitLogTab = () => {
     }
   ], []);
 
+  const visitIdOptions = useMemo(() => {
+    const seen = new Set(data.map((d) => String(d["Visit ID"] || "").trim()).filter(Boolean));
+    return [...seen].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [data]);
+
+  const dateOptions = useMemo(() => {
+    const seen = new Set(data.map((d) => String(d["Date"] || "").trim()).filter(Boolean));
+    return [...seen].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [data]);
+
+  const locationOptions = useMemo(() => {
+    const seen = new Set(data.map((d) => String(d["Location"] || "").trim()).filter(Boolean));
+    return [...seen].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [data]);
+
+  const filteredData = useMemo(() => {
+    return data.filter((row) => {
+      if (visitIdFilter && String(row["Visit ID"]) !== visitIdFilter) return false;
+      if (dateFilter && String(row["Date"]) !== dateFilter) return false;
+      if (locationFilter && String(row["Location"]) !== locationFilter) return false;
+      return true;
+    });
+  }, [data, visitIdFilter, dateFilter, locationFilter]);
+
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <DataTable columns={columns} data={data} />
+      <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-0.5 rounded-lg bg-slate-100/90 p-0.5 whitespace-nowrap dark:bg-slate-800/80">
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            My Data
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            User (10)
+          </button>
+        </div>
+
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
+        <div className="relative w-full sm:w-40">
+          <UserRoundSearch
+            size={14}
+            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <select
+            className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            value={visitIdFilter}
+            onChange={(e) => setVisitIdFilter(e.target.value)}
+            aria-label="Filter by visit id"
+          >
+            <option value="">Visit ID</option>
+            {visitIdOptions.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="relative w-full sm:w-44">
+          <CalendarDays
+            size={14}
+            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <select
+            className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            aria-label="Filter by date"
+          >
+            <option value="">Date</option>
+            {dateOptions.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="relative w-full sm:w-40">
+          <MapPin
+            size={14}
+            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <select
+            className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            aria-label="Filter by location"
+          >
+            <option value="">Location</option>
+            {locationOptions.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      </div>
+
+      <DataTable columns={columns} data={filteredData} />
     </div>
   );
 };

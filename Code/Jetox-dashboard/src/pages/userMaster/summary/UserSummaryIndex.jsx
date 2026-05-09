@@ -74,7 +74,7 @@ const UserSummaryIndex = () => {
         </div>
 
         {/* User Stats Card */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl jitox-panel jitox-panel--shadow p-3 sm:gap-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl jitox-panel jitox-panel--shadow px-3 py-2 sm:gap-4 sm:px-5 sm:py-3">
           <div className="flex min-w-0 items-center gap-2.5 sm:gap-4">
             <div className="relative h-12 w-12 shrink-0 sm:h-14 sm:w-14">
               <div className="h-full w-full overflow-hidden rounded-full border-2 border-primary/20">
@@ -143,7 +143,7 @@ const UserSummaryIndex = () => {
                 role="tab"
                 aria-selected={activeTab === t.id}
                 onClick={() => handleTabChange(t.id)}
-                className={`min-h-9 shrink-0 whitespace-nowrap border-r border-slate-100 px-2.5 py-1.5 text-center text-[10px] font-semibold transition-colors last:border-r-0 sm:min-h-12 sm:px-5 sm:py-2.5 sm:text-sm lg:min-h-0 lg:min-w-0 lg:flex-1 lg:whitespace-normal lg:px-3 lg:py-2.5 dark:border-slate-700 ${
+                className={`min-h-8 shrink-0 whitespace-nowrap border-r border-slate-100 px-2 py-1 text-center text-[10px] font-semibold transition-colors last:border-r-0 sm:min-h-10 sm:px-4 sm:py-2 sm:text-[13px] lg:min-h-0 lg:min-w-0 lg:flex-1 lg:whitespace-normal lg:px-2.5 lg:py-2 dark:border-slate-700 ${
                   activeTab === t.id
                     ? "bg-primary text-white"
                     : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -153,22 +153,6 @@ const UserSummaryIndex = () => {
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Sub-filters */}
-        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-1 rounded-lg bg-slate-100/90 p-1 whitespace-nowrap dark:bg-slate-800/80">
-          <button
-            type="button"
-            className="shrink-0 rounded-md bg-white px-2.5 py-1 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-5 sm:py-1.5 sm:text-sm"
-          >
-            My Data
-          </button>
-          <button
-            type="button"
-            className="shrink-0 rounded-md px-2.5 py-1 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-5 sm:py-1.5 sm:text-sm"
-          >
-            User (10)
-          </button>
         </div>
 
         {/* Dynamic Content */}

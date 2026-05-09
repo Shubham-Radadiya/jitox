@@ -4,7 +4,52 @@ import { IPurchaseItem } from "../types/purchaseVoucher.type";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
-import { sendSuccess } from "../utils/apiResponse";
+import { sendCreated, sendSuccess } from "../utils/apiResponse";
+
+/** Fields accepted from dashboard PUT body when updating a purchase voucher */
+const PURCHASE_VOUCHER_PATCH_KEYS = [
+  "partyName",
+  "invoiceNo",
+  "dueDate",
+  "transportDetails",
+  "deliveryAt",
+  "orderby",
+  "shipToAndBillTo",
+  "billTo",
+  "shipTo",
+  "shipDifferent",
+  "narration",
+  "termsAndConditions",
+  "voucherNo",
+  "voucherDate",
+  "items",
+  "gstAmount",
+  "totalAmount",
+  "paymentMode",
+  "basePrice",
+  "stockDetails",
+] as const;
+
+/**
+ * Use client `V###` if free; otherwise take the next free `V###` (stale UI / race).
+ */
+async function resolveUniqueVoucherNo(requested: string): Promise<string> {
+  const base = String(requested || "").trim();
+  let candidate = base || "V001";
+  for (let i = 0; i < 60; i++) {
+    const taken = await PurchaseVoucher.findOne({ voucherNo: candidate });
+    if (!taken) return candidate;
+    const m = /^V(\d+)$/i.exec(candidate);
+    if (m) {
+      const n = parseInt(m[1], 10) + 1;
+      const w = Math.max(3, m[1].length, String(n).length);
+      candidate = `V${String(n).padStart(w, "0")}`;
+    } else {
+      candidate = i === 0 ? `${base || "V"}-2` : `${base}-${i + 2}`;
+    }
+  }
+  return `V${Date.now()}`;
+}
 
 export const createPurchaseVoucher = async (
   req: Request,
@@ -19,6 +64,11 @@ export const createPurchaseVoucher = async (
       deliveryAt,
       orderby,
       shipToAndBillTo,
+      billTo,
+      shipTo,
+      shipDifferent,
+      narration,
+      termsAndConditions,
       voucherNo,
       voucherDate,
       items,
@@ -38,13 +88,7 @@ export const createPurchaseVoucher = async (
 
     validateAndRespond(req.body, requiredFields, res);
 
-    const existingVoucher = await PurchaseVoucher.findOne({ voucherNo });
-    if (existingVoucher) {
-      throw new AppError(
-        HttpStatusCode.BAD_REQUEST,
-        "Voucher number already exists."
-      );
-    }
+    const resolvedVoucherNo = await resolveUniqueVoucherNo(voucherNo);
 
     const productIds = items.map((item: IPurchaseItem) => item.product);
     const validProducts = await Product.find({ _id: { $in: productIds } });
@@ -63,7 +107,12 @@ export const createPurchaseVoucher = async (
       deliveryAt,
       orderby,
       shipToAndBillTo,
-      voucherNo,
+      billTo,
+      shipTo,
+      shipDifferent,
+      narration,
+      termsAndConditions,
+      voucherNo: resolvedVoucherNo,
       voucherDate,
       items,
       gstAmount,
@@ -74,10 +123,7 @@ export const createPurchaseVoucher = async (
     });
 
     const savedVoucher = await newVoucher.save();
-    res.status(201).json({
-      message: "Purchase voucher created successfully.",
-      data: savedVoucher,
-    });
+    sendCreated(res, savedVoucher, "Purchase voucher created successfully.");
   } catch (error) {
     console.error("Create Purchase Voucher Error:", error);
     throw error;
@@ -189,25 +235,35 @@ export const updatePurchaseVoucher = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const raw = req.body as Record<string, unknown>;
 
-    const updatedVoucher = await PurchaseVoucher.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    ).populate("items.product", "productName category group");
-
-    if (!updatedVoucher) {
+    const voucher = await PurchaseVoucher.findById(id);
+    if (!voucher) {
       throw new AppError(
         HttpStatusCode.NOT_FOUND,
         "No purchase vouchers found."
       );
     }
 
-    res.status(200).json({
-      message: "Purchase voucher updated successfully.",
-      data: updatedVoucher,
+    const patch: Record<string, unknown> = {};
+    for (const key of PURCHASE_VOUCHER_PATCH_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(raw, key)) {
+        patch[key] = raw[key];
+      }
+    }
+
+    voucher.set(patch);
+    await voucher.save();
+    await voucher.populate({
+      path: "items.product",
+      select: "productName category group",
     });
+
+    sendSuccess(
+      res,
+      voucher,
+      "Purchase voucher updated successfully."
+    );
   } catch (error) {
     console.error("Update Purchase Voucher Error:", error);
     throw error;

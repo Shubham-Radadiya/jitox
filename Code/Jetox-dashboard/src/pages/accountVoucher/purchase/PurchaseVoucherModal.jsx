@@ -1,12 +1,28 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommonModal } from "../../../components/ui/CommanUI";
 import PurchaseVoucherForm from "./PurchaseVoucherForm";
-import { buildPurchasePrefill } from "./voucherFormConstants";
+import {
+  mapPurchaseApiDocToPrefill,
+  nextRevoucherNumber,
+} from "./voucherFormConstants";
 import { purchaseVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { purchasePayloadToCreateBody } from "./purchasePayloadToApi";
+
+function savedVoucherNoFromResponse(res, fallbackNo) {
+  const d = res?.data;
+  if (d && typeof d === "object") {
+    if (d.voucherNo != null && String(d.voucherNo).trim() !== "") {
+      return String(d.voucherNo);
+    }
+    if (d.data?.voucherNo != null && String(d.data.voucherNo).trim() !== "") {
+      return String(d.data.voucherNo);
+    }
+  }
+  return String(fallbackNo ?? "");
+}
 
 /**
  * Wide purchase invoice modal — Vyapar-style UI inside the dialog body.
@@ -22,6 +38,26 @@ export default function PurchaseVoucherModal({
   const [now, setNow] = useState(() => new Date());
   const [mountId, setMountId] = useState(0);
 
+  const voucherId =
+    sourceRow && typeof sourceRow === "object" ? sourceRow._id : null;
+  const needsDetail =
+    Boolean(open && voucherId && (mode === "edit" || mode === "revoucher"));
+
+  const {
+    data: voucherDoc,
+    isLoading: detailLoading,
+    isError: detailError,
+    error: detailErrObj,
+  } = useQuery({
+    queryKey: ["purchase-voucher-detail", voucherId],
+    queryFn: async () => {
+      const res = await purchaseVouchersApi.getById(voucherId);
+      return res?.data;
+    },
+    enabled: needsDetail,
+    staleTime: 0,
+  });
+
   useEffect(() => {
     if (!open) return undefined;
     setMountId((k) => k + 1);
@@ -29,10 +65,30 @@ export default function PurchaseVoucherModal({
     return () => clearInterval(t);
   }, [open]);
 
-  const prefill =
-    open && sourceRow && (mode === "edit" || mode === "revoucher")
-      ? buildPurchasePrefill(sourceRow, mode)
-      : null;
+  useEffect(() => {
+    if (!detailError || !open) return;
+    toast.error(
+      getApiErrorMessage(detailErrObj, "Could not load purchase voucher")
+    );
+  }, [detailError, detailErrObj, open]);
+
+  const prefill = useMemo(() => {
+    if (!open || mode === "create") return null;
+    if (!voucherDoc) return null;
+    const base = mapPurchaseApiDocToPrefill(voucherDoc);
+    if (!base) return null;
+    if (mode === "revoucher") {
+      return {
+        ...base,
+        voucherNo: nextRevoucherNumber(voucherDoc.voucherNo || "V000"),
+      };
+    }
+    return base;
+  }, [open, mode, voucherDoc]);
+
+  const showForm =
+    open &&
+    (!needsDetail || (!detailLoading && !detailError && voucherDoc));
 
   const handleInvoiceAction = async (payload, kind) => {
     const body = purchasePayloadToCreateBody(payload);
@@ -44,14 +100,21 @@ export default function PurchaseVoucherModal({
       toast.error("Select a party (supplier account).");
       return;
     }
+    const isEdit = mode === "edit" && Boolean(voucherId);
     try {
-      await purchaseVouchersApi.create(body);
+      const res = isEdit
+        ? await purchaseVouchersApi.update(voucherId, body)
+        : await purchaseVouchersApi.create(body);
+      const savedNo = savedVoucherNoFromResponse(res, body.voucherNo);
       await queryClient.invalidateQueries({ queryKey: ["voucher-list", "purchase"] });
       await queryClient.invalidateQueries({ queryKey: ["purchase-form-meta"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["purchase-voucher-detail", voucherId],
+      });
       toast.success(
         kind === "new"
-          ? `Saved ${body.voucherNo}. Form cleared for a new entry.`
-          : `Saved ${body.voucherNo}.`
+          ? `Saved ${savedNo}. Form cleared for a new entry.`
+          : `Saved ${savedNo}.`
       );
       if (kind === "close") {
         onClose();
@@ -76,17 +139,29 @@ export default function PurchaseVoucherModal({
       bodyClassName="!p-0 !pt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
       footer={null}
     >
-      <PurchaseVoucherForm
-        key={mountId}
-        ref={formRef}
-        formType="purchase"
-        prefill={prefill}
-        showPageHeader={false}
-        layout="invoice"
-        liveNow={now}
-        onClose={onClose}
-        onInvoiceAction={handleInvoiceAction}
-      />
+      {needsDetail && detailLoading && (
+        <div className="flex min-h-[240px] flex-1 items-center justify-center px-6 text-sm text-slate-500 dark:text-slate-400">
+          Loading purchase invoice…
+        </div>
+      )}
+      {needsDetail && !detailLoading && detailError && (
+        <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-red-600 dark:text-red-400">
+          Could not load this voucher. Close and try again.
+        </div>
+      )}
+      {showForm && (
+        <PurchaseVoucherForm
+          key={mountId}
+          ref={formRef}
+          formType="purchase"
+          prefill={prefill}
+          showPageHeader={false}
+          layout="invoice"
+          liveNow={now}
+          onClose={onClose}
+          onInvoiceAction={handleInvoiceAction}
+        />
+      )}
     </CommonModal>
   );
 }

@@ -2,10 +2,12 @@ import React, {
   useState,
   useRef,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useId,
   useCallback,
 } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -23,6 +25,7 @@ import toast from "react-hot-toast";
  * - `compactValue` — smaller font for the closed trigger label only (height unchanged unless with formCompact)
  * - `searchable` — filter options; list scrolls, "+ Add" stays fixed at bottom
  * - `searchPlaceholder` — defaults to "Search…"
+ * - `menuPlacement` — `"bottom"` (default) or `"top"` to open the panel above the trigger; top placement uses a fixed-position portal so parent `overflow:hidden` does not clip the menu
  * - `onAddClick` — called when "+ Add" is clicked; combine with `renderAddModal` for modal flows
  * - `addNavigateTo` — dashboard path (e.g. `/dashboard/product`); used if neither `renderAddModal` nor `onAddClick` is set
  * - `addLabel` — default "+ Add"
@@ -65,6 +68,8 @@ export function SelectWithAdd({
   formCompact = false,
   /** Smaller selected-value font on the trigger; keeps `h-10` / `h-9` sizing */
   compactValue = false,
+  /** Open list above trigger — use in dense tables / near bottom of scroll areas */
+  menuPlacement = "bottom",
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -74,7 +79,11 @@ export function SelectWithAdd({
   const dropdownRef = useRef(null);
   const triggerRef = useRef(null);
   const listRef = useRef(null);
+  const menuPortalRef = useRef(null);
   const listboxId = useId();
+
+  /** Fixed coords when menu opens upward — rendered via portal to escape overflow clipping */
+  const [fixedMenuStyle, setFixedMenuStyle] = useState(null);
 
   const showAdd = !hideAdd;
 
@@ -152,9 +161,14 @@ export function SelectWithAdd({
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        closeMenu();
+      const t = e.target;
+      if (
+        (dropdownRef.current && dropdownRef.current.contains(t)) ||
+        (menuPortalRef.current && menuPortalRef.current.contains(t))
+      ) {
+        return;
       }
+      closeMenu();
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -243,6 +257,42 @@ export function SelectWithAdd({
         ? "text-[12px]"
         : "text-[13px]";
 
+  const openUp = menuPlacement === "top";
+
+  useLayoutEffect(() => {
+    if (!open || !openUp) {
+      setFixedMenuStyle(null);
+      return undefined;
+    }
+    const update = () => {
+      const el = triggerRef.current;
+      if (!el || typeof window === "undefined") return;
+      const rect = el.getBoundingClientRect();
+      const gap = 6;
+      const maxDefault = window.matchMedia("(min-width:640px)").matches
+        ? 288
+        : 240;
+      const rawAbove = rect.top - gap - 10;
+      const maxH = Math.min(maxDefault, Math.max(80, rawAbove));
+      setFixedMenuStyle({
+        position: "fixed",
+        left: rect.left,
+        width: rect.width,
+        bottom: window.innerHeight - rect.top + gap,
+        maxHeight: maxH,
+        zIndex: 200,
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+      setFixedMenuStyle(null);
+    };
+  }, [open, openUp, menuPlacement]);
+
   const valueTextCls = filterBar
     ? `text-sm leading-snug truncate ${
         selectedLabel === placeholder
@@ -258,6 +308,116 @@ export function SelectWithAdd({
             ? "text-slate-800 dark:text-slate-100"
             : "text-slate-900 dark:text-slate-100"
       }`;
+
+  const menuPanelCls =
+    "flex flex-col overflow-hidden outline-none ring-0 bg-white border border-light-border rounded-lg shadow-lg dark:border-slate-600 dark:bg-slate-900";
+
+  const menuInner = (
+    <>
+      {searchable && (
+        <div className="p-2 border-b border-light-border shrink-0 dark:border-slate-600">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                listRef.current?.focus({ preventScroll: true });
+                setActiveIndex(0);
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                closeMenu();
+                triggerRef.current?.focus();
+              }
+            }}
+            placeholder={searchPlaceholder}
+            className={`w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 shadow-sm ring-1 ring-slate-900/[0.04] placeholder:text-slate-500 transition-[border-color,box-shadow,background-color] focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.06] dark:placeholder:text-slate-400 dark:focus:bg-slate-950 dark:focus:text-slate-100 dark:focus:ring-primary/30 ${
+              formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm"
+            }`}
+            aria-label={searchPlaceholder}
+            autoFocus
+          />
+        </div>
+      )}
+
+      <div className="flex-1 min-h-0 overflow-y-auto py-1">
+        {filteredOptions.length === 0 ? (
+          <div
+            className={`px-4 py-3 text-light dark:text-slate-400 ${
+              formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm"
+            }`}
+          >
+            No matches
+          </div>
+        ) : (
+          filteredOptions.map((opt, idx) => {
+            const selected = opt.value === value;
+            const active = idx === activeIndex;
+            const rowText = formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm";
+            return (
+              <div
+                key={String(opt.value)}
+                role="option"
+                aria-selected={selected}
+                aria-disabled={opt.disabled || false}
+                data-active={active}
+                onMouseEnter={() => setActiveIndex(idx)}
+                onClick={() => !opt.disabled && selectIndex(idx)}
+                className={`mx-1 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 ${rowText} transition-colors ${
+                  opt.disabled
+                    ? "opacity-40 cursor-not-allowed"
+                    : active
+                      ? "bg-rowBg dark:bg-slate-800"
+                      : "hover:bg-lightblue dark:hover:bg-slate-800/80"
+                } ${selected ? "text-primary font-medium" : "text-slate-800 dark:text-slate-200"}`}
+              >
+                <span
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                    selected ? "border-primary" : "border-slate-300 dark:border-slate-500"
+                  }`}
+                  aria-hidden
+                >
+                  {selected ? (
+                    <span className="h-2 w-2 rounded-full bg-primary" />
+                  ) : null}
+                </span>
+                <span className="truncate">{opt.label}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {showAdd && (
+        <div className="flex shrink-0 justify-end border-t border-light-border bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-900">
+          <button
+            type="button"
+            role="option"
+            aria-label={addLabel}
+            data-active={activeIndex === filteredOptions.length}
+            onMouseEnter={() => setActiveIndex(filteredOptions.length)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAdd();
+            }}
+            className={`flex min-h-7 w-auto items-center justify-end gap-1 rounded-md border border-transparent px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-emerald-200 hover:bg-emerald-50/80 dark:hover:border-emerald-800/60 dark:hover:bg-emerald-950/50 sm:min-h-8 sm:px-2.5 sm:py-1.5 sm:text-xs ${
+              activeIndex === filteredOptions.length
+                ? "border-emerald-200 bg-rowBg dark:border-emerald-800/60 dark:bg-slate-800"
+                : ""
+            }`}
+          >
+            <span className="text-sm leading-none sm:text-[15px]" aria-hidden>
+              +
+            </span>
+            <span>{String(addLabel).replace(/^\+\s*/, "")}</span>
+          </button>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div ref={dropdownRef} className={`flex flex-col relative min-w-0 ${className}`}>
@@ -296,117 +456,38 @@ export function SelectWithAdd({
         />
       </button>
 
-      {open && (
+      {open &&
+        openUp &&
+        fixedMenuStyle &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            id={listboxId}
+            role="listbox"
+            tabIndex={-1}
+            ref={(el) => {
+              listRef.current = el;
+              menuPortalRef.current = el;
+            }}
+            onKeyDown={onMenuKeyDown}
+            style={fixedMenuStyle}
+            className={menuPanelCls}
+          >
+            {menuInner}
+          </div>,
+          document.body
+        )}
+
+      {open && !openUp && (
         <div
           id={listboxId}
           role="listbox"
           tabIndex={-1}
           ref={listRef}
           onKeyDown={onMenuKeyDown}
-          className="absolute top-full mt-1.5 left-0 w-full bg-white border border-light-border rounded-lg shadow-lg z-50 flex flex-col overflow-hidden outline-none ring-0 max-h-60 sm:max-h-72 dark:border-slate-600 dark:bg-slate-900"
+          className={`absolute top-full left-0 z-50 mt-1.5 w-full max-h-60 sm:max-h-72 ${menuPanelCls}`}
         >
-          {searchable && (
-            <div className="p-2 border-b border-light-border shrink-0 dark:border-slate-600">
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    listRef.current?.focus({ preventScroll: true });
-                    setActiveIndex(0);
-                  }
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    closeMenu();
-                    triggerRef.current?.focus();
-                  }
-                }}
-                placeholder={searchPlaceholder}
-                className={`w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 shadow-sm ring-1 ring-slate-900/[0.04] placeholder:text-slate-500 transition-[border-color,box-shadow,background-color] focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:ring-white/[0.06] dark:placeholder:text-slate-400 dark:focus:bg-slate-950 dark:focus:text-slate-100 dark:focus:ring-primary/30 ${
-                  formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm"
-                }`}
-                aria-label={searchPlaceholder}
-                autoFocus
-              />
-            </div>
-          )}
-
-          <div className="flex-1 min-h-0 overflow-y-auto py-1">
-            {filteredOptions.length === 0 ? (
-              <div
-                className={`px-4 py-3 text-light dark:text-slate-400 ${
-                  formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm"
-                }`}
-              >
-                No matches
-              </div>
-            ) : (
-              filteredOptions.map((opt, idx) => {
-                const selected = opt.value === value;
-                const active = idx === activeIndex;
-                const rowText = formCompact ? "text-sm" : compactValue ? "text-[12px]" : "text-sm";
-                return (
-                  <div
-                    key={String(opt.value)}
-                    role="option"
-                    aria-selected={selected}
-                    aria-disabled={opt.disabled || false}
-                    data-active={active}
-                    onMouseEnter={() => setActiveIndex(idx)}
-                    onClick={() => !opt.disabled && selectIndex(idx)}
-                    className={`mx-1 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 ${rowText} transition-colors ${
-                      opt.disabled
-                        ? "opacity-40 cursor-not-allowed"
-                        : active
-                          ? "bg-rowBg dark:bg-slate-800"
-                          : "hover:bg-lightblue dark:hover:bg-slate-800/80"
-                    } ${selected ? "text-primary font-medium" : "text-slate-800 dark:text-slate-200"}`}
-                  >
-                    <span
-                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                        selected ? "border-primary" : "border-slate-300 dark:border-slate-500"
-                      }`}
-                      aria-hidden
-                    >
-                      {selected ? (
-                        <span className="h-2 w-2 rounded-full bg-primary" />
-                      ) : null}
-                    </span>
-                    <span className="truncate">{opt.label}</span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {showAdd && (
-            <div className="flex shrink-0 justify-end border-t border-light-border bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-900">
-              <button
-                type="button"
-                role="option"
-                aria-label={addLabel}
-                data-active={activeIndex === filteredOptions.length}
-                onMouseEnter={() => setActiveIndex(filteredOptions.length)}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleAdd();
-                }}
-                className={`flex min-h-7 w-auto items-center justify-end gap-1 rounded-md border border-transparent px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-emerald-200 hover:bg-emerald-50/80 dark:hover:border-emerald-800/60 dark:hover:bg-emerald-950/50 sm:min-h-8 sm:px-2.5 sm:py-1.5 sm:text-xs ${
-                  activeIndex === filteredOptions.length
-                    ? "border-emerald-200 bg-rowBg dark:border-emerald-800/60 dark:bg-slate-800"
-                    : ""
-                }`}
-              >
-                <span className="text-sm leading-none sm:text-[15px]" aria-hidden>
-                  +
-                </span>
-                <span>{String(addLabel).replace(/^\+\s*/, "")}</span>
-              </button>
-            </div>
-          )}
+          {menuInner}
         </div>
       )}
 

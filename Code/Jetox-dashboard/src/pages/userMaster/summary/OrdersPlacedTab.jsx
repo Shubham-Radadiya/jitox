@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import DataTable from "../../../components/ui/table/DataTable";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, CalendarDays, Package, CircleDot } from "lucide-react";
 import {
   TABLE_CELL_BORDER,
   tableTdClasses,
@@ -14,19 +14,22 @@ import {
  */
 function DetailRow({ label, children }) {
   return (
-    <>
-      <dt className="py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:py-2.5 sm:pr-2 sm:text-[11px] dark:text-slate-400">
+    <div className="flex items-start justify-between gap-2 py-0.5">
+      <dt className="w-28 shrink-0 whitespace-nowrap text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 sm:w-32 sm:text-xs">
         {label}
       </dt>
-      <dd className="min-w-0 py-2 text-left wrap-break-word text-[11px] font-semibold leading-snug text-slate-900 sm:py-2.5 sm:text-sm dark:text-slate-100">
+      <dd className="min-w-0 flex-1 text-right wrap-break-word text-[11px] font-normal leading-tight text-slate-900 sm:text-xs dark:text-slate-100">
         {children}
       </dd>
-    </>
+    </div>
   );
 }
 
 const OrdersPlacedTab = () => {
   const [expandedRow, setExpandedRow] = useState(0);
+  const [orderNumberFilter, setOrderNumberFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const columns = [
     "Order Number",
@@ -88,6 +91,50 @@ const OrdersPlacedTab = () => {
     []
   );
 
+  const orderNumberOptions = useMemo(() => {
+    const seen = new Set(
+      data
+        .map((d) => String(d["Order Number"] || "").trim())
+        .filter(Boolean)
+    );
+    return [...seen].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [data]);
+
+  const dateOptions = useMemo(() => {
+    const seen = new Set(
+      data
+        .map((d) => String(d["Date & Time"] || "").trim())
+        .filter(Boolean)
+    );
+    return [...seen].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [data]);
+
+  const statusOptions = useMemo(() => {
+    const seen = new Set(
+      data
+        .map((d) => String(d["Order Status"] || "").trim())
+        .filter(Boolean)
+    );
+    return [...seen].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [data]);
+
+  const filteredData = useMemo(() => {
+    return data.filter((row) => {
+      if (orderNumberFilter && String(row["Order Number"]) !== orderNumberFilter)
+        return false;
+      if (dateFilter && String(row["Date & Time"]) !== dateFilter) return false;
+      if (statusFilter && String(row["Order Status"]) !== statusFilter)
+        return false;
+      return true;
+    });
+  }, [data, orderNumberFilter, dateFilter, statusFilter]);
+
   const renderCustomRow = (row, rowIndex) => {
     const isExpanded = expandedRow === rowIndex;
     const rowBg =
@@ -121,13 +168,13 @@ const OrdersPlacedTab = () => {
             </span>
           </td>
           <td className={tableTdClasses("Order Status")}>
-            <span className="font-semibold italic text-amber-600 dark:text-amber-400/95">
+            <span className="font-semibold text-amber-600 dark:text-amber-400/95">
               {row["Order Status"]}
             </span>
           </td>
           <td className={`${tableTdClasses("Payment Status")} relative`}>
             <div className="flex w-full min-w-0 items-center justify-center gap-2 sm:justify-between">
-              <span className="min-w-0 truncate font-semibold italic text-amber-600 dark:text-amber-400/95">
+              <span className="min-w-0 truncate font-semibold text-amber-600 dark:text-amber-400/95">
                 {row["Payment Status"]}
               </span>
               <button
@@ -147,28 +194,27 @@ const OrdersPlacedTab = () => {
           <tr className={rowBg}>
             <td
               colSpan={6}
-              className={`${TABLE_CELL_BORDER} border-t-0 bg-slate-50/90 px-2 py-2.5 sm:px-4 sm:py-4 dark:bg-slate-950/50`}
+              className={`${TABLE_CELL_BORDER} border-t-0 bg-slate-50/90 px-2 py-2 sm:px-3 sm:py-3 dark:bg-slate-950/50`}
             >
-              <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm max-sm:max-h-[70vh] max-sm:overflow-y-auto sm:rounded-xl sm:p-4 dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
-                <div className="grid min-w-0 gap-3.5 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-slate-200 dark:lg:divide-slate-600">
-                  <div className="min-w-0 lg:pr-6 xl:pr-8">
-                    <h4 className="mb-1.5 text-xs font-bold text-slate-900 sm:mb-2 sm:text-sm dark:text-slate-100">
+              <div className="max-sm:max-h-[70vh] max-sm:overflow-y-auto">
+                <div className="grid min-w-0 gap-1.5 lg:grid-cols-2">
+                  <div className="min-w-0 rounded-md border border-slate-200 bg-white px-1.5 py-1 dark:border-slate-600 dark:bg-slate-900">
+                    <h4 className="mb-0.5 text-xs font-bold text-slate-900 sm:text-[13px] dark:text-slate-100">
                       Person Details
                     </h4>
-                    <dl className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-start gap-x-2 gap-y-0 sm:grid-cols-[15rem_minmax(0,1fr)] sm:gap-x-3">
+                    <dl>
                       <DetailRow label="Contact">
                         {row.personDetails.contact}
                       </DetailRow>
                       <DetailRow label="Address">
-                        <span title={row.personDetails.fullAddress || row.personDetails.address}>
-                          {row.personDetails.fullAddress
-                            ? row.personDetails.fullAddress.split("\n").map((line, i) => (
-                                <React.Fragment key={i}>
-                                  {i > 0 ? <br /> : null}
-                                  {line}
-                                </React.Fragment>
-                              ))
-                            : row.personDetails.address}
+                        <span
+                          className="line-clamp-1"
+                          title={row.personDetails.fullAddress || row.personDetails.address}
+                        >
+                          {(row.personDetails.fullAddress || row.personDetails.address || "").replace(
+                            /\n+/g,
+                            ", "
+                          )}
                         </span>
                       </DetailRow>
                       <DetailRow label="Assigned delivery person">
@@ -177,11 +223,11 @@ const OrdersPlacedTab = () => {
                     </dl>
                   </div>
 
-                  <div className="min-w-0 lg:pl-6 xl:pl-8">
-                    <h4 className="mb-1.5 text-xs font-bold text-slate-900 sm:mb-2 sm:text-sm dark:text-slate-100">
+                  <div className="min-w-0 rounded-md border border-slate-200 bg-white px-1.5 py-1 dark:border-slate-600 dark:bg-slate-900">
+                    <h4 className="mb-0.5 text-xs font-bold text-slate-900 sm:text-[13px] dark:text-slate-100">
                       Dispatch Details
                     </h4>
-                    <dl className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-start gap-x-2 gap-y-0 sm:grid-cols-[15rem_minmax(0,1fr)] sm:gap-x-3">
+                    <dl>
                       <DetailRow label="Payment method">
                         {row.dispatchDetails.paymentMethod}
                       </DetailRow>
@@ -195,14 +241,18 @@ const OrdersPlacedTab = () => {
                   </div>
                 </div>
 
-                <div className="mt-3 overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 max-sm:max-h-48 [-webkit-overflow-scrolling:touch] touch-pan-x dark:border-slate-600 sm:mt-4">
+                <div className="mt-2 overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 bg-white max-sm:max-h-48 [-webkit-overflow-scrolling:touch] touch-pan-x dark:border-slate-600 dark:bg-slate-900 sm:mt-3">
                   <table className="w-full min-w-[30rem] border-collapse text-xs sm:min-w-0 sm:text-sm">
                     <thead>
                       <tr>
-                        <th className={tableThClasses("Description")}>Description</th>
-                        <th className={tableThClasses("Qty")}>Qty</th>
-                        <th className={tableThClasses("Rate")}>Rate</th>
-                        <th className={tableThClasses("Amount")}>Amount</th>
+                        <th className={`${tableThClasses("Description")} px-2 py-1.5`}>
+                          Description
+                        </th>
+                        <th className={`${tableThClasses("Qty")} px-2 py-1.5`}>Qty</th>
+                        <th className={`${tableThClasses("Rate")} px-2 py-1.5`}>Rate</th>
+                        <th className={`${tableThClasses("Amount")} px-2 py-1.5`}>
+                          Amount
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -255,7 +305,86 @@ const OrdersPlacedTab = () => {
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <DataTable columns={columns} data={data} renderCustomRow={renderCustomRow} />
+      <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-0.5 rounded-lg bg-slate-100/90 p-0.5 whitespace-nowrap dark:bg-slate-800/80">
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            My Data
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
+          >
+            User (10)
+          </button>
+        </div>
+
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
+          <div className="relative w-full sm:w-44">
+            <Package
+              size={14}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <select
+              className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={orderNumberFilter}
+              onChange={(e) => setOrderNumberFilter(e.target.value)}
+              aria-label="Filter by order number"
+            >
+              <option value="">Order Number</option>
+              {orderNumberOptions.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative w-full sm:w-44">
+            <CalendarDays
+              size={14}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <select
+              className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              aria-label="Filter by date"
+            >
+              <option value="">Date</option>
+              {dateOptions.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative w-full sm:w-44">
+            <CircleDot
+              size={14}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <select
+              className="h-9 w-full rounded-lg border border-light-border bg-white pl-7 pr-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter by order status"
+            >
+              <option value="">Order Status</option>
+              {statusOptions.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <DataTable columns={columns} data={filteredData} renderCustomRow={renderCustomRow} />
     </div>
   );
 };

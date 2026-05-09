@@ -10,6 +10,11 @@ export interface IPurchaseItem {
   category: string;
   subtotal: Number;
   remarks?: string;
+  hsn?: string;
+  batch?: string;
+  expDate?: string;
+  mfgDate?: string;
+  mrp?: string;
 }
 
 export interface IPurchaseVoucher extends Document {
@@ -18,6 +23,11 @@ export interface IPurchaseVoucher extends Document {
   deliveryAt?: string;
   orderby?: string;
   shipToAndBillTo?: string;
+  billTo?: string;
+  shipTo?: string;
+  shipDifferent?: boolean;
+  narration?: string;
+  termsAndConditions?: string;
   voucherNo: string;
   voucherDate: Date;
   supplierName: string;
