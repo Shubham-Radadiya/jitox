@@ -126,13 +126,21 @@ export function mapPurchaseApiDocToPrefill(doc) {
   const billStored = String(doc.billTo ?? "").trim();
   const shipStored = String(doc.shipTo ?? "").trim();
   const billTo = billStored || legacySingle;
-  const shipTo = shipStored || legacySingle;
+
   let shipDifferent = false;
   if (typeof doc.shipDifferent === "boolean") {
     shipDifferent = doc.shipDifferent;
+  } else if (doc.shipDifferent != null && doc.shipDifferent !== "") {
+    shipDifferent = String(doc.shipDifferent).toLowerCase() === "true";
   } else if (billStored && shipStored && billStored !== shipStored) {
     shipDifferent = true;
   }
+
+  /** Prefer explicit `shipTo` from DB when addresses differ; otherwise same-as-bill line. */
+  const shipTo =
+    shipDifferent && shipStored
+      ? shipStored
+      : shipStored || legacySingle || billTo;
 
   const termsFromApi = doc.termsAndConditions;
   const termsText =

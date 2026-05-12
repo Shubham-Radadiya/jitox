@@ -1,10 +1,112 @@
 import { Request, Response } from "express";
-import { PurchaseReturnVoucher, Product } from "../models/index";
+import { Account, PurchaseReturnVoucher, Product } from "../models/index";
 import { IPurchaseItem } from "../types/purchaseVoucher.type";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
+import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+
+/** Fields accepted from PUT body when updating a purchase return voucher */
+const PURCHASE_RETURN_PATCH_KEYS = [
+  "partyName",
+  "invoiceNo",
+  "dueDate",
+  "transportDetails",
+  "deliveryAt",
+  "orderby",
+  "shipToAndBillTo",
+  "voucherNo",
+  "voucherDate",
+  "items",
+  "gstAmount",
+  "totalAmount",
+  "paymentMode",
+  "basePrice",
+  "stockDetails",
+] as const;
+
+/**
+ * Next purchase return voucher no. in `JITOX-DEMO-PR-001` form — scans existing
+ * `JITOX-DEMO-PR-###` codes so sequencing continues past existing data.
+ */
+async function computeNextPurchaseReturnVoucherNo(): Promise<string> {
+  const docs = await PurchaseReturnVoucher.find().select("voucherNo").lean();
+  let max = 0;
+  const re = /^JITOX-DEMO-PR-(\d+)$/i;
+  for (const d of docs) {
+    const v = String(d?.voucherNo ?? "").trim();
+    const m = re.exec(v);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n)) max = Math.max(max, n);
+    }
+  }
+  const next = max + 1;
+  return `JITOX-DEMO-PR-${String(next).padStart(3, "0")}`;
+}
+
+/** Reserve the next free voucher no. — retries on race so two creates can't collide. */
+async function resolveUniquePurchaseReturnVoucherNo(
+  requested?: string
+): Promise<string> {
+  const base = String(requested || "").trim();
+  if (base) {
+    const taken = await PurchaseReturnVoucher.findOne({ voucherNo: base });
+    if (!taken) return base;
+  }
+  for (let i = 0; i < 60; i++) {
+    const candidate = await computeNextPurchaseReturnVoucherNo();
+    const taken = await PurchaseReturnVoucher.findOne({ voucherNo: candidate });
+    if (!taken) return candidate;
+  }
+  return `JITOX-DEMO-PR-${Date.now()}`;
+}
+
+/**
+ * Apply a stock delta to each line item's product (multiplier: +1 to add, -1 to remove).
+ * Returns leave the godown → call with `-1` on create, `+1` on delete/rollback.
+ */
+async function applyStockDelta(
+  items: Array<{ product: unknown; quantity: unknown }>,
+  multiplier: 1 | -1
+): Promise<void> {
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  const totals = new Map<string, number>();
+  for (const it of items) {
+    const pid =
+      it && it.product != null && typeof (it.product as any).toString === "function"
+        ? String((it.product as any).toString())
+        : String(it?.product ?? "").trim();
+    const qty = Number(it?.quantity);
+    if (!pid || !Number.isFinite(qty) || qty === 0) continue;
+    totals.set(pid, (totals.get(pid) ?? 0) + qty);
+  }
+
+  if (totals.size === 0) return;
+
+  await Promise.all(
+    Array.from(totals.entries()).map(([pid, qty]) =>
+      Product.findByIdAndUpdate(pid, {
+        $inc: { quantity: qty * multiplier },
+      }).catch((err) => {
+        console.error("applyStockDelta (return) failed", {
+          pid,
+          qty,
+          multiplier,
+          err,
+        });
+      })
+    )
+  );
+}
+
+/** Did the user opt into stock update for this voucher? */
+function shouldUpdateStock(stockDetails: unknown): boolean {
+  if (!stockDetails || typeof stockDetails !== "object") return false;
+  return Boolean((stockDetails as { stockQuantity?: unknown }).stockQuantity);
+}
 
 export const createPurchaseReturnVoucher = async (
   req: Request,
@@ -29,25 +131,11 @@ export const createPurchaseReturnVoucher = async (
       stockDetails,
     } = req.body;
 
-    const requiredFields = [
-      "partyName",
-      "voucherNo",
-      "voucherDate",
-      "items",
-    ] as const;
-
+    /** voucherNo is generated server-side, so it's not in the required list. */
+    const requiredFields = ["partyName", "voucherDate", "items"] as const;
     validateAndRespond(req.body, requiredFields, res);
 
-    const existingVoucher = await PurchaseReturnVoucher.findOne({ voucherNo });
-    if (existingVoucher) {
-      throw new AppError(
-        HttpStatusCode.BAD_REQUEST,
-        "Voucher number already exists."
-      );
-      return;
-    }
-
-    const productIds = items.map((item: IPurchaseItem) => item.product);
+    const productIds = (items as IPurchaseItem[]).map((item) => item.product);
     const validProducts = await Product.find({ _id: { $in: productIds } });
     if (validProducts.length !== productIds.length) {
       throw new AppError(
@@ -55,6 +143,10 @@ export const createPurchaseReturnVoucher = async (
         "One or more product IDs are invalid."
       );
     }
+
+    const resolvedVoucherNo = await resolveUniquePurchaseReturnVoucherNo(
+      voucherNo
+    );
 
     const newVoucher = new PurchaseReturnVoucher({
       partyName,
@@ -64,7 +156,7 @@ export const createPurchaseReturnVoucher = async (
       deliveryAt,
       orderby,
       shipToAndBillTo,
-      voucherNo,
+      voucherNo: resolvedVoucherNo,
       voucherDate,
       items,
       gstAmount,
@@ -75,6 +167,22 @@ export const createPurchaseReturnVoucher = async (
     });
 
     const savedVoucher = await newVoucher.save();
+
+    /** Stock toggle ON → returns leave stock, so decrement product qty by line qty. */
+    if (shouldUpdateStock(stockDetails)) {
+      await applyStockDelta(items as IPurchaseItem[], -1);
+    }
+
+    await logDayBookEntry({
+      voucherNumber: savedVoucher.voucherNo,
+      voucherType: "Purchase Return",
+      particulars: `${partyName} — purchase return${
+        invoiceNo ? ` (Inv ${invoiceNo})` : ""
+      }`,
+      debitAmount: totalAmount,
+      creditAmount: totalAmount,
+    });
+
     res.status(201).json({
       message: "Purchase return voucher created successfully.",
       data: savedVoucher,
@@ -190,34 +298,89 @@ export const updatePurchaseReturnVoucher = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const raw = req.body as Record<string, unknown>;
 
-    const existingVoucher = await PurchaseReturnVoucher.findOne({
-      voucherNo: updateData?.voucherNo,
+    const voucher = await PurchaseReturnVoucher.findById(id);
+    if (!voucher) {
+      throw new AppError(
+        HttpStatusCode.NOT_FOUND,
+        "No purchase return vouchers found."
+      );
+    }
+
+    /** Snapshot prior stock state so we can rollback before applying new lines. */
+    const prevStockOn = shouldUpdateStock(voucher.stockDetails);
+    const prevItems = Array.isArray(voucher.items)
+      ? voucher.items.map((it: any) => ({
+          product: it?.product,
+          quantity: Number(it?.quantity),
+        }))
+      : [];
+
+    /** If voucherNo is being changed, make sure it's still unique (excluding this doc). */
+    if (
+      typeof raw.voucherNo === "string" &&
+      raw.voucherNo.trim() &&
+      raw.voucherNo.trim() !== voucher.voucherNo
+    ) {
+      const clash = await PurchaseReturnVoucher.findOne({
+        voucherNo: raw.voucherNo.trim(),
+        _id: { $ne: id },
+      });
+      if (clash) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "Voucher number already exists."
+        );
+      }
+    }
+
+    const patch: Record<string, unknown> = {};
+    for (const key of PURCHASE_RETURN_PATCH_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(raw, key)) {
+        patch[key] = raw[key];
+      }
+    }
+
+    voucher.set(patch);
+    await voucher.save();
+    await voucher.populate({
+      path: "items.product",
+      select: "productName category group",
     });
-    if (existingVoucher) {
-      throw new AppError(
-        HttpStatusCode.NOT_FOUND,
-        "No purchase return vouchers found."
-      );
+
+    /** Reconcile stock: rollback the old return, then apply the new return. */
+    const nextStockOn = shouldUpdateStock(voucher.stockDetails);
+    if (prevStockOn) {
+      await applyStockDelta(prevItems, +1); // undo: returns originally removed stock
+    }
+    if (nextStockOn) {
+      const nextItems = Array.isArray(voucher.items)
+        ? voucher.items.map((it: any) => ({
+            product:
+              it?.product && typeof it.product === "object" && it.product?._id
+                ? it.product._id
+                : it?.product,
+            quantity: Number(it?.quantity),
+          }))
+        : [];
+      await applyStockDelta(nextItems, -1);
     }
 
-    const updatedVoucher = await PurchaseReturnVoucher.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    ).populate("items.product", "productName category group");
-
-    if (!updatedVoucher) {
-      throw new AppError(
-        HttpStatusCode.NOT_FOUND,
-        "No purchase return vouchers found."
-      );
-    }
+    const returnInvoiceNo = (voucher as any).invoiceNo;
+    await logDayBookEntry({
+      voucherNumber: voucher.voucherNo,
+      voucherType: "Purchase Return",
+      particulars: `${voucher.partyName} — purchase return${
+        returnInvoiceNo ? ` (Inv ${returnInvoiceNo})` : ""
+      }`,
+      debitAmount: voucher.totalAmount as unknown as string,
+      creditAmount: voucher.totalAmount as unknown as string,
+    });
 
     res.status(200).json({
       message: "Purchase return voucher updated successfully.",
-      data: updatedVoucher,
+      data: voucher,
     });
   } catch (error) {
     console.error("Update Purchase return voucher Error:", error);
@@ -240,11 +403,62 @@ export const deletePurchaseReturnVoucher = async (
       );
     }
 
+    /** Roll back the stock deduction this voucher caused. */
+    if (shouldUpdateStock((deletedVoucher as any).stockDetails)) {
+      const items = Array.isArray((deletedVoucher as any).items)
+        ? (deletedVoucher as any).items.map((it: any) => ({
+            product: it?.product,
+            quantity: Number(it?.quantity),
+          }))
+        : [];
+      await applyStockDelta(items, +1);
+    }
+
+    await removeDayBookEntry((deletedVoucher as any).voucherNo);
+
     res
       .status(200)
       .json({ message: "Purchase return voucher deleted successfully." });
   } catch (error) {
     console.error("Delete Purchase return voucher Error:", error);
     throw error;
+  }
+};
+
+/** Dropdowns + next auto voucher no. for the Add Purchase Return modal. */
+export const getPurchaseReturnFormMeta = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const accounts = await Account.find({
+      customerStatus: { $ne: "Inactive" },
+    })
+      .select("businessName")
+      .sort({ businessName: 1 })
+      .lean();
+
+    const seen = new Set<string>();
+    const parties: { value: string; label: string }[] = [];
+    for (const a of accounts) {
+      const name = String(a?.businessName ?? "").trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      parties.push({ value: name, label: name });
+    }
+
+    let nextPurchaseReturnVoucherNo = "JITOX-DEMO-PR-001";
+    try {
+      nextPurchaseReturnVoucherNo = await computeNextPurchaseReturnVoucherNo();
+    } catch (e) {
+      console.error("computeNextPurchaseReturnVoucherNo", e);
+    }
+
+    sendSuccess(res, { nextPurchaseReturnVoucherNo, parties });
+  } catch (error) {
+    console.error("getPurchaseReturnFormMeta", error);
+    res
+      .status(500)
+      .json({ message: "Failed to load purchase return voucher form meta." });
   }
 };

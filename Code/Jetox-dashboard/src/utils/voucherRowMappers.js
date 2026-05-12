@@ -172,26 +172,68 @@ export function mapQuotationRow(q) {
   };
 }
 
+function pushDetailRow(rows, label, value) {
+  if (value == null) return;
+  const v = String(value).trim();
+  if (!v) return;
+  rows.push({ label, value: v });
+}
+
 /** Shape expected by PurchaseDetails drawer */
 export function purchaseDocToDetailShape(doc) {
   const d = doc;
   if (!d) return null;
+
+  const basePriceNum = Number(d.basePrice);
+  const gstAmountNum = Number(d.gstAmount);
+  const hasSplitGst =
+    Number.isFinite(basePriceNum) &&
+    basePriceNum > 0 &&
+    Number.isFinite(gstAmountNum) &&
+    gstAmountNum >= 0;
+
   const products = (d.items || []).map((it, i) => {
     const p = it.product;
     const name =
       p && typeof p === "object" && p.productName
         ? p.productName
         : String(p || `Item ${i + 1}`);
+    let lineGst = "—";
+    if (hasSplitGst) {
+      const taxable = Number(it.subtotal);
+      if (Number.isFinite(taxable) && taxable >= 0) {
+        const share = (taxable / basePriceNum) * gstAmountNum;
+        lineGst = fmtRupee(share);
+      }
+    }
     return {
       name,
       qty: String(it.quantity ?? ""),
       rate: fmtRupee(it.rateParUnit),
-      gst: "—",
+      gst: lineGst,
       subtotal: fmtRupee(it.subtotal),
     };
   });
   const ta = d.totalAmount;
   const totalLabel = ta != null ? fmtRupee(ta) : "—";
+
+  /** Our (buyer) side — for the “Customer Details” card in PurchaseDetails. */
+  const customer = [];
+  pushDetailRow(customer, "Full Name", d.orderby);
+
+  /** Supplier side — for the “Party Details” card. Keep it to the two slots used by the design. */
+  const party = [];
+  pushDetailRow(party, "Full Name", d.partyName);
+  const shippingAddress =
+    String(d.shipTo ?? "").trim() || String(d.billTo ?? "").trim();
+  pushDetailRow(party, "Shipping Address", shippingAddress);
+
+  if (party.length === 0) {
+    pushDetailRow(party, "Full Name", "—");
+  }
+
+  const termsAndConditions = String(d.termsAndConditions || "").trim();
+
   return {
     voucherNo: d.voucherNo || "—",
     status: d.paymentMode || "—",
@@ -199,11 +241,9 @@ export function purchaseDocToDetailShape(doc) {
       ? dayjs(d.voucherDate).format("DD MMM YYYY")
       : "—",
     narration: d.narration || d.remarks || "",
-    customer: [],
-    party: [
-      { label: "Party Name", value: d.partyName || "—" },
-      { label: "Invoice No", value: d.invoiceNo || "—" },
-    ],
+    termsAndConditions,
+    customer,
+    party,
     products:
       products.length > 0
         ? products

@@ -144,6 +144,7 @@ export const purchaseReturnVouchersApi = {
   getAll: (params) => http.get("/purchaseReturnVouchers/", { params }),
   getById: (id) =>
     http.get(`/purchaseReturnVouchers/${encodeURIComponent(id)}`),
+  getFormMeta: () => http.get("/purchaseReturnVouchers/form-meta"),
   create: (body) =>
     http.post("/purchaseReturnVouchers/create-purchase-return-voucher", body),
   update: (id, body) =>
@@ -159,8 +160,14 @@ export const purchaseReturnVouchersApi = {
 
 export const paymentVouchersApi = {
   getAll: (params) => http.get("/paymentVouchers/", { params }),
+  getById: (id) => http.get(`/paymentVouchers/${encodeURIComponent(id)}`),
   getTotal: () => http.get("/paymentVouchers/get-total"),
+  getFormMeta: () => http.get("/paymentVouchers/form-meta"),
   create: (body) => http.post("/paymentVouchers/create", body),
+  update: (id, body) =>
+    http.put(`/paymentVouchers/update/${encodeURIComponent(id)}`, body),
+  delete: (id) =>
+    http.delete(`/paymentVouchers/delete/${encodeURIComponent(id)}`),
 };
 
 export const expenseVouchersApi = {
@@ -170,6 +177,12 @@ export const expenseVouchersApi = {
     http.post("/expenseVouchers/create", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+  update: (id, formData) =>
+    http.put(`/expenseVouchers/update/${encodeURIComponent(id)}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  delete: (id) =>
+    http.delete(`/expenseVouchers/delete/${encodeURIComponent(id)}`),
 };
 
 export const cashVouchersApi = {

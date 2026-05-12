@@ -64,6 +64,9 @@ export function buildPurchaseDetailShareText(detail) {
   if (!detail) return "";
   let t = `Purchase voucher\nVoucher: ${detail.voucherNo}\nDate: ${detail.purchaseDate}\n`;
   if (detail.narration) t += `\nNarration:\n${detail.narration}\n`;
+  if (detail.termsAndConditions) {
+    t += `\nTerms & conditions:\n${detail.termsAndConditions}\n`;
+  }
   (detail.party || []).forEach((r) => {
     t += `${r.label}: ${r.value}\n`;
   });
@@ -94,6 +97,11 @@ function buildPurchaseDetailBillBody(detail) {
   const narr = detail.narration
     ? `<p><strong>Narration</strong><br/>${escapeHtml(detail.narration).replace(/\n/g, "<br/>")}</p>`
     : "";
+  const terms = detail.termsAndConditions
+    ? `<p><strong>Terms &amp; conditions</strong><br/>${escapeHtml(
+        detail.termsAndConditions
+      ).replace(/\n/g, "<br/>")}</p>`
+    : "";
   const partyRows = (detail.party || [])
     .map(
       (r) =>
@@ -111,6 +119,7 @@ function buildPurchaseDetailBillBody(detail) {
   return `
 <p><strong>Date:</strong> ${escapeHtml(detail.purchaseDate)}</p>
 ${narr}
+${terms}
 <table><tbody>${partyRows}</tbody></table>
 <table>
 <thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>GST</th><th>Subtotal</th></tr></thead>
@@ -130,6 +139,68 @@ export async function downloadPurchaseDetailBillPdf(detail) {
   if (!detail) return;
   const title = `Purchase — ${detail.voucherNo || "voucher"}`;
   const body = buildPurchaseDetailBillBody(detail);
+  const fullHtml = buildStandalonePrintableHtml(title, body, {
+    bodyPaddingPx: 10,
+    bodyFontSizePx: 12,
+    h1FontSizePx: 16,
+    tableCellPaddingPx: 5,
+  });
+  await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
+}
+
+export function buildPaymentDetailShareText(detail) {
+  if (!detail) return "";
+  let t = `Payment voucher\nVoucher: ${detail.voucherNo}\nDate: ${detail.date}\n`;
+  t += `Status: ${detail.status}\n`;
+  (detail.party || []).forEach((r) => {
+    t += `${r.label}: ${r.value}\n`;
+  });
+  t += `Amount: ${detail.totals?.amount ?? "—"}\n`;
+  if (detail.remarks) t += `\nRemarks:\n${detail.remarks}\n`;
+  return t;
+}
+
+export function downloadPaymentDetailCsv(detail) {
+  if (!detail) return;
+  const safe = String(detail.voucherNo || "payment").replace(
+    /[/\\?%*:|"<>]/g,
+    "-"
+  );
+  const rows = [
+    ["Voucher No", detail.voucherNo || ""],
+    ["Date", detail.date || ""],
+    ["Status", detail.status || ""],
+    ...(detail.party || []).map((r) => [r.label, r.value]),
+    ["Amount", detail.totals?.amount || ""],
+    ["Remarks", detail.remarks || ""],
+  ];
+  downloadCsv(`${safe}-summary.csv`, ["Field", "Value"], rows);
+}
+
+function buildPaymentDetailBillBody(detail) {
+  if (!detail) return "";
+  const partyRows = (detail.party || [])
+    .map(
+      (r) =>
+        `<tr><th>${escapeHtml(r.label)}</th><td>${escapeHtml(r.value)}</td></tr>`
+    )
+    .join("");
+  const remarks = detail.remarks
+    ? `<p><strong>Remarks</strong><br/>${escapeHtml(detail.remarks).replace(/\n/g, "<br/>")}</p>`
+    : "";
+  return `
+<p><strong>Date:</strong> ${escapeHtml(detail.date)}</p>
+<p><strong>Status:</strong> ${escapeHtml(detail.status || "—")}</p>
+<table><tbody>${partyRows}</tbody></table>
+<p><strong>Amount:</strong> ${escapeHtml(detail.totals?.amount ?? "—")}</p>
+${remarks}
+`;
+}
+
+export async function downloadPaymentDetailBillPdf(detail) {
+  if (!detail) return;
+  const title = `Payment — ${detail.voucherNo || "voucher"}`;
+  const body = buildPaymentDetailBillBody(detail);
   const fullHtml = buildStandalonePrintableHtml(title, body, {
     bodyPaddingPx: 10,
     bodyFontSizePx: 12,

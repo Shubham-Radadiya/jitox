@@ -3,6 +3,7 @@ import {
   createPurchaseReturnVoucher,
   deletePurchaseReturnVoucher,
   getAllPurchaseReturnVouchers,
+  getPurchaseReturnFormMeta,
   getPurchaseReturnVoucherById,
   updatePurchaseReturnVoucher,
 } from "../controllers/purchaseReturnVoucher.controller";
@@ -10,6 +11,7 @@ import {
 const router = express.Router();
 
 router.post("/create-purchase-return-voucher", createPurchaseReturnVoucher);
+router.get("/form-meta", getPurchaseReturnFormMeta);
 router.get("/", getAllPurchaseReturnVouchers);
 router.get("/:id", getPurchaseReturnVoucherById);
 router.put("/update-purchase-return-voucher/:id", updatePurchaseReturnVoucher);

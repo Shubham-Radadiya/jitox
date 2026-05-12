@@ -5,6 +5,48 @@ import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
+import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+
+/**
+ * Apply a stock delta to each line item's product (multiplier: +1 to add, -1 to remove).
+ * Sums duplicate product ids across lines so a single product appears once per `$inc`.
+ * Silently skips lines without a valid product / quantity so a partial bad row can't crash a save.
+ */
+async function applyStockDelta(
+  items: Array<{ product: unknown; quantity: unknown }>,
+  multiplier: 1 | -1
+): Promise<void> {
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  const totals = new Map<string, number>();
+  for (const it of items) {
+    const pid =
+      it && it.product != null && typeof (it.product as any).toString === "function"
+        ? String((it.product as any).toString())
+        : String(it?.product ?? "").trim();
+    const qty = Number(it?.quantity);
+    if (!pid || !Number.isFinite(qty) || qty === 0) continue;
+    totals.set(pid, (totals.get(pid) ?? 0) + qty);
+  }
+
+  if (totals.size === 0) return;
+
+  await Promise.all(
+    Array.from(totals.entries()).map(([pid, qty]) =>
+      Product.findByIdAndUpdate(pid, {
+        $inc: { quantity: qty * multiplier },
+      }).catch((err) => {
+        console.error("applyStockDelta failed", { pid, qty, multiplier, err });
+      })
+    )
+  );
+}
+
+/** Did the user opt into stock update for this voucher? */
+function shouldUpdateStock(stockDetails: unknown): boolean {
+  if (!stockDetails || typeof stockDetails !== "object") return false;
+  return Boolean((stockDetails as { stockQuantity?: unknown }).stockQuantity);
+}
 
 /** Fields accepted from dashboard PUT body when updating a purchase voucher */
 const PURCHASE_VOUCHER_PATCH_KEYS = [
@@ -123,6 +165,22 @@ export const createPurchaseVoucher = async (
     });
 
     const savedVoucher = await newVoucher.save();
+
+    /** Stock toggle ON → add purchase qty to each product's current stock. */
+    if (shouldUpdateStock(stockDetails)) {
+      await applyStockDelta(items as IPurchaseItem[], +1);
+    }
+
+    await logDayBookEntry({
+      voucherNumber: savedVoucher.voucherNo,
+      voucherType: "Purchase",
+      particulars: `${partyName} — purchase${
+        invoiceNo ? ` (Inv ${invoiceNo})` : ""
+      }`,
+      debitAmount: totalAmount,
+      creditAmount: totalAmount,
+    });
+
     sendCreated(res, savedVoucher, "Purchase voucher created successfully.");
   } catch (error) {
     console.error("Create Purchase Voucher Error:", error);
@@ -245,6 +303,15 @@ export const updatePurchaseVoucher = async (
       );
     }
 
+    /** Snapshot stock state BEFORE patch so we can rollback the old delta cleanly. */
+    const prevStockOn = shouldUpdateStock(voucher.stockDetails);
+    const prevItems = Array.isArray(voucher.items)
+      ? voucher.items.map((it: any) => ({
+          product: it?.product,
+          quantity: Number(it?.quantity),
+        }))
+      : [];
+
     const patch: Record<string, unknown> = {};
     for (const key of PURCHASE_VOUCHER_PATCH_KEYS) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -257,6 +324,39 @@ export const updatePurchaseVoucher = async (
     await voucher.populate({
       path: "items.product",
       select: "productName category group",
+    });
+
+    /**
+     * Reconcile stock: rollback what the previous version of this voucher added,
+     * then re-apply the new lines if the toggle is still on. This keeps Product.quantity
+     * correct across qty edits, line removals, and toggle flips.
+     */
+    const nextStockOn = shouldUpdateStock(voucher.stockDetails);
+    if (prevStockOn) {
+      await applyStockDelta(prevItems, -1);
+    }
+    if (nextStockOn) {
+      const nextItems = Array.isArray(voucher.items)
+        ? voucher.items.map((it: any) => ({
+            product:
+              it?.product && typeof it.product === "object" && it.product?._id
+                ? it.product._id
+                : it?.product,
+            quantity: Number(it?.quantity),
+          }))
+        : [];
+      await applyStockDelta(nextItems, +1);
+    }
+
+    const voucherInvoiceNo = (voucher as any).invoiceNo;
+    await logDayBookEntry({
+      voucherNumber: voucher.voucherNo,
+      voucherType: "Purchase",
+      particulars: `${voucher.partyName} — purchase${
+        voucherInvoiceNo ? ` (Inv ${voucherInvoiceNo})` : ""
+      }`,
+      debitAmount: voucher.totalAmount as unknown as string,
+      creditAmount: voucher.totalAmount as unknown as string,
     });
 
     sendSuccess(
@@ -284,6 +384,19 @@ export const deletePurchaseVoucher = async (
         "No purchase vouchers found."
       );
     }
+
+    /** If this voucher had previously bumped product stock, roll it back on delete. */
+    if (shouldUpdateStock((deletedVoucher as any).stockDetails)) {
+      const items = Array.isArray((deletedVoucher as any).items)
+        ? (deletedVoucher as any).items.map((it: any) => ({
+            product: it?.product,
+            quantity: Number(it?.quantity),
+          }))
+        : [];
+      await applyStockDelta(items, -1);
+    }
+
+    await removeDayBookEntry((deletedVoucher as any).voucherNo);
 
     res.status(200).json({ message: "Purchase voucher deleted successfully." });
   } catch (error) {

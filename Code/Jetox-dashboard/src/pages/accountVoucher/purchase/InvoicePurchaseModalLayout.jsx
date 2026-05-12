@@ -127,6 +127,8 @@ export default function InvoicePurchaseModalLayout({
   moreDetailsOpen,
   setMoreDetailsOpen,
   lineTotals,
+  renderGstAddModal,
+  renderTermsAddModal,
 }) {
   const [notesOpen, setNotesOpen] = useState(false);
   const [roundOff, setRoundOff] = useState(false);
@@ -986,7 +988,6 @@ export default function InvoicePurchaseModalLayout({
               </p>
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <CommonDropdown
-                  hideAdd
                   searchable
                   searchPlaceholder="Search rate…"
                   label="GST on invoice"
@@ -994,10 +995,11 @@ export default function InvoicePurchaseModalLayout({
                   value={gstRate}
                   onChange={setGstRate}
                   placeholder="GST %"
+                  closeOnAdd={false}
+                  renderAddModal={renderGstAddModal}
                   className="min-w-0"
                 />
                 <CommonDropdown
-                  hideAdd
                   searchable
                   searchPlaceholder="Search terms…"
                   label="Terms"
@@ -1005,6 +1007,8 @@ export default function InvoicePurchaseModalLayout({
                   value={termsPayment}
                   onChange={setTermsPayment}
                   placeholder="Payment term"
+                  closeOnAdd={false}
+                  renderAddModal={renderTermsAddModal}
                   className="min-w-0"
                 />
               </div>

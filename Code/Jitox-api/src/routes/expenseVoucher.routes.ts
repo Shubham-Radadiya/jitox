@@ -6,14 +6,22 @@ import {
   getExpenseVoucherById,
   updateExpenseVoucher,
 } from "../controllers/expenseVoucher.controller";
-import { upload } from "../middleware/multer.middleware";
+import { singleProofUpload } from "../middleware/multer.middleware";
 
 const router = express.Router();
 
-router.post("/create", upload.single("uploadProof"), createExpenseVoucher);
+router.post(
+  "/create",
+  singleProofUpload("uploadProof"),
+  createExpenseVoucher
+);
 router.get("/", getAllExpenseVouchers);
 router.get("/:id", getExpenseVoucherById);
-router.put("/update/:id", upload.single("uploadProof"), updateExpenseVoucher);
+router.put(
+  "/update/:id",
+  singleProofUpload("uploadProof"),
+  updateExpenseVoucher
+);
 
 router.delete("/delete/:id", deleteExpenseVoucher);
 

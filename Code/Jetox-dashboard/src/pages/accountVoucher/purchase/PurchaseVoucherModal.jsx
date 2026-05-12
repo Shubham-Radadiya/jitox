@@ -37,11 +37,17 @@ export default function PurchaseVoucherModal({
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   const [mountId, setMountId] = useState(0);
+  /**
+   * After “Save & New”, we must create the next voucher (not update the one we were editing)
+   * and show a blank form with the next voucher no. from meta.
+   */
+  const [continuingAsNew, setContinuingAsNew] = useState(false);
 
   const voucherId =
     sourceRow && typeof sourceRow === "object" ? sourceRow._id : null;
   const needsDetail =
-    Boolean(open && voucherId && (mode === "edit" || mode === "revoucher"));
+    Boolean(open && voucherId && (mode === "edit" || mode === "revoucher")) &&
+    !continuingAsNew;
 
   const {
     data: voucherDoc,
@@ -59,11 +65,19 @@ export default function PurchaseVoucherModal({
   });
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) {
+      setContinuingAsNew(false);
+      return undefined;
+    }
     setMountId((k) => k + 1);
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, [open]);
+
+  /** Switching list row / mode starts a fresh edit session (not “continue as new”). */
+  useEffect(() => {
+    setContinuingAsNew(false);
+  }, [voucherId, mode]);
 
   useEffect(() => {
     if (!detailError || !open) return;
@@ -73,7 +87,7 @@ export default function PurchaseVoucherModal({
   }, [detailError, detailErrObj, open]);
 
   const prefill = useMemo(() => {
-    if (!open || mode === "create") return null;
+    if (!open || mode === "create" || continuingAsNew) return null;
     if (!voucherDoc) return null;
     const base = mapPurchaseApiDocToPrefill(voucherDoc);
     if (!base) return null;
@@ -84,7 +98,7 @@ export default function PurchaseVoucherModal({
       };
     }
     return base;
-  }, [open, mode, voucherDoc]);
+  }, [open, mode, voucherDoc, continuingAsNew]);
 
   const showForm =
     open &&
@@ -100,7 +114,8 @@ export default function PurchaseVoucherModal({
       toast.error("Select a party (supplier account).");
       return;
     }
-    const isEdit = mode === "edit" && Boolean(voucherId);
+    const isEdit =
+      mode === "edit" && Boolean(voucherId) && !continuingAsNew;
     try {
       const res = isEdit
         ? await purchaseVouchersApi.update(voucherId, body)
@@ -119,6 +134,7 @@ export default function PurchaseVoucherModal({
       if (kind === "close") {
         onClose();
       } else {
+        setContinuingAsNew(true);
         setMountId((k) => k + 1);
       }
     } catch (e) {

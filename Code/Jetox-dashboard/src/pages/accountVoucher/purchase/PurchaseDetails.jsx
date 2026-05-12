@@ -22,7 +22,6 @@ const PurchaseDetails = ({ open, onClose, data }) => {
     party,
     products,
     totals,
-    narration,
   } = data;
 
   return (
@@ -87,19 +86,12 @@ const PurchaseDetails = ({ open, onClose, data }) => {
             </div>
           </section>
 
-          {narration ? (
-            <section className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/30">
-              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                Narration
-              </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-800 dark:text-slate-200">
-                {narration}
-              </p>
-            </section>
+          {customer && customer.length > 0 ? (
+            <InfoSection title="Customer Details" rows={customer} />
           ) : null}
-
-          <InfoSection title="Customer Details" rows={customer} />
-          <InfoSection title="Party Details" rows={party} />
+          {party && party.length > 0 ? (
+            <InfoSection title="Party Details" rows={party} />
+          ) : null}
 
           {/* Product table */}
           <section className="flex flex-col gap-2">

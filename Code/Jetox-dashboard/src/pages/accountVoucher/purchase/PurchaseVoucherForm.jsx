@@ -8,7 +8,14 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Card, InputField, CommonDropdown, DateInput } from "../../../components/ui/CommanUI";
+import {
+  Button,
+  Card,
+  CommonDropdown,
+  CommonModal,
+  DateInput,
+  InputField,
+} from "../../../components/ui/CommanUI";
 import dayjs from "dayjs";
 import {
   ArrowLeft,
@@ -25,6 +32,12 @@ import {
   usePurchaseFormMeta,
 } from "../../../hooks/usePurchaseFormMeta";
 import toast from "react-hot-toast";
+import {
+  mergeDefaultAndStoredExtras,
+  persistFullOptions,
+  readStoredExtras,
+} from "../../../utils/dropdownExtrasStorage";
+import { PURCHASE_INVOICE_EXTRA_KEYS } from "../../../utils/purchaseInvoiceDropdownKeys";
 
 const autoFieldInputClass =
   "bg-slate-100 text-slate-600 cursor-not-allowed border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-600";
@@ -85,6 +98,10 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   const [narration, setNarration] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
+  const [invoiceDropdownExtrasVersion, setInvoiceDropdownExtrasVersion] =
+    useState(0);
+  const [newInvoiceGstDraft, setNewInvoiceGstDraft] = useState("");
+  const [newInvoiceTermsDraft, setNewInvoiceTermsDraft] = useState("");
 
   const { data: meta, isError: metaError } = usePurchaseFormMeta();
   const nextVoucherAppliedRef = useRef(false);
@@ -95,6 +112,8 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
    * so Save after toggling the checkbox cannot snapshot stale shipDifferent=false.
    */
   const shipDifferentLiveRef = useRef(false);
+  /** After applying API prefill, skip one passive run of “sync ship to bill” so it cannot wipe ship-to from DB. */
+  const suppressShipToBillSyncRef = useRef(false);
 
   const setShipDifferentLive = useCallback((next) => {
     setShipDifferent((prev) => {
@@ -125,7 +144,19 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   }, [meta?.nextPurchaseVoucherNo, prefill]);
 
   const dropdownOptions = useMemo(() => {
-    if (!meta) return emptyMeta;
+    const gstBase = meta?.gst?.length ? meta.gst : emptyMeta.gst;
+    const termsBase = meta?.terms?.length ? meta.terms : emptyMeta.terms;
+    const gstOpts = mergeDefaultAndStoredExtras(
+      gstBase,
+      readStoredExtras(PURCHASE_INVOICE_EXTRA_KEYS.gst)
+    );
+    const termsOpts = mergeDefaultAndStoredExtras(
+      termsBase,
+      readStoredExtras(PURCHASE_INVOICE_EXTRA_KEYS.termsPayment)
+    );
+    if (!meta) {
+      return { ...emptyMeta, gst: gstOpts, terms: termsOpts };
+    }
     return {
       parties: meta.parties?.length ? meta.parties : emptyMeta.parties,
       partyCreditHints:
@@ -140,10 +171,10 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
         ? meta.transporters
         : emptyMeta.transporters,
       employees: meta.employees?.length ? meta.employees : emptyMeta.employees,
-      terms: meta.terms?.length ? meta.terms : emptyMeta.terms,
-      gst: meta.gst?.length ? meta.gst : emptyMeta.gst,
+      terms: termsOpts,
+      gst: gstOpts,
     };
-  }, [meta]);
+  }, [meta, invoiceDropdownExtrasVersion]);
 
   const partyCreditHints = dropdownOptions.partyCreditHints || {};
 
@@ -166,13 +197,15 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     if (prefill.transporter != null) setTransporter(prefill.transporter);
     if (prefill.deliveryAt != null) setDeliveryAt(prefill.deliveryAt);
     if (prefill.orderBy != null) setOrderBy(prefill.orderBy);
-    if (prefill.shipDifferent != null) {
+    {
       const sd = Boolean(prefill.shipDifferent);
       shipDifferentLiveRef.current = sd;
       setShipDifferent(sd);
+      setBillTo(String(prefill.billTo ?? ""));
+      setShipTo(String(prefill.shipTo ?? ""));
+      persistedShipToRef.current = String(prefill.shipTo ?? "");
+      suppressShipToBillSyncRef.current = true;
     }
-    if (prefill.billTo != null) setBillTo(prefill.billTo);
-    if (prefill.shipTo != null) setShipTo(prefill.shipTo);
     if (prefill.termsPayment != null) setTermsPayment(prefill.termsPayment);
     if (prefill.gstRate != null && String(prefill.gstRate).trim() !== "") {
       setGstRate(prefill.gstRate);
@@ -186,7 +219,6 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     if (Array.isArray(prefill.productRows) && prefill.productRows.length > 0) {
       setProductRows(prefill.productRows);
     }
-    persistedShipToRef.current = String(prefill.shipTo ?? "");
   }, [prefill]);
 
   useEffect(() => {
@@ -196,6 +228,10 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   }, [shipTo, shipDifferent]);
 
   useEffect(() => {
+    if (suppressShipToBillSyncRef.current) {
+      suppressShipToBillSyncRef.current = false;
+      return;
+    }
     if (!shipDifferent) {
       setShipTo(billTo);
     }
@@ -298,6 +334,167 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       { qty: 0, subtotal: 0, taxable: 0, tax: 0 }
     );
   }, [productRows, gstRate]);
+
+  const resetInvoiceGstDraft = useCallback(() => setNewInvoiceGstDraft(""), []);
+  const resetInvoiceTermsDraft = useCallback(
+    () => setNewInvoiceTermsDraft(""),
+    []
+  );
+
+  const submitNewInvoiceGstRate = useCallback(
+    (closeModal) => {
+      const raw = String(newInvoiceGstDraft || "").trim().replace(/%/g, "");
+      if (!raw || !/^\d+(\.\d{1,2})?$/.test(raw)) {
+        toast.error("Enter a valid GST rate (e.g. 28 or 28.5)");
+        return;
+      }
+      const value = raw;
+      const label = `${raw}%`;
+      const gstBase = meta?.gst?.length ? meta.gst : emptyMeta.gst;
+      const current = mergeDefaultAndStoredExtras(
+        gstBase,
+        readStoredExtras(PURCHASE_INVOICE_EXTRA_KEYS.gst)
+      );
+      if (current.some((o) => o.value === value || o.label === label)) {
+        toast.error("This GST rate is already in the list");
+        closeModal?.();
+        return;
+      }
+      const next = [...current, { value, label }];
+      persistFullOptions(PURCHASE_INVOICE_EXTRA_KEYS.gst, gstBase, next);
+      setGstRate(value);
+      resetInvoiceGstDraft();
+      setInvoiceDropdownExtrasVersion((v) => v + 1);
+      closeModal?.();
+    },
+    [meta, newInvoiceGstDraft, resetInvoiceGstDraft]
+  );
+
+  const submitNewInvoiceTerms = useCallback(
+    (closeModal) => {
+      const name = String(newInvoiceTermsDraft || "").trim();
+      if (!name) {
+        toast.error("Enter a payment term");
+        return;
+      }
+      const termsBase = meta?.terms?.length ? meta.terms : emptyMeta.terms;
+      const current = mergeDefaultAndStoredExtras(
+        termsBase,
+        readStoredExtras(PURCHASE_INVOICE_EXTRA_KEYS.termsPayment)
+      );
+      const lower = name.toLowerCase();
+      if (
+        current.some(
+          (o) =>
+            String(o.label).toLowerCase() === lower ||
+            String(o.value).toLowerCase() === lower
+        )
+      ) {
+        toast.error("This term is already in the list");
+        closeModal?.();
+        return;
+      }
+      const value = name;
+      const next = [...current, { value, label: name }];
+      persistFullOptions(
+        PURCHASE_INVOICE_EXTRA_KEYS.termsPayment,
+        termsBase,
+        next
+      );
+      setTermsPayment(value);
+      resetInvoiceTermsDraft();
+      setInvoiceDropdownExtrasVersion((v) => v + 1);
+      closeModal?.();
+    },
+    [meta, newInvoiceTermsDraft, resetInvoiceTermsDraft]
+  );
+
+  const renderGstAddModal = useCallback(
+    ({ open: gstModalOpen, onClose: closeGstModal }) => (
+      <CommonModal
+        open={gstModalOpen}
+        onClose={() => {
+          resetInvoiceGstDraft();
+          closeGstModal();
+        }}
+        title="New GST rate"
+        size="md"
+        footer={[
+          <Button
+            key="cancel"
+            label="Cancel"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              resetInvoiceGstDraft();
+              closeGstModal();
+            }}
+          />,
+          <Button
+            key="add"
+            label="Add"
+            variant="primary"
+            size="sm"
+            onClick={() => submitNewInvoiceGstRate(closeGstModal)}
+            className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
+          />,
+        ]}
+      >
+        <InputField
+          label="GST %"
+          name="newInvoiceGstDraft"
+          value={newInvoiceGstDraft}
+          onChange={(e) => setNewInvoiceGstDraft(e.target.value)}
+          placeholder="e.g. 28"
+          inputMode="decimal"
+        />
+      </CommonModal>
+    ),
+    [newInvoiceGstDraft, resetInvoiceGstDraft, submitNewInvoiceGstRate]
+  );
+
+  const renderTermsAddModal = useCallback(
+    ({ open: termsModalOpen, onClose: closeTermsModal }) => (
+      <CommonModal
+        open={termsModalOpen}
+        onClose={() => {
+          resetInvoiceTermsDraft();
+          closeTermsModal();
+        }}
+        title="New payment term"
+        size="md"
+        footer={[
+          <Button
+            key="cancel"
+            label="Cancel"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              resetInvoiceTermsDraft();
+              closeTermsModal();
+            }}
+          />,
+          <Button
+            key="add"
+            label="Add"
+            variant="primary"
+            size="sm"
+            onClick={() => submitNewInvoiceTerms(closeTermsModal)}
+            className="!text-white hover:!text-white dark:!text-white dark:hover:!text-white"
+          />,
+        ]}
+      >
+        <InputField
+          label="Term name"
+          name="newInvoiceTermsDraft"
+          value={newInvoiceTermsDraft}
+          onChange={(e) => setNewInvoiceTermsDraft(e.target.value)}
+          placeholder="e.g. Net 30"
+        />
+      </CommonModal>
+    ),
+    [newInvoiceTermsDraft, resetInvoiceTermsDraft, submitNewInvoiceTerms]
+  );
 
   const partyHint = partyName ? partyCreditHints[partyName] : null;
 
@@ -425,6 +622,8 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
         moreDetailsOpen={moreDetailsOpen}
         setMoreDetailsOpen={setMoreDetailsOpen}
         lineTotals={lineTotals}
+        renderGstAddModal={renderGstAddModal}
+        renderTermsAddModal={renderTermsAddModal}
       />
     );
   }
@@ -702,7 +901,10 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
         <Card title="Payment & terms">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-5">
             <CommonDropdown
-              hideAdd
+              searchable
+              searchPlaceholder="Search terms…"
+              closeOnAdd={false}
+              renderAddModal={renderTermsAddModal}
               label="Terms of Payment"
               options={dropdownOptions.terms}
               value={termsPayment}
@@ -721,7 +923,10 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
         <Card title="Pricing">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-5">
             <CommonDropdown
-              hideAdd
+              searchable
+              searchPlaceholder="Search rate…"
+              closeOnAdd={false}
+              renderAddModal={renderGstAddModal}
               label="GST"
               options={dropdownOptions.gst}
               value={gstRate}

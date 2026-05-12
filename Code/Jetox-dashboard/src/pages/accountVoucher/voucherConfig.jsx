@@ -21,6 +21,7 @@ import {
   shareOrCopyText,
 } from "../../utils/voucherShare";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { buildUploadUrl } from "../../utils/uploadUrl";
 import { IoEyeOutline } from "react-icons/io5";
 import { TbEdit } from "react-icons/tb";
 import {
@@ -495,23 +496,24 @@ const formatIsoDateRow = (key, value, defaultRenderer) => {
   return defaultRenderer(key, value);
 };
 
-const expenseTableRenderer = (key, value, defaultRenderer) => {
+const expenseTableRenderer = (key, value, defaultRenderer, row) => {
   if (key === "Date") {
     return formatIsoDateRow(key, value, defaultRenderer);
   }
   if (key === "Proof") {
-    if (value === "view") {
+    const storedPath = row?._raw?.uploadProof;
+    if (value === "view" && storedPath) {
+      const url = buildUploadUrl(storedPath);
       return (
         <td className={tableTdClasses(key)}>
-          <button
-            type="button"
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-blue text-sm font-medium hover:underline"
-            onClick={() =>
-              toast.success("Proof opens from Documents when linked to this expense.")
-            }
           >
             View
-          </button>
+          </a>
         </td>
       );
     }
@@ -735,16 +737,37 @@ export const voucherConfigs = {
       }),
     ],
     buildTableAction:
-      ({ openDetails, navigate }) =>
+      ({ openDetails, navigate, markPaymentVoucherPaid }) =>
       (row) =>
         createActionButtons(
           [
             { type: "eye" },
             {
               type: "payNow",
-              onClick: (_row, navigate) => {
-                navigate("/dashboard/accounting-voucher/payment");
-                toast.success("Use Add voucher on the list to settle this voucher.");
+              onClick: async (r) => {
+                const id = r?._id;
+                const voucherNo = r?.["Voucher No"] || "";
+                if (!id || typeof markPaymentVoucherPaid !== "function") {
+                  toast.error("Cannot update this voucher (missing id).");
+                  return;
+                }
+                if (
+                  !window.confirm(
+                    `Mark payment voucher ${voucherNo} as Paid?`
+                  )
+                ) {
+                  return;
+                }
+                try {
+                  await markPaymentVoucherPaid(id);
+                  toast.success(
+                    voucherNo
+                      ? `Voucher ${voucherNo} marked as Paid.`
+                      : "Payment voucher marked as Paid."
+                  );
+                } catch (e) {
+                  toast.error(getApiErrorMessage(e, "Could not update status"));
+                }
               },
             },
           ],
@@ -815,29 +838,17 @@ export const voucherConfigs = {
       }),
     ],
     buildTableAction:
-      ({ openDetails, navigate }) =>
+      ({ openDetails, navigate, openExpenseEdit, attachExpenseProof }) =>
       (row) =>
         createActionButtons(
           [
             {
               type: "edit",
-              onClick: (_r, navigate) => {
-                navigate("/dashboard/accounting-voucher/expenses");
-                toast.success("Use Add voucher on the list to record adjustments.");
-              },
+              onClick: () => openExpenseEdit?.(row),
             },
             {
               type: "attach",
-              onClick: () => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = ".pdf,image/*";
-                input.onchange = () => {
-                  const f = input.files?.[0];
-                  toast.success(f ? `Selected: ${f.name}` : "No file selected");
-                };
-                input.click();
-              },
+              onClick: () => attachExpenseProof?.(row),
             },
           ],
           { openDetails, navigate, row }

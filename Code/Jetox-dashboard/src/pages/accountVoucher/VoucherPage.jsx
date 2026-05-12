@@ -27,7 +27,12 @@ import ExcelColumnFilterHeader, {
 import { Plus, X } from "lucide-react";
 import ManufacturingOverview from "./manufacturing/ManufacturingOverview";
 import PurchaseVoucherModal from "./purchase/PurchaseVoucherModal";
-import { purchaseReturnVouchersApi, purchaseVouchersApi } from "../../services/api";
+import {
+  expenseVouchersApi,
+  paymentVouchersApi,
+  purchaseReturnVouchersApi,
+  purchaseVouchersApi,
+} from "../../services/api";
 
 /** Matches `w-56` (14rem); clamp math must stay in sync with popover max-width below */
 const COLUMN_PICKER_MAX_WIDTH_PX = 224;
@@ -118,9 +123,13 @@ const VoucherPage = () => {
   }, [isColumnPickerOpen, computeColumnPickerPosition]);
 
   const [activeModalKey, setActiveModalKey] = useState(null);
+  // ExpenseModal is reused for both create and edit; this holds the raw doc
+  // when the user clicks the pencil on a row.
+  const [editingExpense, setEditingExpense] = useState(null);
 
   useEffect(() => {
     setActiveModalKey(null);
+    setEditingExpense(null);
   }, [voucherSlug]);
 
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -290,6 +299,18 @@ const VoucherPage = () => {
     [queryClient]
   );
 
+  /** Mark a payment voucher's status to "Paid" via PUT /paymentVouchers/update/:id. */
+  const markPaymentVoucherPaid = useCallback(
+    async (id) => {
+      if (!id) return;
+      await paymentVouchersApi.update(String(id), { status: "Paid" });
+      await queryClient.invalidateQueries({
+        queryKey: ["voucher-list", "payment"],
+      });
+    },
+    [queryClient]
+  );
+
   const deletePurchaseReturnVoucher = useCallback(
     async (id) => {
       if (!id) return;
@@ -297,6 +318,68 @@ const VoucherPage = () => {
       await queryClient.invalidateQueries({
         queryKey: ["voucher-list", "purchase-return"],
       });
+    },
+    [queryClient]
+  );
+
+  // ---- Expense voucher: edit + quick-attach proof --------------------------
+  // `editingExpense` is declared up near `activeModalKey` so both reset
+  // together when the slug changes. Setting it alongside the modal key in
+  // the open handler keeps the open state and the edit data in lockstep.
+  const openExpenseEdit = useCallback((row) => {
+    const raw = row?._raw;
+    if (!raw?._id) {
+      toast.error("This expense is missing an id — cannot edit.");
+      return;
+    }
+    setEditingExpense(raw);
+    setActiveModalKey("expense-modal");
+  }, []);
+
+  const closeExpenseModal = useCallback(() => {
+    setActiveModalKey(null);
+    setEditingExpense(null);
+  }, []);
+
+  /** Opens a one-off file picker, validates, and PUTs only the new proof file
+   *  to /expenseVouchers/update/:id. Mirrors the validation done inside
+   *  ExpenseModal so the paperclip shortcut feels consistent. */
+  const attachExpenseProof = useCallback(
+    (row) => {
+      const id = row?._raw?._id;
+      if (!id) {
+        toast.error("This expense is missing an id — cannot attach a file.");
+        return;
+      }
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept =
+        ".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf";
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const allowed = /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
+        if (!allowed) {
+          toast.error("Only JPG, JPEG, PNG, WEBP, or PDF files are allowed.");
+          return;
+        }
+        if (file.size > 20 * 1024 * 1024) {
+          toast.error("Proof file must be 20 MB or smaller.");
+          return;
+        }
+        try {
+          const body = new FormData();
+          body.append("uploadProof", file);
+          await expenseVouchersApi.update(String(id), body);
+          await queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "expenses"],
+          });
+          toast.success("Proof attached.");
+        } catch (e) {
+          toast.error(getApiErrorMessage(e, "Could not attach proof"));
+        }
+      };
+      input.click();
     },
     [queryClient]
   );
@@ -354,6 +437,9 @@ const VoucherPage = () => {
       openPurchaseModal,
       deletePurchaseVoucher,
       deletePurchaseReturnVoucher,
+      markPaymentVoucherPaid,
+      openExpenseEdit,
+      attachExpenseProof,
     }) ||
     config.tableAction ||
     defaultTableAction;
@@ -649,11 +735,13 @@ const VoucherPage = () => {
 
         {config.modals?.map((modalConfig) => {
           const { key, component: ModalComponent, props } = modalConfig;
+          const isExpense = key === "expense-modal";
           return (
             <ModalComponent
               key={key}
               open={activeModalKey === key}
-              onClose={() => setActiveModalKey(null)}
+              onClose={isExpense ? closeExpenseModal : () => setActiveModalKey(null)}
+              {...(isExpense ? { expense: editingExpense } : {})}
               {...(props || {})}
             />
           );

@@ -6,7 +6,15 @@ const expenseSchema = new Schema<IExpenseVoucher>(
     startDate: { type: Date, trim: true },
     expenseType: {
       type: String,
-      enum: ["Fuel", "Travel", "supplies"],
+      enum: [
+        "Fuel",
+        "Travel",
+        "Supplies",
+        "Rent",
+        "Electricity",
+        "Salaries",
+        "Other",
+      ],
       trim: true,
     },
     description: { type: String, trim: true },
@@ -14,7 +22,7 @@ const expenseSchema = new Schema<IExpenseVoucher>(
     paymentMode: {
       type: String,
       trim: true,
-      enum: ["Cash", "Card", "UPI", "NEFT"],
+      enum: ["Cash", "Card", "UPI", "NEFT", "Cheque"],
     },
     amount: { type: Number, trim: true },
     uploadProof: { type: String, trim: true },
