@@ -4,8 +4,17 @@ import { CommonModal, Button } from "../../components/ui/CommanUI";
 /**
  * SchemeSuccessModal Component
  * Success confirmation after adding or updating a scheme.
+ * @param {() => void} [onEditAgain] — Close success UI and reopen the scheme form (edit when `scheme.id` exists).
  */
-const SchemeSuccessModal = ({ open, onClose, scheme, mode = "add" }) => {
+const SchemeSuccessModal = ({ open, onClose, onEditAgain, scheme, mode = "add" }) => {
+  const handleEditAgain = () => {
+    if (typeof onEditAgain === "function") {
+      onEditAgain();
+      return;
+    }
+    onClose();
+  };
+
   return (
     <CommonModal open={open} onClose={onClose} width="600px">
       <div className="flex flex-col items-center gap-4 py-3">
@@ -39,7 +48,7 @@ const SchemeSuccessModal = ({ open, onClose, scheme, mode = "add" }) => {
           <Button 
             label="Edit Again" 
             variant="secondary" 
-            onClick={onClose} 
+            onClick={handleEditAgain} 
             className="flex-1 py-3 text-dark border border-gray-100 rounded-xl font-bold shadow-none"
           />
         </div>

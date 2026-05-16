@@ -14,6 +14,7 @@ import {
 import * as Dyn from "../services/dashboardDynamic.service";
 import { uploadDocumentFile } from "../middleware/multerDocuments.middleware";
 import { sendSuccess } from "../utils/apiResponse";
+import { productLineAmount, resolveProductUnit } from "../utils/productUnit";
 
 function parseRupeeAmount(s: string): number {
   const n = Number(
@@ -106,12 +107,10 @@ async function aggregateDashboardTotalsFromDb(): Promise<{
   };
   const sumStockFromProducts = async () => {
     const docs = await Product.find().lean();
-    return docs.reduce((s, p: Record<string, unknown>) => {
-      const qty = Number(p.quantity) || 0;
-      const rate = Number(p.rate) || Number(p.billingRatePerUnit) || 0;
-      const lineAmt = Number(p.amout) || 0;
-      return s + (lineAmt > 0 ? lineAmt : qty * rate);
-    }, 0);
+    return docs.reduce(
+      (s, p: Record<string, unknown>) => s + productLineAmount(p),
+      0
+    );
   };
 
   const [
@@ -284,6 +283,23 @@ export const postScheme = async (req: Request, res: Response) => {
   }
 };
 
+export const putScheme = async (req: Request, res: Response) => {
+  try {
+    const data = await Dyn.updateMarketingScheme(
+      req.params.id,
+      req.body || {}
+    );
+    if (!data) {
+      res.status(404).json({ message: "Scheme not found" });
+      return;
+    }
+    res.json(data);
+  } catch (e) {
+    console.error("putScheme", e);
+    res.status(500).json({ message: "Failed to update scheme" });
+  }
+};
+
 export const deleteScheme = async (req: Request, res: Response) => {
   try {
     await Dyn.deleteMarketingScheme(req.params.id);
@@ -445,11 +461,9 @@ export const getPurchaseFormMeta = async (
     const unitSet = new Set<string>();
     for (const p of productsRaw) {
       if (p.group) groupSet.add(String(p.group));
-      const u = p.alternateUnits
-        ? String(p.alternateUnits)
-        : p.units != null
-          ? String(p.units)
-          : "";
+      const u =
+        resolveProductUnit(p.units) ||
+        (p.alternateUnits ? String(p.alternateUnits) : "");
       if (u) unitSet.add(u);
     }
     const groups = [...groupSet]

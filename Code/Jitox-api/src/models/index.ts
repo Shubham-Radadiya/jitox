@@ -4,6 +4,7 @@ import Account from "./account.model";
 import Product from "./product.model";
 import PurchaseVoucher from "./purchaseVoucher.model";
 import PurchaseReturnVoucher from "./purchaseReturnVoucher.model";
+import SalesVoucher from "./salesVoucher.model";
 import PaymentVoucher from "./paymentVoucher.model";
 import ReceiptVoucher from "./receiptVoucher.model";
 import ExpenseVoucher from "./expenseVoucher.model";
@@ -19,6 +20,7 @@ import Employee from "./employee.model";
 import SalarySlip from "./salarySlip.model";
 import OfferLetter from "./offerLetter.model";
 import AppointmentLetter from "./appointmentLetter.model";
+import ManufacturingVoucher from "./manufacturingVoucher.model";
 import MarketingScheme from "./marketingScheme.model";
 import DocumentCategory from "./documentCategory.model";
 import DocumentEntry from "./documentEntry.model";
@@ -31,6 +33,7 @@ export {
   Product,
   PurchaseVoucher,
   PurchaseReturnVoucher,
+  SalesVoucher,
   PaymentVoucher,
   ReceiptVoucher,
   ExpenseVoucher,
@@ -44,6 +47,7 @@ export {
   SalarySlip,
   OfferLetter,
   AppointmentLetter,
+  ManufacturingVoucher,
   MarketingScheme,
   DocumentCategory,
   DocumentEntry,

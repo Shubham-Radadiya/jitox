@@ -6,7 +6,7 @@ const ProductSchema = new Schema<IProduct>(
     productName: { type: String, required: true, trim: true },
     category: { type: String, required: true },
     group: { type: String, required: true },
-    units: { type: Number, required: true },
+    units: { type: String, required: true, trim: true },
     billingRatePerUnit: { type: Number, trim: true, required: true },
     alternateUnits: { type: String, trim: true },
     packingStyle: { type: String, trim: true },

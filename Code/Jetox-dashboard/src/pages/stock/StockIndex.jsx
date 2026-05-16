@@ -12,6 +12,7 @@ import { ChevronDown, ChevronRight, Eye } from "lucide-react";
 import AddProductModal from "../productMaster/AddProductModal";
 import { dashboardUiService } from "../../services/dashboardUi.service";
 import toast from "react-hot-toast";
+import { STOCK_CHANGED_EVENT } from "../../utils/invalidateStockQueries";
 
 function parseInrLike(v) {
   if (v == null) return 0;
@@ -68,6 +69,16 @@ const StockIndex = () => {
   useEffect(() => {
     loadSummary();
   }, [loadSummary]);
+
+  useEffect(() => {
+    const onStockChanged = () => {
+      loadSummary();
+      loadProducts();
+      loadGroups();
+    };
+    window.addEventListener(STOCK_CHANGED_EVENT, onStockChanged);
+    return () => window.removeEventListener(STOCK_CHANGED_EVENT, onStockChanged);
+  }, [loadSummary, loadProducts, loadGroups]);
 
   useEffect(() => {
     setLoading(true);

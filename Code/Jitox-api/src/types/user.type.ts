@@ -23,4 +23,6 @@ export interface IUser extends Document {
   state?: string;
   taluka?: string;
   district?: string;
+  region?: string;
+  profilePhoto?: string;
 }

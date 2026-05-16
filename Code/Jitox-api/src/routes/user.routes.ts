@@ -13,13 +13,24 @@ import {
   changePassword,
 } from "../controllers/user.controller";
 import { adminAuthenticate } from "../utils/authRoles.utils";
+import { optionalUserPhotoUpload } from "../middleware/multer.middleware";
 
 const router = express.Router();
 
 router.post("/login", login);
 router.post("/register", registerUser);
-router.post("/create-user", adminAuthenticate, createUser);
-router.put("/update-user/:id", adminAuthenticate, updateUser);
+router.post(
+  "/create-user",
+  adminAuthenticate,
+  optionalUserPhotoUpload("photo"),
+  createUser
+);
+router.put(
+  "/update-user/:id",
+  adminAuthenticate,
+  optionalUserPhotoUpload("photo"),
+  updateUser
+);
 router.delete("/delete-user/:id", adminAuthenticate, deleteUser);
 router.get("/", adminAuthenticate, getAllUsers);
 router.get("/get-users", (req, res) => {

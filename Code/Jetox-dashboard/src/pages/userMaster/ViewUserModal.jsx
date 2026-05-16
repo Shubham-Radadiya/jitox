@@ -99,7 +99,7 @@ const ViewUserModal = ({ open, onClose, user, permissionSummary }) => {
           <section className="space-y-0">
             <SectionTitle>Location</SectionTitle>
             <div className="pt-1">
-              <Row label="Region">{user.Region || user.regine}</Row>
+              <Row label="Region">{user.Region}</Row>
               <Row label="Area">{user.Area || user.assignedAreas}</Row>
             </div>
             <div className="mt-2 rounded-lg border border-light-border bg-slate-50/80 px-2.5 py-2.5 sm:mt-2.5 sm:px-3 sm:py-3 dark:border-slate-600 dark:bg-slate-800/40">
@@ -110,7 +110,7 @@ const ViewUserModal = ({ open, onClose, user, permissionSummary }) => {
                 value={addressFromUser({
                   streetAddress: user.streetAddress,
                   area: user.area,
-                  city: user.city || user.Region,
+                  city: user.city,
                   taluka: user.taluka,
                   district: user.district || user.Area,
                   state: user.state,

@@ -37,6 +37,9 @@ const RIGHT_ALIGN_KEYS = new Set([
   "Opening Balance",
   "Closing Balance",
   "Grand Total",
+  "Total Cost",
+  "Cost/Unit",
+  "Qty Made",
   "Tax",
   "Discount",
   "EMI",
@@ -300,6 +303,19 @@ export function paymentStatusBadgeClasses(value, options = {}) {
     return `${B} border-amber-200/90 bg-amber-100 text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50`;
   if (s === "unpaid")
     return `${B} border-slate-200/90 bg-gray-100 text-gray-700 dark:border-slate-500/40 dark:bg-slate-500/18 dark:text-slate-100`;
+  return `${B} border-slate-200/80 bg-gray-100 text-gray-600 dark:border-slate-500/35 dark:bg-slate-500/15 dark:text-slate-200`;
+}
+
+/** Scheme list lifecycle: Active / Expired / Upcoming (from start/end dates). */
+export function schemeLifecycleBadgeClasses(value, options = {}) {
+  const B = pickBadgeBase(options.dense);
+  const s = String(value ?? "").toLowerCase();
+  if (s === "active")
+    return `${B} border-emerald-200/90 bg-emerald-100 text-emerald-900 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50`;
+  if (s === "expired")
+    return `${B} border-red-200/90 bg-red-100 text-red-900 dark:border-rose-400/45 dark:bg-rose-500/18 dark:text-rose-50`;
+  if (s === "upcoming")
+    return `${B} border-amber-200/90 bg-amber-100 text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50`;
   return `${B} border-slate-200/80 bg-gray-100 text-gray-600 dark:border-slate-500/35 dark:bg-slate-500/15 dark:text-slate-200`;
 }
 

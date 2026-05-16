@@ -4,6 +4,8 @@ import { ICashVoucher } from "../types/cashVoucher.type";
 const cashVoucherSchema = new Schema<ICashVoucher>(
   {
     voucherNumber: { type: String, required: true, unique: true },
+    /** Transaction date chosen by user (optional; UI falls back to createdAt). */
+    voucherDate: { type: Date },
     amount: { type: Number, required: true },
     debitFrom: { type: String, required: true },
     creditTo: { type: String, required: true },

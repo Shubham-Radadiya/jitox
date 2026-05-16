@@ -17,6 +17,7 @@ export const dashboardUiService = {
 
   getSchemes: (params) => dashboardUiApi.getSchemes(params),
   createScheme: (body) => dashboardUiApi.createScheme(body),
+  updateScheme: (id, body) => dashboardUiApi.updateScheme(id, body),
   deleteScheme: (id) => dashboardUiApi.deleteScheme(id),
 
   getDocuments: (params) => dashboardUiApi.getDocuments(params),

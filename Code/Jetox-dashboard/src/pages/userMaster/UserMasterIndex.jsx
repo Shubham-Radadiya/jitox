@@ -24,6 +24,29 @@ import { AddressTableCell } from "../../components/address/AddressDisplay";
 import { addressFromUser, buildTableSummary } from "../../utils/addressFormat";
 import { TABLE_ACTION_ICON_BTN, tableTdClasses } from "../../utils/tableUi";
 import { mergePageAddButton } from "../../utils/pageAddButton";
+import { buildUploadUrl } from "../../utils/uploadUrl";
+
+function pickFormField(payload, key) {
+  if (payload instanceof FormData) {
+    const v = payload.get(key);
+    return v != null && v !== "" ? String(v) : "";
+  }
+  return payload[key] != null ? String(payload[key]) : "";
+}
+
+function pickPayloadPermissions(payload) {
+  if (payload instanceof FormData) {
+    const raw = payload.get("permissions");
+    if (raw == null || raw === "") return [];
+    try {
+      const v = JSON.parse(String(raw));
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  return payload.permissions;
+}
 
 function mapApiUserToRow(u) {
   const id = u._id || u.id;
@@ -42,7 +65,8 @@ function mapApiUserToRow(u) {
     "Phone No": u.phone || "-",
     Role: u.role,
     "Total Users": "-",
-    Region: u.city || "-",
+    region: u.region || "",
+    Region: u.region || u.city || "-",
     Area: u.district || u.taluka || "-",
     Address: u.addressSummary || buildTableSummary(addr),
     streetAddress: addr.streetAddress,
@@ -58,7 +82,8 @@ function mapApiUserToRow(u) {
       ? new Date(u.createdAt).toISOString().slice(0, 10)
       : "-",
     isActive: true,
-    image: null,
+    image: u.profilePhoto ? buildUploadUrl(u.profilePhoto) : null,
+    profilePhoto: u.profilePhoto,
     permissions: u.permissions || [],
     roleLower: (u.role || "").toLowerCase(),
   };
@@ -173,10 +198,10 @@ const UserMasterIndex = () => {
     const { data } = await userService.create(payload);
     const created = data.user;
     setLastAddedUser({
-      name: created.name || payload.firstName,
+      name: created.name || "—",
       role: created.role,
-      region: payload.city || "—",
-      assignedAreas: payload.district || "—",
+      region: created.region || created.city || "—",
+      assignedAreas: created.district || "—",
     });
     await loadUsers();
     setIsSuccessModalOpen(true);
@@ -194,7 +219,11 @@ const UserMasterIndex = () => {
     const changes = [];
 
     const prevRegion = previous.Region || "—";
-    const nextRegion = updated.Region || payload.city || "—";
+    const nextRegion =
+      updated.Region ||
+      pickFormField(payload, "region") ||
+      pickFormField(payload, "city") ||
+      "—";
     if (normalized(prevRegion) !== normalized(nextRegion)) {
       changes.push({
         label: "Region",
@@ -204,7 +233,8 @@ const UserMasterIndex = () => {
     }
 
     const prevArea = previous.Area || "—";
-    const nextArea = updated.Area || payload.district || "—";
+    const nextArea =
+      updated.Area || pickFormField(payload, "district") || "—";
     if (normalized(prevArea) !== normalized(nextArea)) {
       changes.push({
         label: "Area",
@@ -214,7 +244,8 @@ const UserMasterIndex = () => {
     }
 
     const prevRole = previous.Role || previous.role || "User";
-    const nextRole = updated.Role || payload.role || "User";
+    const nextRole =
+      updated.Role || pickFormField(payload, "role") || "User";
     if (normalized(prevRole) !== normalized(nextRole)) {
       changes.push({
         label: "Role",
@@ -228,8 +259,8 @@ const UserMasterIndex = () => {
       previous.Role || previous.role
     );
     const nextModules = permLabels(
-      payload.permissions,
-      payload.role || updated.Role || updated.role
+      pickPayloadPermissions(payload),
+      pickFormField(payload, "role") || updated.Role || updated.role
     );
     if (normalized(prevModules) !== normalized(nextModules)) {
       changes.push({
@@ -241,7 +272,11 @@ const UserMasterIndex = () => {
 
     setSelectedUser(updated);
     setLastEditSummary({
-      name: updated["User Name"] || previous["User Name"] || payload.firstName || "User",
+      name:
+        updated["User Name"] ||
+        previous["User Name"] ||
+        pickFormField(payload, "firstName") ||
+        "User",
       changes,
     });
     setIsEditSuccessOpen(true);

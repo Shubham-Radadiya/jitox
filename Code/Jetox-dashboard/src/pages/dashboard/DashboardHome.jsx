@@ -952,6 +952,11 @@ function DashboardHome() {
                     {item.name}
                   </div>
                   <div className="text-xs font-semibold text-dark">{item.qty}</div>
+                  {item.amountLabel ? (
+                    <div className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                      {item.amountLabel}
+                    </div>
+                  ) : null}
                   <div
                     className={`text-[10px] ${item.changePct >= 0 ? "text-primary" : "text-red-500"}`}
                   >

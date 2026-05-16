@@ -75,6 +75,7 @@ function rowMoney(row, gstRate) {
  * Purchase invoice UI for the wide modal — tuned for clarity, touch targets, and scanability.
  */
 export default function InvoicePurchaseModalLayout({
+  formType = "purchase",
   dropdownOptions,
   liveNow,
   onClose,
@@ -184,6 +185,39 @@ export default function InvoicePurchaseModalLayout({
   const displayGrand = Math.round(rawGrand);
   const roundDelta = roundOff ? displayGrand - rawGrand : 0;
 
+  const isReturn = formType === "purchase-return";
+  const isSales = formType === "sales";
+  const headerEyebrow = isSales
+    ? "Sales invoice"
+    : isReturn
+      ? "Purchase return"
+      : "Purchase invoice";
+  const headerTitle = isSales
+    ? "Create Sales Invoice"
+    : isReturn
+      ? "Create Purchase Return"
+      : "Create Purchase Invoice";
+  const billFromEyebrow = isSales
+    ? "Bill to"
+    : isReturn
+      ? "Return to"
+      : "Bill from";
+  const shipFromEyebrow = isSales
+    ? "Ship to"
+    : isReturn
+      ? "Ship from (your end)"
+      : "Ship from";
+  const invoiceSectionTitle = isSales
+    ? "Sales details"
+    : isReturn
+      ? "Return details"
+      : "Invoice details";
+  const stockToggleLabel = isSales
+    ? "Decrease stock when this sale is saved"
+    : isReturn
+      ? "Decrease stock when this return is saved"
+      : "Update stock when this voucher is saved";
+
   return (
     <div className="flex min-h-0 flex-col bg-gradient-to-b from-slate-100/95 via-slate-50/90 to-slate-100/80 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 px-3 py-2.5 shadow-[0_4px_24px_-8px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-slate-700/90 dark:bg-slate-900/98 dark:shadow-[0_4px_24px_-8px_rgba(0,0,0,0.35)] sm:px-4 sm:py-3">
@@ -199,10 +233,10 @@ export default function InvoicePurchaseModalLayout({
             </button>
             <div className="min-w-0 border-l border-slate-200/90 pl-3 dark:border-slate-600">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary dark:text-emerald-400">
-                Purchase invoice
+                {headerEyebrow}
               </p>
               <h2 className="text-[1.05rem] font-bold leading-snug tracking-tight text-slate-900 dark:text-slate-50 sm:truncate sm:text-lg">
-                Create Purchase Invoice
+                {headerTitle}
               </h2>
               <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:hidden">
                 Totals and taxes update as you fill each line.
@@ -491,7 +525,7 @@ export default function InvoicePurchaseModalLayout({
               <div className="mb-2.5 flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                   <Building2 className="h-3.5 w-3.5 shrink-0 text-primary dark:text-emerald-400" aria-hidden />
-                  Bill from
+                  {billFromEyebrow}
                 </span>
                 <span className="shrink-0 text-[11px] font-semibold text-primary dark:text-emerald-400">
                   Change party
@@ -535,7 +569,7 @@ export default function InvoicePurchaseModalLayout({
               <div className="mb-2.5 flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                   <Truck className="h-3.5 w-3.5 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-                  Ship from
+                  {shipFromEyebrow}
                 </span>
                 <span className="shrink-0 text-[11px] font-semibold text-primary dark:text-emerald-400">
                   Change shipping
@@ -595,7 +629,7 @@ export default function InvoicePurchaseModalLayout({
                 strokeWidth={2}
                 aria-hidden
               />
-              Invoice details
+              {invoiceSectionTitle}
             </h3>
             <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 sm:gap-y-4 lg:grid-cols-3 xl:grid-cols-6 [&_input]:!text-[14px] [&_input]:!leading-tight [&_textarea]:!text-[14px] [&_textarea]:!leading-tight sm:[&_input]:!text-[13px] sm:[&_textarea]:!text-[13px] max-sm:[&_input]:!min-h-11 max-sm:[&_.ant-picker]:!min-h-[2.75rem]">
               <div className="min-w-0">
@@ -1150,7 +1184,7 @@ export default function InvoicePurchaseModalLayout({
                         checked={stockToggle}
                         onChange={(e) => setStockToggle(e.target.checked)}
                       />
-                      Update stock when this voucher is saved
+                      {stockToggleLabel}
                     </label>
                   </div>
                 </>

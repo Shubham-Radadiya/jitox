@@ -14,6 +14,7 @@ import {
   employeesTrackingSeed,
   type EmployeeSeed,
 } from "../data/employeeTracking.seed";
+import { productLineAmount, resolveProductUnit } from "../utils/productUnit";
 
 function parseRupeeAmount(s: string): number {
   const n = Number(
@@ -23,6 +24,14 @@ function parseRupeeAmount(s: string): number {
       .trim()
   );
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Demo seed prefixes product names; store and return clean names on schemes. */
+function stripJitoxDemoProductNamePrefix(name: string): string {
+  const s = String(name ?? "").trim();
+  if (!s) return s;
+  const stripped = s.replace(/^JITOX-DEMO\s+/i, "").trim();
+  return stripped || s;
 }
 
 function formatPayableDisplayDate(iso: string): string {
@@ -486,9 +495,7 @@ export async function fetchStockSummary() {
   for (const p of products) {
     const qty = Number(p.quantity) || 0;
     const min = Number(p.minimumReorderLevel) || 0;
-    const rate = Number(p.rate) || Number(p.billingRatePerUnit) || 0;
-    const lineAmt = Number(p.amout) || qty * rate;
-    totalValue += lineAmt;
+    totalValue += productLineAmount(p);
     if (qty <= 0) outStock += 1;
     else if (min > 0 && qty < min) lowStock += 1;
     else inStock += 1;
@@ -507,15 +514,18 @@ export async function fetchStockProducts(group: string) {
   const products = await Product.find().sort({ productName: 1 }).lean();
   let list = products.map((p) => {
     const qty = Number(p.quantity) || 0;
-    const rate = Number(p.rate) || Number(p.billingRatePerUnit) || 0;
+    const rate =
+      p.rate != null && Number.isFinite(Number(p.rate))
+        ? Number(p.rate)
+        : Number(p.billingRatePerUnit) || 0;
     const min = Number(p.minimumReorderLevel) || 50;
-    const valueNum = Number(p.amout) || qty * rate;
+    const valueNum = productLineAmount(p);
     return {
       product: p.productName,
       sku: p.batchNo || String(p._id).slice(-8),
       group: p.group || "—",
       category: p.category || "—",
-      unit: p.alternateUnits || String(p.units ?? ""),
+      unit: resolveProductUnit(p.units) || String(p.alternateUnits || ""),
       qty,
       rate,
       value: formatInr(Math.round(valueNum)),
@@ -539,7 +549,11 @@ export async function createStockProductFromUi(body: Record<string, unknown>) {
   const rate =
     Number(body.rate) || Number(body.billingRate) || Number(body.billingRatePerUnit) || 0;
   const minReorder = Number(body.minReorderLevel) || 50;
-  const units = Number(body.units) || 1;
+  const unitsRaw = body.units ?? body.alternateUnits ?? "kg";
+  const units =
+    typeof unitsRaw === "string" && unitsRaw.trim()
+      ? String(unitsRaw).trim()
+      : String(unitsRaw || "kg");
   const doc = new Product({
     productName: String(body.productName || "New Product").trim() || "New Product",
     category: String(body.category || "General").trim() || "General",
@@ -548,18 +562,26 @@ export async function createStockProductFromUi(body: Record<string, unknown>) {
     billingRatePerUnit: rate,
     quantity: qty,
     rate,
-    amout: Math.round(qty * rate),
+    amout:
+      body.amout != null && Number.isFinite(Number(body.amout))
+        ? Number(body.amout)
+        : body.amount != null && Number.isFinite(Number(body.amount))
+          ? Number(body.amount)
+          : Math.round(qty * rate),
     minimumReorderLevel: minReorder,
-    alternateUnits: String(body.units || "Kg"),
+    alternateUnits: body.alternateUnits
+      ? String(body.alternateUnits).trim()
+      : undefined,
   });
   const saved = await doc.save();
-  const valueNum = Number(saved.amout) || qty * rate;
+  const valueNum = productLineAmount(saved);
   const row = {
     product: saved.productName,
     sku: saved.batchNo || String(saved._id).slice(-8),
     group: saved.group,
     category: saved.category,
-    unit: saved.alternateUnits || String(saved.units),
+    unit:
+      resolveProductUnit(saved.units) || String(saved.alternateUnits || ""),
     qty: Number(saved.quantity) || 0,
     rate: Number(saved.rate) || rate,
     value: formatInr(Math.round(valueNum)),
@@ -609,8 +631,11 @@ export async function fetchStockGroups() {
     }
     const g = byGroup.get(gName)!;
     const qty = Number(p.quantity) || 0;
-    const rate = Number(p.rate) || Number(p.billingRatePerUnit) || 0;
-    const line = Number(p.amout) || qty * rate;
+    const rate =
+      p.rate != null && Number.isFinite(Number(p.rate))
+        ? Number(p.rate)
+        : Number(p.billingRatePerUnit) || 0;
+    const line = productLineAmount(p);
     g.valueNum += line;
     if (!g.categories.has(cName)) {
       g.categories.set(cName, {
@@ -673,7 +698,8 @@ export async function fetchSchemesFiltered(query: Record<string, unknown>) {
   const rows = list.map((s) => ({
     id: String(s._id),
     "Scheme Name": s.schemeName,
-    "Applied Products": s.appliedProducts,
+    "Scheme Description": String(s.schemeDescription ?? "").trim(),
+    "Applied Products": stripJitoxDemoProductNamePrefix(s.appliedProducts),
     Type: s.schemeType,
     "Target Audience": s.targetAudience,
     "Offer Name": s.offerDetails,
@@ -683,10 +709,37 @@ export async function fetchSchemesFiltered(query: Record<string, unknown>) {
   return { schemes: rows, total: all.length };
 }
 
+function marketingSchemeToRow(s: {
+  _id: unknown;
+  schemeName: string;
+  schemeDescription?: string;
+  appliedProducts: string;
+  schemeType: string;
+  targetAudience: string;
+  offerDetails: string;
+  startDate: string;
+  endDate: string;
+}) {
+  return {
+    id: String(s._id),
+    "Scheme Name": s.schemeName,
+    "Scheme Description": String(s.schemeDescription ?? "").trim(),
+    "Applied Products": stripJitoxDemoProductNamePrefix(s.appliedProducts),
+    Type: s.schemeType,
+    "Target Audience": s.targetAudience,
+    "Offer Name": s.offerDetails,
+    "Start Date": s.startDate,
+    "End Date": s.endDate,
+  };
+}
+
 export async function createMarketingScheme(body: Record<string, unknown>) {
   const doc = await MarketingScheme.create({
     schemeName: String(body.schemeName || "New Scheme"),
-    appliedProducts: String(body.appliedProducts || "-"),
+    schemeDescription: String(body.schemeDescription ?? "").trim(),
+    appliedProducts: stripJitoxDemoProductNamePrefix(
+      String(body.appliedProducts || "-")
+    ),
     schemeType: String(body.schemeType || "Cashback"),
     targetAudience: String(body.targetAudience || "Farmer"),
     offerDetails: String(body.offerDetails || "-"),
@@ -695,17 +748,44 @@ export async function createMarketingScheme(body: Record<string, unknown>) {
   });
   const s = doc.toObject();
   return {
-    scheme: {
-      id: String(s._id),
-      "Scheme Name": s.schemeName,
-      "Applied Products": s.appliedProducts,
-      Type: s.schemeType,
-      "Target Audience": s.targetAudience,
-      "Offer Name": s.offerDetails,
-      "Start Date": s.startDate,
-      "End Date": s.endDate,
-    },
+    scheme: marketingSchemeToRow(s),
   };
+}
+
+export async function updateMarketingScheme(
+  id: string,
+  body: Record<string, unknown>
+): Promise<{ scheme: ReturnType<typeof marketingSchemeToRow> } | null> {
+  if (!mongoose.Types.ObjectId.isValid(id)) return null;
+  const doc = await MarketingScheme.findByIdAndUpdate(
+    id,
+    {
+      schemeName: String(body.schemeName || "New Scheme"),
+      schemeDescription: String(body.schemeDescription ?? "").trim(),
+      appliedProducts: stripJitoxDemoProductNamePrefix(
+        String(body.appliedProducts || "-")
+      ),
+      schemeType: String(body.schemeType || "Cashback"),
+      targetAudience: String(body.targetAudience || "Farmer"),
+      offerDetails: String(body.offerDetails || "-"),
+      startDate: String(body.startDate || ""),
+      endDate: String(body.endDate || ""),
+    },
+    { new: true, runValidators: true }
+  ).lean();
+  if (!doc) return null;
+  const d = doc as {
+    _id: unknown;
+    schemeName: string;
+    schemeDescription?: string;
+    appliedProducts: string;
+    schemeType: string;
+    targetAudience: string;
+    offerDetails: string;
+    startDate: string;
+    endDate: string;
+  };
+  return { scheme: marketingSchemeToRow(d) };
 }
 
 export async function deleteMarketingScheme(id: string) {

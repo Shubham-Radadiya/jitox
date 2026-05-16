@@ -12,6 +12,7 @@ import {
   getStockGroups,
   getSchemes,
   postScheme,
+  putScheme,
   deleteScheme,
   getDocuments,
   postDocumentCategory,
@@ -45,6 +46,7 @@ router.get("/stock/groups", getStockGroups);
 
 router.get("/schemes", getSchemes);
 router.post("/schemes", postScheme);
+router.put("/schemes/:id", putScheme);
 router.delete("/schemes/:id", deleteScheme);
 
 router.get("/documents", getDocuments);

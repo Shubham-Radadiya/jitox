@@ -15,6 +15,11 @@ const receiptVoucherSchema = new Schema<IReceiptVoucher>(
       default: "Pending",
       enum: ["Pending", "Paid"],
     },
+    /** Optional back-link to the sales voucher this collection is against. */
+    sourceSalesId: {
+      type: Schema.Types.ObjectId,
+      ref: "SalesVoucher",
+    },
   },
   {
     timestamps: true,

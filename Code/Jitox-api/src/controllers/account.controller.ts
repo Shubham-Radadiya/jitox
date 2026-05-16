@@ -7,6 +7,7 @@ import { sendSuccess } from "../utils/apiResponse";
 import {
   classifyCustomersByQuotations,
   isCustomerAccount,
+  type CustomerActivityClassification,
 } from "../services/customerActivity.service";
 import {
   assertRequiredAddressParts,
@@ -159,8 +160,27 @@ export const getAllAccounts = async (
       filter.accountType = { $regex: /^customer$/i };
     }
     const accounts = await Account.find(filter).sort({ createdAt: -1 }).lean();
-    const settings = await getOrCreateSystemSettings();
-    const classification = await classifyCustomersByQuotations(settings);
+
+    let classification: CustomerActivityClassification;
+    try {
+      const settings = await getOrCreateSystemSettings();
+      classification = await classifyCustomersByQuotations(settings);
+    } catch (activityErr) {
+      console.error(
+        "[accounts] Customer activity classification failed; listing accounts without activity flags.",
+        activityErr
+      );
+      classification = {
+        total: 0,
+        active: 0,
+        inactive: 0,
+        activeNames: [],
+        inactiveNames: [],
+        idToStatus: new Map(),
+        activePartyKeys: new Set(),
+        cutoff: new Date(),
+      };
+    }
 
     const enriched = accounts.map((a) => {
       const row = enrichAccountJson({ ...a } as Record<string, unknown>);

@@ -1,9 +1,41 @@
 import { Request, Response } from "express";
-import { JournalVoucher, Account, PurchaseVoucher } from "../models/index";
+import { JournalVoucher, Account } from "../models/index";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
+
+/**
+ * Next journal voucher no. in `JITOX-DEMO-JV-001` form — scans existing
+ * `JITOX-DEMO-JV-###` codes so sequencing continues past seeded / legacy data.
+ */
+async function computeNextJournalVoucherNo(): Promise<string> {
+  const docs = await JournalVoucher.find().select("voucherNo").lean();
+  let max = 0;
+  const re = /^JITOX-DEMO-JV-(\d+)$/i;
+  for (const d of docs) {
+    const v = String(d?.voucherNo ?? "").trim();
+    const m = re.exec(v);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n)) max = Math.max(max, n);
+    }
+  }
+  return `JITOX-DEMO-JV-${String(max + 1).padStart(3, "0")}`;
+}
+
+export const getNextJournalVoucherNo = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const voucherNo = await computeNextJournalVoucherNo();
+    res.status(200).json({ voucherNo });
+  } catch (error) {
+    console.error("Get next journal voucher no Error:", error);
+    throw error;
+  }
+};
 
 export const createJournalVoucher = async (
   req: Request,
@@ -30,11 +62,29 @@ export const createJournalVoucher = async (
     ] as const;
 
     validateAndRespond(req.body, requiredFields, res);
-    // const existingVoucher = await PaymentVoucher.findOne({ voucherNo });
-    // if (existingVoucher) {
-    //   res.status(400).json({ message: "Voucher number already exists." });
-    //   return;
-    // }
+
+    const debitNum = Number(debitAmount);
+    const creditNum = Number(creditAmount);
+    if (!Number.isFinite(debitNum) || !Number.isFinite(creditNum) || debitNum <= 0) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Debit and credit amounts must be positive numbers."
+      );
+    }
+    if (Math.abs(debitNum - creditNum) > 0.005) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Journal debit and credit amounts must match."
+      );
+    }
+
+    const duplicateNo = await JournalVoucher.findOne({ voucherNo });
+    if (duplicateNo) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Journal voucher number already exists."
+      );
+    }
 
     const accountFrom = await Account.findOne({ _id: paymentBy });
     if (!accountFrom) {
@@ -58,16 +108,6 @@ export const createJournalVoucher = async (
       );
     }
 
-    const voucherNotFoundInPurchase = await PurchaseVoucher.findOne({
-      voucherNo,
-    });
-    if (!voucherNotFoundInPurchase) {
-      throw new AppError(
-        HttpStatusCode.BAD_REQUEST,
-        "Voucher number does not exist in Purchase Vouchers."
-      );
-    }
-
     const newVoucher = new JournalVoucher({
       voucherNo,
       date,
@@ -82,11 +122,11 @@ export const createJournalVoucher = async (
     const savedVoucher = await newVoucher.save();
 
     res.status(201).json({
-      message: "Payment voucher created successfully.",
+      message: "Journal voucher created successfully.",
       voucher: savedVoucher,
     });
   } catch (error) {
-    console.error("Create Payment Voucher Error:", error);
+    console.error("Create Journal Voucher Error:", error);
     throw error;
   }
 };
@@ -116,7 +156,7 @@ export const getAllJournalVouchers = async (
       vouchers.length ? "" : "No journal vouchers found."
     );
   } catch (error) {
-    console.error("Get All Payment Vouchers Error:", error);
+    console.error("Get All Journal Vouchers Error:", error);
     throw error;
   }
 };
@@ -147,18 +187,98 @@ export const updateJournalVoucher = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
-    const updatedVoucher = await JournalVoucher.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    );
-    if (!updatedVoucher) {
+    const existing = await JournalVoucher.findById(id);
+    if (!existing) {
       throw new AppError(
         HttpStatusCode.NOT_FOUND,
         "Journal voucher not found."
       );
     }
+
+    const b = req.body as Record<string, unknown>;
+    const voucherNo =
+      b.voucherNo != null && String(b.voucherNo).trim() !== ""
+        ? String(b.voucherNo).trim()
+        : existing.voucherNo;
+    const date =
+      b.date != null ? new Date(String(b.date)) : (existing.date as Date);
+    const paymentBy = (b.paymentBy ?? existing.paymentBy) as string;
+    const paymentTo = (b.paymentTo ?? existing.paymentTo) as string;
+    const debitNum =
+      b.debitAmount != null && b.debitAmount !== ""
+        ? Number(b.debitAmount)
+        : Number(existing.debitAmount);
+    const creditNum =
+      b.creditAmount != null && b.creditAmount !== ""
+        ? Number(b.creditAmount)
+        : Number(existing.creditAmount);
+    const remarks =
+      b.remarks != null ? String(b.remarks) : existing.remarks ?? "";
+    const status =
+      b.status != null && String(b.status).trim() !== ""
+        ? String(b.status).trim()
+        : existing.status ?? "Pending";
+
+    if (!Number.isFinite(debitNum) || !Number.isFinite(creditNum) || debitNum <= 0) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Debit and credit amounts must be positive numbers."
+      );
+    }
+    if (Math.abs(debitNum - creditNum) > 0.005) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Journal debit and credit amounts must match."
+      );
+    }
+
+    const dup = await JournalVoucher.findOne({
+      voucherNo,
+      _id: { $ne: id },
+    });
+    if (dup) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Journal voucher number already exists."
+      );
+    }
+
+    const accountFrom = await Account.findOne({ _id: paymentBy });
+    if (!accountFrom) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        `Account '${paymentBy}' does not exist.`
+      );
+    }
+    const accountTo = await Account.findOne({ _id: paymentTo });
+    if (!accountTo) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        `Account '${paymentTo}' does not exist.`
+      );
+    }
+    if (String(paymentBy) === String(paymentTo)) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Payment By and Payment To cannot be the same."
+      );
+    }
+
+    const updatedVoucher = await JournalVoucher.findByIdAndUpdate(
+      id,
+      {
+        voucherNo,
+        date,
+        paymentBy,
+        paymentTo,
+        debitAmount: debitNum,
+        creditAmount: creditNum,
+        remarks,
+        status,
+      },
+      { new: true }
+    );
+
     res.status(200).json({
       message: "Journal voucher updated successfully.",
       voucher: updatedVoucher,

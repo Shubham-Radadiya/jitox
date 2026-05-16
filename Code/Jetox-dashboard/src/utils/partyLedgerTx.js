@@ -177,8 +177,8 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
         kind: "cash",
         _id: cv._id,
         raw: cv,
-        date: cv.createdAt,
-        dateIso: toIsoDate(cv.createdAt),
+        date: cv.voucherDate || cv.createdAt,
+        dateIso: toIsoDate(cv.voucherDate || cv.createdAt),
         voucherType: "Cash",
         voucherNo: cv.voucherNumber || "—",
         particulars:

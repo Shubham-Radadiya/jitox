@@ -60,6 +60,8 @@ async function seedDemoMarketingSchemes(): Promise<void> {
   await MarketingScheme.insertMany([
     {
       schemeName: `${DEMO_PREFIX} Monsoon Farmer Cashback`,
+      schemeDescription:
+        "Instant cashback on eligible crop nutrition products for the monsoon window.",
       appliedProducts: "Organic Fertilizer 50kg",
       schemeType: "Cashback",
       targetAudience: "Farmer",
@@ -69,6 +71,8 @@ async function seedDemoMarketingSchemes(): Promise<void> {
     },
     {
       schemeName: `${DEMO_PREFIX} Dealer Bulk Discount`,
+      schemeDescription:
+        "Volume-based discount for dealers stocking hybrid maize for the season.",
       appliedProducts: "Hybrid Maize Seeds",
       schemeType: "Discount",
       targetAudience: "Dealer",

@@ -2,10 +2,13 @@ import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import PurchaseDetails from "./purchase/PurchaseDetails";
+import SalesDetailsDrawer from "./sales/SalesDetailsDrawer";
 import {
   fetchPurchaseDetail,
   fetchPurchaseReturnDetail,
   fetchSalesOrderDetail,
+  fetchJournalDetail,
+  fetchManufacturingDetail,
 } from "./voucherDetailFetchers.jsx";
 import { parseRupeeCell, fmtRupee } from "../../utils/voucherRowMappers";
 import {
@@ -22,7 +25,7 @@ import {
 } from "../../utils/voucherShare";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { buildUploadUrl } from "../../utils/uploadUrl";
-import { IoEyeOutline } from "react-icons/io5";
+import { IoEyeOutline, IoDocumentTextOutline } from "react-icons/io5";
 import { TbEdit } from "react-icons/tb";
 import {
   BadgeCheck,
@@ -32,6 +35,10 @@ import {
   Plus,
   Share2,
   Trash2,
+  Play,
+  CircleCheck,
+  Pause,
+  Square,
 } from "lucide-react";
 import PaymentModal from "./modals/PaymentModal";
 import ReceiptModal from "./modals/ReceiptModal";
@@ -39,6 +46,8 @@ import ExpenseModal from "./modals/ExpenseModal";
 import CashTransferModal from "./modals/CashTransferModal";
 import BankToCashModal from "./modals/BankToCashModal";
 import JournalModal from "./modals/JournalModal";
+import JournalDetailsDrawer from "./JournalDetailsDrawer";
+import ManufacturingDetailsDrawer from "./manufacturing/ManufacturingDetailsDrawer";
 
 dayjs.extend(customParseFormat);
 
@@ -206,13 +215,14 @@ const bankColumns = [
 ];
 
 const manufacturingColumns = [
-  "Batch",
-  "Product",
-  "Qty",
-  "Start Date",
-  "End Date",
+  "Batch ID",
+  "Product Name",
+  "Date",
+  "Qty Made",
+  "Cost/Unit",
+  "Total Cost",
   "Status",
-  "Actions",
+  "Action",
 ];
 
 const journalColumns = [
@@ -267,6 +277,11 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
     attach: "Attach",
     approve: "Approve",
     delete: "Delete",
+    voucherDocument: "Document",
+    mfgStart: "Start manufacturing",
+    mfgComplete: "Complete / add to stock",
+    mfgPause: "Pause",
+    mfgStop: "Mark failed",
   };
 
   /** Named group so tooltips only react to this wrapper, not the `<tr class="group">` in TableContent */
@@ -331,19 +346,38 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
           if (action.type === "payReqSend") {
             // Only show if status is Pending (unless condition is disabled)
             if (action.showCondition !== false && row.Status !== "Pending") return null;
+            /**
+             * `isDisabled(row)` lets a per-row config gate the click (e.g. a
+             * sales row that already has a linked Payment Voucher). When
+             * disabled we render a muted, no-op button with an explanatory
+             * tooltip so the user understands why it's inert.
+             */
+            const disabled =
+              typeof action.isDisabled === "function" && !!action.isDisabled(row);
+            const tooltip =
+              disabled && action.disabledTooltip
+                ? action.disabledTooltip
+                : action.tooltip || tooltipLabels.payReqSend;
             return renderButtonWithTooltip(
               <button
                 type="button"
                 onClick={() => {
+                  if (disabled) return;
                   if (action.onClick) action.onClick(row, navigate);
                   else toast.success("Payment request flow opens from Add voucher on the list.");
                 }}
-                className="hover:text-blue transition"
+                disabled={disabled}
+                className={
+                  disabled
+                    ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                    : "hover:text-blue transition"
+                }
                 aria-label="Request Send Pay Now"
+                aria-disabled={disabled || undefined}
               >
                 <CreditCard size={18} />
               </button>,
-              action.tooltip || tooltipLabels.payReqSend,
+              tooltip,
               index
             );
           }
@@ -442,6 +476,76 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
                 <Trash2 size={18} />
               </button>,
               action.tooltip || tooltipLabels.delete,
+              index
+            );
+          }
+          if (action.type === "voucherDocument") {
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => action.onClick?.(row, navigate)}
+                className="hover:text-blue transition"
+                aria-label="Document"
+              >
+                <IoDocumentTextOutline size={18} />
+              </button>,
+              action.tooltip || tooltipLabels.voucherDocument,
+              index
+            );
+          }
+          if (action.type === "mfgStart") {
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => action.onClick?.(row, navigate)}
+                className="hover:text-emerald-600 transition"
+                aria-label="Start manufacturing"
+              >
+                <Play size={18} />
+              </button>,
+              action.tooltip || tooltipLabels.mfgStart,
+              index
+            );
+          }
+          if (action.type === "mfgComplete") {
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => action.onClick?.(row, navigate)}
+                className="hover:text-emerald-600 transition"
+                aria-label="Complete manufacturing"
+              >
+                <CircleCheck size={18} />
+              </button>,
+              action.tooltip || tooltipLabels.mfgComplete,
+              index
+            );
+          }
+          if (action.type === "mfgPause") {
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => action.onClick?.(row, navigate)}
+                className="hover:text-blue transition"
+                aria-label="Pause"
+              >
+                <Pause size={18} />
+              </button>,
+              action.tooltip || tooltipLabels.mfgPause,
+              index
+            );
+          }
+          if (action.type === "mfgStop") {
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => action.onClick?.(row, navigate)}
+                className="hover:text-red transition"
+                aria-label="Stop"
+              >
+                <Square size={16} fill="currentColor" />
+              </button>,
+              action.tooltip || tooltipLabels.mfgStop,
               index
             );
           }
@@ -557,6 +661,46 @@ const salesBadgeRenderer = (key, value, defaultRenderer) => {
   return defaultRenderer(key, value);
 };
 
+function manufacturingStatusBadgeClasses(status) {
+  const s = String(status ?? "").trim();
+  if (s === "Completed") {
+    return "inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
+  }
+  if (s === "Failed") {
+    return "inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300";
+  }
+  if (s === "Planned") {
+    return "inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300";
+  }
+  if (s === "In Progress") {
+    return "text-sm font-medium text-blue";
+  }
+  if (s === "Paused") {
+    return "inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
+  }
+  return "inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600";
+}
+
+const manufacturingTableRenderer = (key, value, defaultRenderer) => {
+  if (key === "Date" && value && /^\d{4}-\d{2}-\d{2}/.test(String(value))) {
+    return (
+      <td className={`${tableTdClasses(key)} text-slate-600 dark:text-slate-400`}>
+        {dayjs(value).format("DD-MMM-YY")}
+      </td>
+    );
+  }
+  if (key === "Status") {
+    return (
+      <td className={tableTdClasses(key)}>
+        <div className={STATUS_CELL_INNER}>
+          <span className={manufacturingStatusBadgeClasses(value)}>{value}</span>
+        </div>
+      </td>
+    );
+  }
+  return defaultRenderer(key, value);
+};
+
 export const voucherConfigs = {
   purchase: {
     title: "Purchase Voucher",
@@ -648,20 +792,31 @@ export const voucherConfigs = {
     detailsComponent: PurchaseDetails,
     enableColumnPicker: false,
     renderRowCell: purchaseReturnRowRenderer,
-    filterFields: [],
+    filterFields: [
+      voucherAddButton({
+        key: "addPurchaseReturn",
+        action: "purchase-return-open",
+      }),
+    ],
     footerRenderer: purchaseReturnFooterRenderer,
     buildTableAction:
-      ({ openDetails, navigate, deletePurchaseReturnVoucher }) =>
+      ({
+        openDetails,
+        navigate,
+        openPurchaseReturnModal,
+        deletePurchaseReturnVoucher,
+      }) =>
       (row) =>
         createActionButtons(
           [
             { type: "eye" },
             {
+              type: "revoucher",
+              onClick: (r) => openPurchaseReturnModal?.(r, "revoucher"),
+            },
+            {
               type: "edit",
-              onClick: (_row, navigate) => {
-                navigate("/dashboard/accounting-voucher/add-purchase");
-                toast.success("Use purchase return flow when available; form opened for reference.");
-              },
+              onClick: (r) => openPurchaseReturnModal?.(r, "edit"),
             },
             {
               type: "delete",
@@ -687,7 +842,7 @@ export const voucherConfigs = {
               },
             },
           ],
-          { openDetails, navigate, row }
+          { openDetails, navigate, row, openPurchaseReturnModal }
         ),
   },
   sales: {
@@ -695,15 +850,73 @@ export const voucherConfigs = {
     columns: salesColumns,
     rowId: "Invoice No.",
     fetchDetail: fetchSalesOrderDetail,
-    detailsComponent: PurchaseDetails,
-    filterFields: [],
+    detailsComponent: SalesDetailsDrawer,
+    enableColumnPicker: true,
+    filterFields: [
+      voucherAddButton({
+        key: "addSales",
+        action: "sales-open",
+      }),
+    ],
     renderRowCell: salesBadgeRenderer,
     buildTableAction:
-      ({ navigate, openDetails }) =>
+      ({
+        navigate,
+        openDetails,
+        openSalesModal,
+        deleteSalesVoucher,
+        createPaymentRequestForSale,
+      }) =>
       (row) =>
         createActionButtons(
-          [{ type: "eye" }, { type: "payReqSend", showCondition: false }],
-          { openDetails, navigate, row }
+          [
+            { type: "eye" },
+            {
+              type: "payReqSend",
+              showCondition: false,
+              tooltip: "Send payment request — adds a row to Payment Voucher",
+              /**
+               * Disable when this sale already has a linked Payment Voucher
+               * (created via this same button). Backend also rejects a
+               * duplicate request server-side as a defence in depth.
+               */
+              isDisabled: (r) => Boolean(r?._raw?.paymentRequestId),
+              disabledTooltip: "Payment request already sent",
+              onClick: (r) => createPaymentRequestForSale?.(r),
+            },
+            {
+              type: "revoucher",
+              onClick: (r) => openSalesModal?.(r, "revoucher"),
+            },
+            {
+              type: "edit",
+              onClick: (r) => openSalesModal?.(r, "edit"),
+            },
+            {
+              type: "delete",
+              onClick: async (r) => {
+                if (
+                  !window.confirm(
+                    `Delete sales voucher ${r["Invoice No."] || ""}?`
+                  )
+                ) {
+                  return;
+                }
+                const id = r?._id;
+                if (!id || typeof deleteSalesVoucher !== "function") {
+                  toast.error("Cannot delete this row (missing id).");
+                  return;
+                }
+                try {
+                  await deleteSalesVoucher(id);
+                  toast.success("Sales voucher deleted.");
+                } catch (e) {
+                  toast.error(getApiErrorMessage(e, "Delete failed"));
+                }
+              },
+            },
+          ],
+          { openDetails, navigate, row, openSalesModal }
         ),
     footerRenderer: salesFooterRenderer,
   },
@@ -896,11 +1109,12 @@ export const voucherConfigs = {
     title: "Manufacturing",
     columns: manufacturingColumns,
     emptyState: {
-      title: "No manufacturing API",
+      title: "No manufacturing batches yet",
       description:
-        "Manufacturing batches are not exposed by the backend yet. Add a manufacturing route in Jitox-api to populate this list.",
+        "Use Add to start a batch. Save as planned, then start from the list when raw stock is available.",
     },
-    rowId: "Batch",
+    rowId: "Batch ID",
+    renderRowCell: manufacturingTableRenderer,
     filterFields: [
       voucherAddButton({
         key: "addManufacturing",
@@ -908,11 +1122,101 @@ export const voucherConfigs = {
         path: "/dashboard/accounting-voucher/add-manufacturing",
       }),
     ],
+    fetchDetail: fetchManufacturingDetail,
+    detailsComponent: ManufacturingDetailsDrawer,
+    buildTableAction:
+      ({
+        openDetails,
+        navigate,
+        startManufacturingBatch,
+        completeManufacturingBatch,
+        deleteManufacturingBatch,
+        openFailManufacturingForm,
+        openMfgBlockedModal,
+      }) =>
+      (row) => {
+        const status = String(row?.Status ?? "");
+        const stockBlocked =
+          Boolean(row?.stockBlocked) ||
+          (Array.isArray(row?.stockIssues) && row.stockIssues.length > 0) ||
+          (Array.isArray(row?._raw?.stockIssues) &&
+            row._raw.stockIssues.length > 0);
+        if (status === "Failed") {
+          return createActionButtons(
+            [
+              {
+                type: "eye",
+                tooltip: "View reason",
+                onClick: () => openDetails?.(row),
+              },
+            ],
+            { openDetails, navigate, row }
+          );
+        }
+        if (status === "Paused" || stockBlocked) {
+          const blockedActions = [
+            {
+              type: "eye",
+              tooltip: "View batch",
+              onClick: () => openDetails?.(row),
+            },
+            {
+              type: "mfgPause",
+              tooltip: "Low stock — view details",
+              onClick: () => openMfgBlockedModal?.(row),
+            },
+            {
+              type: "mfgStop",
+              tooltip: "Mark failed",
+              onClick: () => openFailManufacturingForm?.(row),
+            },
+          ];
+          return createActionButtons(blockedActions, {
+            openDetails,
+            navigate,
+            row,
+          });
+        }
+        const actions = [
+          {
+            type: "eye",
+            tooltip: "View batch",
+            onClick: () => openDetails?.(row),
+          },
+        ];
+        const rawStatus = String(row?._raw?.status ?? "");
+        if (rawStatus === "Planned" || status === "Planned") {
+          actions.push({
+            type: "mfgStart",
+            onClick: () => startManufacturingBatch?.(row),
+          });
+          actions.push({
+            type: "delete",
+            tooltip: "Delete planned batch",
+            onClick: () => deleteManufacturingBatch?.(row),
+          });
+        }
+        if (rawStatus === "In Progress" || status === "In Progress") {
+          actions.push({
+            type: "mfgStop",
+            tooltip: "Mark failed",
+            onClick: () => openFailManufacturingForm?.(row),
+          });
+          actions.push({
+            type: "mfgComplete",
+            tooltip: "Add warehouse / complete",
+            onClick: () => completeManufacturingBatch?.(row),
+          });
+        }
+        return createActionButtons(actions, { openDetails, navigate, row });
+      },
   },
   journal: {
     title: "Journal",
     columns: journalColumns,
     rowId: "Entry No",
+    fetchDetail: fetchJournalDetail,
+    detailsComponent: JournalDetailsDrawer,
     modals: [{ key: "journal-modal", component: JournalModal }],
     filterFields: [
       voucherAddButton({
@@ -921,6 +1225,23 @@ export const voucherConfigs = {
         modalKey: "journal-modal",
       }),
     ],
+    buildTableAction:
+      ({ openDetails, navigate, openJournalEdit, onVoucherDocument }) =>
+      (row) =>
+        createActionButtons(
+          [
+            { type: "eye" },
+            {
+              type: "edit",
+              onClick: () => openJournalEdit?.(row),
+            },
+            {
+              type: "voucherDocument",
+              onClick: () => onVoucherDocument?.(row),
+            },
+          ],
+          { openDetails, navigate, row }
+        ),
   },
   quotation: {
     title: "Quotation Voucher",

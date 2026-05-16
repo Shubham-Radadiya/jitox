@@ -228,8 +228,13 @@ const AccountIndex = () => {
     queryKey: ["accounts"],
     queryFn: async () => {
       try {
-        const { data } = await accountsApi.getAll({});
-        const list = Array.isArray(data) ? data : [];
+        const res = await accountsApi.getAll({});
+        const raw = res?.data;
+        const list = Array.isArray(raw)
+          ? raw
+          : raw && typeof raw === "object" && Array.isArray(raw.data)
+            ? raw.data
+            : [];
         return list.map(mapAccountToRow);
       } catch (e) {
         if (isEmptyListNotFound(e)) return [];

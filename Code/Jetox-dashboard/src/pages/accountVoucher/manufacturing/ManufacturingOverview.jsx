@@ -1,97 +1,142 @@
-import React, { useMemo, useState } from "react";
-import { Button, CommonDropdown, SearchBar } from "../../../components/ui/CommanUI";
+import React, { useEffect, useMemo, useState } from "react";
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
+import { CommonDropdown } from "../../../components/ui/CommanUI";
+import { fmtRupee } from "../../../utils/voucherRowMappers";
+import {
+  buildFinishedProductOptions,
+  buildManufacturingStatusSummary,
+  buildManufacturingTrend,
+  buildManufacturingTrendYears,
+  buildRawMaterialBreakdown,
+  buildTrendChartScale,
+  formatTrendAxisValue,
+  resolveManufacturingTrendYear,
+} from "./manufacturingOverviewUtils";
 
-const productOptions = [
-  { value: "all", label: "All Products" },
-  { value: "organic-fertilizer", label: "Organic Fertilizer" },
-  { value: "bio-pesticide", label: "Bio Pesticide" },
-  { value: "mulch-sheet", label: "Mulch Sheet" },
-];
+const CHART_BAR_MAX_PX = 180;
 
-const expenseFilterOptions = [
-  { value: "all", label: "Expense Type" },
-  { value: "raw", label: "Raw Material" },
-  { value: "packaging", label: "Packaging" },
-  { value: "labor", label: "Labor" },
-];
+const DONUT_CX = 80;
+const DONUT_CY = 80;
+const DONUT_INNER_R = 60;
+const DONUT_OUTER_R = 80;
 
-const trendTemplate = [
-  { month: "Jan", value: 1800 },
-  { month: "Feb", value: 1000 },
-  { month: "Mar", value: 2300 },
-  { month: "Apr", value: 3348 },
-  { month: "May", value: 1600 },
-  { month: "Jun", value: 4200 },
-  { month: "Jul", value: 1500 },
-  { month: "Aug", value: 2600 },
-  { month: "Sep", value: 2100 },
-  { month: "Oct", value: 3800 },
-  { month: "Nov", value: 1300 },
-  { month: "Dec", value: 1700 },
-];
+/** SVG arc cannot draw a full 360° slice — use a full ring path instead. */
+function getFullDonutRingPath(
+  innerRadius = DONUT_INNER_R,
+  outerRadius = DONUT_OUTER_R,
+  cx = DONUT_CX,
+  cy = DONUT_CY
+) {
+  return [
+    `M ${cx} ${cy - outerRadius}`,
+    `A ${outerRadius} ${outerRadius} 0 1 1 ${cx - 0.001} ${cy - outerRadius}`,
+    `M ${cx} ${cy - innerRadius}`,
+    `A ${innerRadius} ${innerRadius} 0 1 0 ${cx + 0.001} ${cy - innerRadius}`,
+    "Z",
+  ].join(" ");
+}
 
-const rawMaterialTemplate = [
-  { label: "Urea", value: 40, color: "bg-[#FFC857]" },
-  { label: "DAP", value: 20, color: "bg-[#58A4B0]" },
-  { label: "Neem Cake", value: 15, color: "bg-[#9B5DE5]" },
-  { label: "Green Manure", value: 15, color: "bg-[#41EAD4]" },
-  { label: "Bone Meal", value: 10, color: "bg-[#F95738]" },
-];
+function getDonutPath(
+  startAngle,
+  endAngle,
+  innerRadius = DONUT_INNER_R,
+  outerRadius = DONUT_OUTER_R,
+  cx = DONUT_CX,
+  cy = DONUT_CY
+) {
+  const sweep = endAngle - startAngle;
+  if (sweep >= 359.99) {
+    return getFullDonutRingPath(innerRadius, outerRadius, cx, cy);
+  }
 
-const donutColors = ["#FFC857", "#58A4B0", "#9B5DE5", "#41EAD4", "#F95738"];
+  const start = (startAngle * Math.PI) / 180;
+  const end = (endAngle * Math.PI) / 180;
+  const x1 = cx + outerRadius * Math.cos(start);
+  const y1 = cy + outerRadius * Math.sin(start);
+  const x2 = cx + outerRadius * Math.cos(end);
+  const y2 = cy + outerRadius * Math.sin(end);
+  const x3 = cx + innerRadius * Math.cos(end);
+  const y3 = cy + innerRadius * Math.sin(end);
+  const x4 = cx + innerRadius * Math.cos(start);
+  const y4 = cy + innerRadius * Math.sin(start);
+  const largeArc = sweep > 180 ? 1 : 0;
+  return `M ${x1} ${y1} A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x4} ${y4} Z`;
+}
 
-const ManufacturingOverview = ({
-  rows = []
-}) => {
-  const [selectedProduct, setSelectedProduct] = useState(productOptions[1].value);
+const ManufacturingOverview = ({ rows = [] }) => {
+  const productOptions = useMemo(
+    () => buildFinishedProductOptions(rows),
+    [rows]
+  );
+
+  const [selectedProduct, setSelectedProduct] = useState("all");
   const [hoveredMonth, setHoveredMonth] = useState(null);
   const [hoveredMaterial, setHoveredMaterial] = useState(null);
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
 
-  const statusSummary = useMemo(() => {
-    if (!rows.length) {
-      return {
-        total: 128,
-        completed: 110,
-        inProgress: 15,
-        planned: 0,
-        failed: 3,
-        totalCost: "₹6,20,000",
-      };
+  const trendYearOptions = useMemo(
+    () => buildManufacturingTrendYears(rows),
+    [rows]
+  );
+
+  const defaultTrendYear = useMemo(
+    () => resolveManufacturingTrendYear(rows),
+    [rows]
+  );
+
+  const [trendYear, setTrendYear] = useState(defaultTrendYear);
+
+  useEffect(() => {
+    setTrendYear((y) =>
+      trendYearOptions.includes(y) ? y : defaultTrendYear
+    );
+  }, [trendYearOptions, defaultTrendYear]);
+
+  useEffect(() => {
+    if (!productOptions.some((o) => o.value === selectedProduct)) {
+      setSelectedProduct("all");
     }
+  }, [productOptions, selectedProduct]);
 
-    const completed = rows.filter((row) => row.Status === "Completed").length;
-    const inProgress = rows.filter((row) => row.Status?.toLowerCase().includes("progress")).length;
-    const planned = rows.filter((row) => row.Status?.toLowerCase() === "planned").length;
-    const failed = rows.filter((row) => row.Status?.toLowerCase().includes("fail")).length;
-    return {
-      total: rows.length,
-      completed,
-      inProgress,
-      planned,
-      failed,
-      totalCost: `₹${(rows.length * 52000).toLocaleString("en-IN")}`,
-    };
-  }, [rows]);
+  const statusSummary = useMemo(
+    () => buildManufacturingStatusSummary(rows),
+    [rows]
+  );
 
-  // Calculate SVG path for donut segments
-  const getDonutPath = (startAngle, endAngle, innerRadius, outerRadius) => {
-    const start = (startAngle * Math.PI) / 180;
-    const end = (endAngle * Math.PI) / 180;
-    const x1 = 80 + outerRadius * Math.cos(start);
-    const y1 = 80 + outerRadius * Math.sin(start);
-    const x2 = 80 + outerRadius * Math.cos(end);
-    const y2 = 80 + outerRadius * Math.sin(end);
-    const x3 = 80 + innerRadius * Math.cos(end);
-    const y3 = 80 + innerRadius * Math.sin(end);
-    const x4 = 80 + innerRadius * Math.cos(start);
-    const y4 = 80 + innerRadius * Math.sin(start);
-    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-    return `M ${x1} ${y1} A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x4} ${y4} Z`;
-  };
+  const trendData = useMemo(
+    () => buildManufacturingTrend(rows, selectedProduct, trendYear),
+    [rows, selectedProduct, trendYear]
+  );
+
+  const trendScale = useMemo(
+    () => buildTrendChartScale(trendData),
+    [trendData]
+  );
+
+  const rawMaterialSlices = useMemo(
+    () => buildRawMaterialBreakdown(rows, selectedProduct),
+    [rows, selectedProduct]
+  );
 
   const donutSegments = useMemo(() => {
-    let currentAngle = -90; // Start from top
-    return rawMaterialTemplate.map((slice, index) => {
+    if (rawMaterialSlices.length === 1) {
+      const slice = rawMaterialSlices[0];
+      return [
+        {
+          ...slice,
+          value: 100,
+          startAngle: -90,
+          endAngle: 270,
+          middleAngle: 0,
+          isFullRing: true,
+          path: getFullDonutRingPath(),
+        },
+      ];
+    }
+
+    let currentAngle = -90;
+    return rawMaterialSlices.map((slice) => {
       const startAngle = currentAngle;
       const angle = (slice.value / 100) * 360;
       const endAngle = currentAngle + angle;
@@ -99,190 +144,313 @@ const ManufacturingOverview = ({
       currentAngle = endAngle;
       return {
         ...slice,
-        color: donutColors[index],
         startAngle,
         endAngle,
         middleAngle,
-        path: getDonutPath(startAngle, endAngle, 60, 80),
+        isFullRing: false,
+        path: getDonutPath(startAngle, endAngle),
       };
     });
-  }, []);
+  }, [rawMaterialSlices]);
+
+  const singleMaterial = rawMaterialSlices.length === 1 ? rawMaterialSlices[0] : null;
+
+  const pausedOrFailed = statusSummary.paused + statusSummary.failed;
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-slate-900 flex flex-col gap-3 2xl:gap-4">
-
+    <div className="min-w-0 rounded-2xl bg-white dark:bg-slate-900 flex flex-col gap-3 2xl:gap-4">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 border border-light-border rounded-2xl p-4 text-center dark:border-slate-600 dark:bg-slate-800/40">
         <div className="border-r border-light-border dark:border-slate-600">
-          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.total}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Total Batches</div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {statusSummary.total}
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Total Batches
+          </div>
         </div>
         <div className="border-r border-light-border dark:border-slate-600">
-          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.completed}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Completed Batches</div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {statusSummary.completed}
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Completed Batches
+          </div>
         </div>
         <div className="border-r border-light-border dark:border-slate-600">
-          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.inProgress}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">In-Progress</div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {statusSummary.inProgress}
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            In-Progress
+          </div>
         </div>
         <div className="border-r border-light-border dark:border-slate-600">
-          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.failed}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Failed/Paused</div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {pausedOrFailed}
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Failed/Paused
+          </div>
         </div>
-        <div>
-          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{statusSummary.totalCost}</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Total Cost</div>
+        <div className="col-span-2 text-center md:col-span-1">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {statusSummary.totalCost}
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Total Cost
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-      <div className="border border-light-border rounded-2xl p-4 dark:border-slate-600 dark:bg-slate-800/40">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="text-lg font-semibold text-dark ">Manufacturing Trend</div>
-
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-5 min-w-0">
+        <div className="min-w-0 overflow-hidden border border-light-border rounded-2xl p-3 sm:p-4 dark:border-slate-600 dark:bg-slate-800/40">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-3 sm:mb-4">
+            <div className="min-w-0">
+              <div className="text-base sm:text-lg font-semibold text-dark dark:text-slate-100">
+                Manufacturing Trend
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Batch cost by month · {trendYear}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full sm:w-auto items-stretch gap-2 shrink-0">
               <CommonDropdown
                 options={productOptions}
                 value={selectedProduct}
                 addNavigateTo="/dashboard/product"
                 onChange={setSelectedProduct}
-                className="w-44"
+                className="flex-1 min-w-0 sm:flex-none sm:w-44"
               />
-              <button className="p-2 border border-light-border rounded-lg hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-700/70">
-                <svg className="w-5 h-5 text-gray-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-              </button>
+              <div className="relative shrink-0">
+                <DatePicker
+                  picker="year"
+                  format="YYYY"
+                  value={dayjs().year(trendYear).startOf("year")}
+                  open={yearPickerOpen}
+                  onOpenChange={setYearPickerOpen}
+                  onChange={(d) => {
+                    if (d?.isValid()) setTrendYear(d.year());
+                  }}
+                  allowClear={false}
+                  disabledDate={(d) =>
+                    !trendYearOptions.includes(d.year())
+                  }
+                  placement="bottomRight"
+                  getPopupContainer={(node) =>
+                    node.parentElement ?? document.body
+                  }
+                  className="!absolute !w-0 !h-0 !min-w-0 !p-0 !m-0 !border-0 !opacity-0 overflow-hidden pointer-events-none"
+                  popupClassName="jitox-picker-form"
+                />
+                <button
+                  type="button"
+                  onClick={() => setYearPickerOpen(true)}
+                  className={`p-2 border rounded-lg transition-colors dark:border-slate-600 ${
+                    yearPickerOpen
+                      ? "border-primary bg-primary/5 dark:bg-primary/10"
+                      : "border-light-border hover:bg-gray-50 dark:hover:bg-slate-700/70"
+                  }`}
+                  aria-label={`Select chart year, currently ${trendYear}`}
+                  title={`Year: ${trendYear}`}
+                >
+                  <svg
+                    className="w-5 h-5 text-gray-600 dark:text-slate-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden
+                  >
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-          <div className="relative">
-            {/* Y-axis labels and grid lines */}
-            <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-gray-400 dark:text-slate-500">
-              <span>5k</span>
-              <span>4k</span>
-              <span>3k</span>
-              <span>2k</span>
-              <span>1k</span>
-              <span>0</span>
-            </div>
-            
-            {/* Grid lines */}
-            <div className="absolute left-10 right-0 top-0 bottom-6 flex flex-col justify-between">
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="border-t border-gray-100 dark:border-slate-700/70" />
+          <div className="relative min-w-0">
+            <div className="absolute left-0 top-0 bottom-5 sm:bottom-6 w-7 sm:w-10 flex flex-col justify-between text-[10px] sm:text-xs text-gray-400 dark:text-slate-500">
+              {trendScale.ticks.map((tick) => (
+                <span key={tick}>{formatTrendAxisValue(tick)}</span>
               ))}
             </div>
-
-             {/* Bars */}
-             <div className="ml-10 flex items-end gap-3 overflow-x-auto" style={{ height: '200px' }}>
-              {trendTemplate.map((item) => {
-                const height = (item.value / 5000) * 180;
-                const monthNames = {
-                  Jan: "Jan", Feb: "Feb", Mar: "Mar", Apr: "Apr", 
-                  May: "May", Jun: "June", Jul: "July", Aug: "Aug",
-                  Sep: "Sep", Oct: "Oct", Nov: "Nov", Dec: "Dec"
-                };
-                 return (
-                  <div key={item.month} className="flex flex-col items-center gap-2 flex-1">
-                     <div
-                       className="relative z-0 h-full w-full max-w-[0.5rem] flex items-end"
-                       onMouseEnter={() => setHoveredMonth(item)}
-                       onMouseLeave={() => setHoveredMonth(null)}
-                     >
-                       {hoveredMonth?.month === item.month && (
-                         <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-dark text-white text-xs px-2 py-0.5 rounded-md shadow dark:bg-slate-700">
-                           ₹{item.value.toLocaleString("en-IN")}
-                         </div>
-                       )}
+            <div className="absolute left-7 sm:left-10 right-0 top-0 bottom-5 sm:bottom-6 flex flex-col justify-between">
+              {trendScale.ticks.map((tick) => (
+                <div
+                  key={`grid-${tick}`}
+                  className="border-t border-gray-100 dark:border-slate-700/70"
+                />
+              ))}
+            </div>
+            <div className="ml-7 sm:ml-10 overflow-x-auto overscroll-x-contain touch-pan-x pb-1">
+              <div className="flex items-end gap-1.5 sm:gap-3 h-36 sm:h-[200px] min-w-[17.5rem] sm:min-w-0 w-full max-w-full">
+              {trendData.map((item) => {
+                const height =
+                  trendScale.chartMax > 0
+                    ? Math.max(
+                        item.value > 0 ? 4 : 0,
+                        (item.value / trendScale.chartMax) * CHART_BAR_MAX_PX
+                      )
+                    : 0;
+                return (
+                  <div
+                    key={item.month}
+                    className="flex flex-1 flex-col items-center gap-1 sm:gap-2 min-w-[1.125rem] sm:min-w-[1.75rem]"
+                  >
+                    <div
+                      className="relative z-0 flex h-full w-full max-w-[0.45rem] sm:max-w-[0.5rem] items-end justify-center"
+                      onMouseEnter={() => setHoveredMonth(item)}
+                      onMouseLeave={() => setHoveredMonth(null)}
+                      onClick={() =>
+                        setHoveredMonth((prev) =>
+                          prev?.month === item.month ? null : item
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setHoveredMonth((prev) =>
+                            prev?.month === item.month ? null : item
+                          );
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${item.month}: ${fmtRupee(item.value)}`}
+                    >
+                      {hoveredMonth?.month === item.month && item.value > 0 && (
+                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-dark text-white text-xs px-2 py-0.5 rounded-md shadow dark:bg-slate-700">
+                          {fmtRupee(item.value)}
+                        </div>
+                      )}
                       <div
-                        className="w-full rounded-t-lg manufacturing-gradient transition-all duration-200"
+                        className="w-full max-h-full rounded-t-lg manufacturing-gradient transition-all duration-200"
                         style={{ height: `${height}px` }}
                       />
                     </div>
-                    <span className="text-xs text-gray-500 mt-1 dark:text-slate-400">{monthNames[item.month]}</span>
+                    <span className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 dark:text-slate-400">
+                      {item.month}
+                    </span>
                   </div>
                 );
               })}
+              </div>
             </div>
+            {!trendScale.hasData && (
+              <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400 px-4">
+                {rows.length === 0
+                  ? "No manufacturing batches yet."
+                  : `No batch costs recorded for ${trendYear} with this filter.`}
+              </p>
+            )}
           </div>
         </div>
 
-          <div className="border border-light-border rounded-2xl p-4 dark:border-slate-600 dark:bg-slate-800/40">
-          <div className="flex items-center justify-between mb-4">
-               <div className="font-semibold text-dark text-lg">Raw Material Overview</div>
+        <div className="min-w-0 overflow-hidden border border-light-border rounded-2xl p-3 sm:p-4 dark:border-slate-600 dark:bg-slate-800/40">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 mb-3 sm:mb-4">
+            <div className="text-base sm:text-lg font-semibold text-dark dark:text-slate-100 shrink-0">
+              Raw Material Overview
+            </div>
             <CommonDropdown
               options={productOptions}
               value={selectedProduct}
               onChange={setSelectedProduct}
               addNavigateTo="/dashboard/product"
-              className="w-44"
+              className="w-full sm:w-44 shrink-0"
             />
           </div>
-          <div className="flex items-center gap-4">
-            <div className="relative w-40 h-40">
-              <svg
-                width="160"
-                height="160"
-                viewBox="0 0 160 160"
-                className="absolute inset-0"
-                onMouseLeave={() => setHoveredMaterial(null)}
-              >
-                {donutSegments.map((segment) => (
-                  <path
-                    key={segment.label}
-                    d={segment.path}
-                    fill={segment.color}
-                    className="cursor-pointer transition-opacity hover:opacity-80"
-                    onMouseEnter={() => setHoveredMaterial(segment)}
-                    onMouseLeave={() => setHoveredMaterial(null)}
-                  />
-                ))}
-              </svg>
-              <div className="absolute inset-4 bg-white rounded-full flex flex-col text-center items-center justify-center pointer-events-none dark:bg-slate-900">
-                <span className="font-semibold text-dark text-lg">
-                  {hoveredMaterial ? `${hoveredMaterial.value}%` : "100%"}
-                </span>
-                <span className="text-xs text-dark">
-                  {hoveredMaterial ? hoveredMaterial.label : "Total"}
-                </span>
-              </div>
-              {hoveredMaterial && (() => {
-                // Calculate tooltip position near the segment
-                const tooltipRadius = 95; // Position outside the donut
-                const angleRad = (hoveredMaterial.middleAngle * Math.PI) / 180;
-                const x = 80 + tooltipRadius * Math.cos(angleRad);
-                const y = 80 + tooltipRadius * Math.sin(angleRad);
-                return (
+
+          {rawMaterialSlices.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              {rows.length === 0
+                ? "No manufacturing batches yet."
+                : "No raw material lines for this filter."}
+            </p>
+          ) : (
+            <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
+              <div className="relative mx-auto h-36 w-36 shrink-0 sm:h-40 sm:w-40">
+                <svg
+                  viewBox="0 0 160 160"
+                  className="absolute inset-0 h-full w-full"
+                  onMouseLeave={() => setHoveredMaterial(null)}
+                >
+                  {singleMaterial ? (
+                    <circle
+                      cx={DONUT_CX}
+                      cy={DONUT_CY}
+                      r={DONUT_OUTER_R}
+                      fill={singleMaterial.color}
+                      className="cursor-pointer transition-opacity hover:opacity-90"
+                      onMouseEnter={() =>
+                        setHoveredMaterial({
+                          ...singleMaterial,
+                          value: 100,
+                          middleAngle: 0,
+                        })
+                      }
+                    />
+                  ) : (
+                    donutSegments.map((segment) => (
+                      <path
+                        key={segment.label}
+                        d={segment.path}
+                        fill={segment.color}
+                        fillRule={segment.isFullRing ? "evenodd" : "nonzero"}
+                        className="cursor-pointer transition-opacity hover:opacity-80"
+                        onMouseEnter={() => setHoveredMaterial(segment)}
+                      />
+                    ))
+                  )}
+                </svg>
+                <div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-white text-center pointer-events-none dark:bg-slate-900">
+                  <span className="text-base font-semibold text-dark sm:text-lg">
+                    {singleMaterial || hoveredMaterial
+                      ? `${(hoveredMaterial ?? singleMaterial).value}%`
+                      : "100%"}
+                  </span>
+                  <span className="text-xs text-dark dark:text-slate-300 px-1 truncate max-w-full">
+                    {singleMaterial
+                      ? singleMaterial.label
+                      : hoveredMaterial
+                        ? hoveredMaterial.label
+                        : "Total"}
+                  </span>
+                </div>
+                {hoveredMaterial ? (
                   <div
                     className="absolute bg-dark text-white text-xs px-2 py-0.5 rounded-md shadow z-10 pointer-events-none whitespace-nowrap dark:bg-slate-700"
                     style={{
-                      left: `${x}px`,
-                      top: `${y}px`,
-                      transform: 'translate(-50%, -50%)',
+                      left: `${DONUT_CX + 95 * Math.cos((hoveredMaterial.middleAngle * Math.PI) / 180)}px`,
+                      top: `${DONUT_CY + 95 * Math.sin((hoveredMaterial.middleAngle * Math.PI) / 180)}px`,
+                      transform: "translate(-50%, -50%)",
                     }}
                   >
-                    {hoveredMaterial.value}%
+                    {fmtRupee(hoveredMaterial.total)}
                   </div>
-                );
-              })()}
+                ) : null}
+              </div>
+              <div className="flex w-full min-w-0 flex-col gap-2.5 sm:flex-1">
+                {rawMaterialSlices.map((item) => (
+                  <div
+                    key={item.label}
+                    className="flex min-w-0 items-center gap-2 text-sm"
+                  >
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-dark flex-1 truncate dark:text-slate-200">
+                      {item.label}
+                    </span>
+                    <span className="text-xs text-light shrink-0 dark:text-slate-400">
+                      {item.value}%
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-col gap-3">
-              {rawMaterialTemplate.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center gap-3 text-sm"
-                >
-                  <span className={`h-2 w-2 rounded-full ${item.color}`} />
-                  <span className="text-dark flex-1 dark:text-slate-200">{item.label}</span>
-                  <span className="text-xs text-light dark:text-slate-400">{item.value}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -290,4 +458,3 @@ const ManufacturingOverview = ({
 };
 
 export default ManufacturingOverview;
-

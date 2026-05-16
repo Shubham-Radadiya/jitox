@@ -12,6 +12,7 @@ import toast from "react-hot-toast";
 import { MODULE_ACCESS_OPTIONS } from "../../constants/accessModules";
 import AddressForm from "../../components/address/AddressForm";
 import { EMPTY_ADDRESS, addressFromUser } from "../../utils/addressFormat";
+import { buildUserMultipartFormData } from "../../services/api";
 
 const ROLE_OPTIONS = [
   { label: "Admin", value: "admin" },
@@ -51,6 +52,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
 
   const [selectedPerms, setSelectedPerms] = useState(() => new Set(["dashboard"]));
   const [imagePreview, setImagePreview] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
   const fileInputRef = useRef(null);
   const [errors, setErrors] = useState({});
   const [addrErrors, setAddrErrors] = useState({});
@@ -63,7 +65,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
     const nextAddr = addressFromUser({
       streetAddress: user.streetAddress,
       area: user.area,
-      city: user.city || user.Region,
+      city: user.city,
       taluka: user.taluka,
       district: user.district || user.Area,
       state: user.state,
@@ -80,7 +82,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
       joiningDate: user["Joining Date"]
         ? dayjs(user["Joining Date"])
         : null,
-      region: user.Region || user.region || nextAddr.city || "",
+      region: user.region || user.Region || "",
       assignedAreas: user.Area || user.assignedAreas || nextAddr.district || "",
       password: "",
       confirmPassword: "",
@@ -96,6 +98,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
       setSelectedPerms(new Set(["dashboard"]));
     }
     setImagePreview(user.image || null);
+    setPhotoFile(null);
     setErrors({});
     setAddrErrors({});
   }, [user, open]);
@@ -132,8 +135,9 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
+      setPhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => setImagePreview(reader.result);
       reader.readAsDataURL(file);
@@ -181,7 +185,8 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
       permissions: isAdminRole ? [] : Array.from(selectedPerms),
       streetAddress: address.streetAddress.trim(),
       area: address.area.trim(),
-      city: (address.city || form.region || "").trim(),
+      city: String(address.city || "").trim(),
+      region: String(form.region || "").trim(),
       taluka: address.taluka.trim(),
       district: (address.district || form.assignedAreas || "").trim(),
       state: address.state.trim(),
@@ -193,9 +198,14 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
       payload.password = form.password;
     }
 
+    const body =
+      photoFile instanceof File
+        ? buildUserMultipartFormData(payload, photoFile)
+        : payload;
+
     setSaving(true);
     try {
-      await onSave(user._id, payload);
+      await onSave(user._id, body);
       onClose();
     } catch (err) {
       toast.error(
@@ -320,7 +330,7 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
               />
             </div>
             <CommonDropdown
-              label="Region (city)"
+              label="Region"
               addNavigateTo="/dashboard/user-master"
               value={form.region}
               onChange={(v) => setForm({ ...form, region: v })}

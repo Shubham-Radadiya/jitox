@@ -6,6 +6,7 @@ import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+import { applyProductStockDelta } from "../utils/applyProductStockDelta";
 
 /** Fields accepted from PUT body when updating a purchase return voucher */
 const PURCHASE_RETURN_PATCH_KEYS = [
@@ -61,45 +62,6 @@ async function resolveUniquePurchaseReturnVoucherNo(
     if (!taken) return candidate;
   }
   return `JITOX-DEMO-PR-${Date.now()}`;
-}
-
-/**
- * Apply a stock delta to each line item's product (multiplier: +1 to add, -1 to remove).
- * Returns leave the godown → call with `-1` on create, `+1` on delete/rollback.
- */
-async function applyStockDelta(
-  items: Array<{ product: unknown; quantity: unknown }>,
-  multiplier: 1 | -1
-): Promise<void> {
-  if (!Array.isArray(items) || items.length === 0) return;
-
-  const totals = new Map<string, number>();
-  for (const it of items) {
-    const pid =
-      it && it.product != null && typeof (it.product as any).toString === "function"
-        ? String((it.product as any).toString())
-        : String(it?.product ?? "").trim();
-    const qty = Number(it?.quantity);
-    if (!pid || !Number.isFinite(qty) || qty === 0) continue;
-    totals.set(pid, (totals.get(pid) ?? 0) + qty);
-  }
-
-  if (totals.size === 0) return;
-
-  await Promise.all(
-    Array.from(totals.entries()).map(([pid, qty]) =>
-      Product.findByIdAndUpdate(pid, {
-        $inc: { quantity: qty * multiplier },
-      }).catch((err) => {
-        console.error("applyStockDelta (return) failed", {
-          pid,
-          qty,
-          multiplier,
-          err,
-        });
-      })
-    )
-  );
 }
 
 /** Did the user opt into stock update for this voucher? */
@@ -170,7 +132,7 @@ export const createPurchaseReturnVoucher = async (
 
     /** Stock toggle ON → returns leave stock, so decrement product qty by line qty. */
     if (shouldUpdateStock(stockDetails)) {
-      await applyStockDelta(items as IPurchaseItem[], -1);
+      await applyProductStockDelta(items as IPurchaseItem[], -1);
     }
 
     await logDayBookEntry({
@@ -352,7 +314,7 @@ export const updatePurchaseReturnVoucher = async (
     /** Reconcile stock: rollback the old return, then apply the new return. */
     const nextStockOn = shouldUpdateStock(voucher.stockDetails);
     if (prevStockOn) {
-      await applyStockDelta(prevItems, +1); // undo: returns originally removed stock
+      await applyProductStockDelta(prevItems, +1); // undo: returns originally removed stock
     }
     if (nextStockOn) {
       const nextItems = Array.isArray(voucher.items)
@@ -364,7 +326,7 @@ export const updatePurchaseReturnVoucher = async (
             quantity: Number(it?.quantity),
           }))
         : [];
-      await applyStockDelta(nextItems, -1);
+      await applyProductStockDelta(nextItems, -1);
     }
 
     const returnInvoiceNo = (voucher as any).invoiceNo;
@@ -411,7 +373,7 @@ export const deletePurchaseReturnVoucher = async (
             quantity: Number(it?.quantity),
           }))
         : [];
-      await applyStockDelta(items, +1);
+      await applyProductStockDelta(items, +1);
     }
 
     await removeDayBookEntry((deletedVoucher as any).voucherNo);

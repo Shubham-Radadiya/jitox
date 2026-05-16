@@ -15,6 +15,16 @@ const paymentVoucherSchema = new Schema<IPaymentVoucher>(
       default: "Pending",
       enum: ["Pending", "Paid"],
     },
+    /**
+     * Back-link to the sales voucher this payment was requested from. Set by
+     * `createPaymentVoucher` when the request originates from the sales list;
+     * used on `update` (to flip the sale's paymentStatus when this is paid)
+     * and on `delete` (to clear the sale's `paymentRequestId`).
+     */
+    sourceSalesId: {
+      type: Schema.Types.ObjectId,
+      ref: "SalesVoucher",
+    },
   },
   {
     timestamps: true,

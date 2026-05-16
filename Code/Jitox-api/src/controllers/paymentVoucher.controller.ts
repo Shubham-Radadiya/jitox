@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
-import { Account, PaymentVoucher } from "../models/index";
+import mongoose from "mongoose";
+import { Account, PaymentVoucher, SalesVoucher } from "../models/index";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
@@ -16,6 +17,18 @@ const PAYMENT_VOUCHER_PATCH_KEYS = [
   "remarks",
   "status",
 ] as const;
+
+/**
+ * Parse the freeform `amount` string ("₹1,200" / "1200" / 1200) into a number
+ * we can use to reconcile a linked sales voucher's `paidAmount`.
+ */
+function parseAmountToNumber(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const cleaned = String(value).replace(/[^\d.-]/g, "");
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
 
 /**
  * Next payment voucher no. in `JITOX-DEMO-PAY-001` form — scans existing
@@ -66,11 +79,37 @@ export const createPaymentVoucher = async (
       amount,
       remarks,
       status,
+      sourceSalesId,
     } = req.body;
 
     /** voucherNo is generated server-side, so it's not in the required list. */
     const requiredFields = ["date", "paymentTo", "amount"] as const;
     validateAndRespond(req.body, requiredFields, res);
+
+    /**
+     * If a `sourceSalesId` is passed, refuse to create a second request for the
+     * same sale — keeps the row's button gating honest even if a stale client
+     * tries to retry.
+     */
+    let linkedSalesId: mongoose.Types.ObjectId | null = null;
+    if (sourceSalesId && mongoose.isValidObjectId(sourceSalesId)) {
+      const sale = await SalesVoucher.findById(sourceSalesId).select(
+        "paymentRequestId"
+      );
+      if (!sale) {
+        throw new AppError(
+          HttpStatusCode.NOT_FOUND,
+          "Linked sales voucher not found."
+        );
+      }
+      if (sale.paymentRequestId) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "A payment request already exists for this sales voucher."
+        );
+      }
+      linkedSalesId = sale._id as mongoose.Types.ObjectId;
+    }
 
     const resolvedVoucherNo = await resolveUniquePaymentVoucherNo(voucherNo);
 
@@ -82,9 +121,17 @@ export const createPaymentVoucher = async (
       amount,
       remarks,
       status,
+      sourceSalesId: linkedSalesId,
     });
 
     const savedVoucher = await newVoucher.save();
+
+    /** Back-link so the sales row button gates itself on the next fetch. */
+    if (linkedSalesId) {
+      await SalesVoucher.findByIdAndUpdate(linkedSalesId, {
+        $set: { paymentRequestId: savedVoucher._id },
+      });
+    }
 
     await logDayBookEntry({
       voucherNumber: savedVoucher.voucherNo as unknown as string,
@@ -201,6 +248,7 @@ export const updatePaymentVoucher = async (
       }
     }
 
+    const previousStatus = String(voucher.status || "");
     const patch: Record<string, unknown> = {};
     for (const key of PAYMENT_VOUCHER_PATCH_KEYS) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -210,6 +258,32 @@ export const updatePaymentVoucher = async (
 
     voucher.set(patch);
     await voucher.save();
+
+    /**
+     * Keep the originating sales voucher in sync. When this payment flips
+     * Pending → Paid we mark the sale Paid and bump its `paidAmount`.
+     * When it flips Paid → Pending (rare, but supported), we reverse the
+     * reconciliation so the sale's outstanding shows up again.
+     */
+    const nextStatus = String(voucher.status || "");
+    if (voucher.sourceSalesId && previousStatus !== nextStatus) {
+      const sale = await SalesVoucher.findById(voucher.sourceSalesId);
+      if (sale) {
+        if (nextStatus === "Paid") {
+          const total = Number(sale.totalAmount) || 0;
+          sale.paidAmount = total;
+          sale.paymentStatus = "Paid";
+          await sale.save();
+        } else if (previousStatus === "Paid") {
+          const paid = parseAmountToNumber(voucher.amount);
+          const current = Number(sale.paidAmount) || 0;
+          sale.paidAmount = Math.max(0, current - paid);
+          sale.paymentStatus =
+            (sale.paidAmount || 0) > 0 ? "Partial" : "Pending";
+          await sale.save();
+        }
+      }
+    }
 
     await logDayBookEntry({
       voucherNumber: voucher.voucherNo as unknown as string,
@@ -241,6 +315,27 @@ export const deletePaymentVoucher = async (
         HttpStatusCode.NOT_FOUND,
         "Payment voucher not found."
       );
+    }
+
+    /**
+     * If the deleted payment was linked to a sale, clear the back-pointer so
+     * the sales row's "Send Payment Request" button is enabled again. If the
+     * payment had already reconciled the sale (status was "Paid"), also
+     * revert the sale's `paidAmount` / `paymentStatus`.
+     */
+    if ((deleted as any).sourceSalesId) {
+      const sale = await SalesVoucher.findById((deleted as any).sourceSalesId);
+      if (sale) {
+        if (String((deleted as any).status || "") === "Paid") {
+          const paid = parseAmountToNumber((deleted as any).amount);
+          const current = Number(sale.paidAmount) || 0;
+          sale.paidAmount = Math.max(0, current - paid);
+          sale.paymentStatus =
+            (sale.paidAmount || 0) > 0 ? "Partial" : "Pending";
+        }
+        sale.paymentRequestId = undefined;
+        await sale.save();
+      }
     }
 
     await removeDayBookEntry((deleted as any).voucherNo);

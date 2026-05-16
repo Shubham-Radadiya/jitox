@@ -11,7 +11,6 @@ export const createCashVoucher = async (
 ): Promise<void> => {
   try {
     const {
-      voucherNumber,
       amount,
       debitFrom,
       creditTo,
@@ -20,7 +19,6 @@ export const createCashVoucher = async (
     } = req.body;
 
     const requiredFields = [
-      "voucherNumber",
       "debitFrom",
       "creditTo",
       "narration",
@@ -29,6 +27,22 @@ export const createCashVoucher = async (
     ] as const;
 
     validateAndRespond(req.body, requiredFields, res);
+
+    let voucherNumber = String(req.body.voucherNumber ?? "").trim();
+    if (!voucherNumber) {
+      const creditIsCash =
+        String(creditTo ?? "")
+          .trim()
+          .toLowerCase() === "cash";
+      voucherNumber = creditIsCash ? `BV-${Date.now()}` : `CV-${Date.now()}`;
+    }
+
+    let voucherDate: Date | undefined;
+    const rawDate = req.body.voucherDate;
+    if (rawDate != null && String(rawDate).trim() !== "") {
+      const parsed = new Date(String(rawDate));
+      if (!Number.isNaN(parsed.getTime())) voucherDate = parsed;
+    }
 
     const existingVoucher = await CashVoucher.findOne({ voucherNumber });
     if (existingVoucher) {
@@ -45,6 +59,7 @@ export const createCashVoucher = async (
 
     const newCashVoucher = new CashVoucher({
       voucherNumber,
+      ...(voucherDate && { voucherDate }),
       amount,
       debitFrom,
       creditTo,
@@ -90,7 +105,20 @@ export const getAllCashVouchers = async (
       const date = new Date(startDate as string);
       const nextDate = new Date(date);
       nextDate.setDate(nextDate.getDate() + 1);
-      filter.createdAt = { $gte: date, $lt: nextDate };
+      filter.$or = [
+        { voucherDate: { $gte: date, $lt: nextDate } },
+        {
+          $and: [
+            {
+              $or: [
+                { voucherDate: { $exists: false } },
+                { voucherDate: null },
+              ],
+            },
+            { createdAt: { $gte: date, $lt: nextDate } },
+          ],
+        },
+      ];
     }
 
     const vouchers = await CashVoucher.find(filter).sort({ createdAt: -1 });

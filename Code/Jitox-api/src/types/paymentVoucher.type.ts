@@ -1,4 +1,4 @@
-import { Document } from "mongoose";
+import mongoose, { Document } from "mongoose";
 
 export interface IPaymentVoucher extends Document {
   voucherNo: String;
@@ -8,6 +8,8 @@ export interface IPaymentVoucher extends Document {
   amount: String;
   remarks: String;
   status: String;
+  /** Optional back-link to a sales voucher this payment was requested for. */
+  sourceSalesId?: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

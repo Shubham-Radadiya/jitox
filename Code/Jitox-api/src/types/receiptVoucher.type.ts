@@ -1,4 +1,5 @@
 import { Document } from "mongoose";
+import mongoose from "mongoose";
 
 export interface IReceiptVoucher extends Document {
   voucherNo: String;
@@ -8,6 +9,7 @@ export interface IReceiptVoucher extends Document {
   amount: String;
   remarks: String;
   status: String;
+  sourceSalesId?: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

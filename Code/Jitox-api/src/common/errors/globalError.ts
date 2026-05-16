@@ -43,6 +43,7 @@ export const globalErrorHandler = (
     success: false,
     message,
     ...(err.missingFields && { missingFields: err.missingFields }),
+    ...(err.stockIssues && { stockIssues: err.stockIssues }),
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 };

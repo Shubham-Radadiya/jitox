@@ -26,6 +26,10 @@ const userSchema = new Schema<IUser>(
     state: { type: String, trim: true },
     taluka: { type: String, trim: true },
     district: { type: String, trim: true },
+    /** Sales / territory region (separate from address city). */
+    region: { type: String, trim: true },
+    /** Public URL path e.g. `/uploads/…` (served by API static). */
+    profilePhoto: { type: String, trim: true },
   },
   {
     timestamps: true,

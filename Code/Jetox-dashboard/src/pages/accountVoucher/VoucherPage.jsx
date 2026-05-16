@@ -15,6 +15,7 @@ import { TableContent, tableColumnKey } from "../../hooks/TableCustomHook";
 import { useTableData } from "../../hooks/useTableData";
 import { useVoucherListData } from "../../hooks/useVoucherListData";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { invalidateProductAndStockQueries } from "../../utils/invalidateStockQueries";
 import {
   TABLE_ELEMENT_CLASS,
   TABLE_WRAPPER_CLASS,
@@ -26,12 +27,20 @@ import ExcelColumnFilterHeader, {
 } from "../../components/ui/table/ExcelColumnFilterHeader";
 import { Plus, X } from "lucide-react";
 import ManufacturingOverview from "./manufacturing/ManufacturingOverview";
+import ManufacturingFailedModal from "./manufacturing/ManufacturingFailedModal";
+import ManufacturingFailedViewModal from "./manufacturing/ManufacturingFailedViewModal";
+import { ManufacturingBlockedModal } from "./manufacturing/ManufacturingStockModals";
 import PurchaseVoucherModal from "./purchase/PurchaseVoucherModal";
+import PurchaseReturnModal from "./purchase/PurchaseReturnModal";
+import SalesVoucherModal from "./purchase/SalesVoucherModal";
 import {
   expenseVouchersApi,
   paymentVouchersApi,
   purchaseReturnVouchersApi,
   purchaseVouchersApi,
+  receiptVouchersApi,
+  salesVouchersApi,
+  manufacturingVouchersApi,
 } from "../../services/api";
 
 /** Matches `w-56` (14rem); clamp math must stay in sync with popover max-width below */
@@ -126,10 +135,12 @@ const VoucherPage = () => {
   // ExpenseModal is reused for both create and edit; this holds the raw doc
   // when the user clicks the pencil on a row.
   const [editingExpense, setEditingExpense] = useState(null);
+  const [editingJournal, setEditingJournal] = useState(null);
 
   useEffect(() => {
     setActiveModalKey(null);
     setEditingExpense(null);
+    setEditingJournal(null);
   }, [voucherSlug]);
 
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -150,6 +161,40 @@ const VoucherPage = () => {
   }, []);
   const closePurchaseModal = useCallback(() => {
     setPurchaseModal({ open: false, sourceRow: null, mode: "create" });
+  }, []);
+
+  const [purchaseReturnModal, setPurchaseReturnModal] = useState({
+    open: false,
+    sourceRow: null,
+    mode: "create",
+  });
+  const openPurchaseReturnModal = useCallback((sourceRow, mode) => {
+    setPurchaseReturnModal({
+      open: true,
+      sourceRow:
+        sourceRow && typeof sourceRow === "object" ? sourceRow : null,
+      mode: mode || "create",
+    });
+  }, []);
+  const closePurchaseReturnModal = useCallback(() => {
+    setPurchaseReturnModal({ open: false, sourceRow: null, mode: "create" });
+  }, []);
+
+  const [salesModal, setSalesModal] = useState({
+    open: false,
+    sourceRow: null,
+    mode: "create",
+  });
+  const openSalesModal = useCallback((sourceRow, mode) => {
+    setSalesModal({
+      open: true,
+      sourceRow:
+        sourceRow && typeof sourceRow === "object" ? sourceRow : null,
+      mode: mode || "create",
+    });
+  }, []);
+  const closeSalesModal = useCallback(() => {
+    setSalesModal({ open: false, sourceRow: null, mode: "create" });
   }, []);
 
   const [excelFilters, setExcelFilters] = useState({});
@@ -299,14 +344,43 @@ const VoucherPage = () => {
     [queryClient]
   );
 
-  /** Mark a payment voucher's status to "Paid" via PUT /paymentVouchers/update/:id. */
+  /**
+   * Mark a payment voucher's status to "Paid" via PUT /paymentVouchers/update/:id.
+   * If the payment is linked to a sales voucher (via `sourceSalesId`), the
+   * backend reconciles that sale's `paidAmount` / `paymentStatus`, so we also
+   * refresh the sales list here.
+   */
   const markPaymentVoucherPaid = useCallback(
     async (id) => {
       if (!id) return;
       await paymentVouchersApi.update(String(id), { status: "Paid" });
-      await queryClient.invalidateQueries({
-        queryKey: ["voucher-list", "payment"],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "payment"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "sales"],
+        }),
+      ]);
+    },
+    [queryClient]
+  );
+
+  const markReceiptVoucherPaid = useCallback(
+    async (id) => {
+      if (!id) return;
+      await receiptVouchersApi.update(String(id), { status: "Paid" });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "receipt"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["receiptVouchers"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "sales"],
+        }),
+      ]);
     },
     [queryClient]
   );
@@ -318,6 +392,93 @@ const VoucherPage = () => {
       await queryClient.invalidateQueries({
         queryKey: ["voucher-list", "purchase-return"],
       });
+    },
+    [queryClient]
+  );
+
+  const deleteSalesVoucher = useCallback(
+    async (id) => {
+      if (!id) return;
+      await salesVouchersApi.delete(String(id));
+      await queryClient.invalidateQueries({
+        queryKey: ["voucher-list", "sales"],
+      });
+    },
+    [queryClient]
+  );
+
+  /**
+   * Sales-row "Send Payment Request" handler — directly creates a Payment
+   * Voucher row from the sales voucher data and refreshes the Payment list.
+   * Voucher number is generated server-side. The `paymentTo` is the customer
+   * (party) name, amount defaults to the outstanding balance (or total if
+   * nothing has been paid yet).
+   */
+  const createPaymentRequestForSale = useCallback(
+    async (row) => {
+      const raw = row?._raw || {};
+      const partyName =
+        raw.partyName || row?.["Party Name"] || row?.Party || "";
+      if (!partyName) {
+        toast.error("This sales row is missing a party name.");
+        return;
+      }
+
+      const totalAmount = Number(raw.totalAmount) || 0;
+      const paidAmount = Number(raw.paidAmount) || 0;
+      const outstanding = Math.max(0, totalAmount - paidAmount);
+      const amount = outstanding > 0 ? outstanding : totalAmount;
+      if (!amount) {
+        toast.error("Cannot send a payment request for ₹0.");
+        return;
+      }
+
+      const invoiceNo = raw.voucherNo || row?.["Invoice No."] || "";
+      const today = new Date().toISOString().slice(0, 10);
+
+      /**
+       * `paymentThrough` on Payment Voucher is restricted to "Cash" | "Bank".
+       * The sales voucher's `paymentMode` is freeform ("Credit", "UPI", …),
+       * so we normalise: "Cash" → "Cash", everything else → "Bank".
+       */
+      const paymentThrough =
+        String(raw.paymentMode || "").trim().toLowerCase() === "cash"
+          ? "Cash"
+          : "Bank";
+
+      try {
+        await paymentVouchersApi.create({
+          date: today,
+          paymentTo: partyName,
+          amount,
+          paymentThrough,
+          remarks: invoiceNo
+            ? `Payment request for sales voucher ${invoiceNo}`
+            : "Payment request from sales voucher",
+          status: "Pending",
+          sourceSalesId: raw._id,
+        });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "payment"],
+          }),
+          /**
+           * Refresh the sales list too — the backend just linked the new
+           * Payment Voucher's id onto this sale, so the row's button needs
+           * to flip to disabled on the next render.
+           */
+          queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "sales"],
+          }),
+        ]);
+        toast.success(
+          invoiceNo
+            ? `Payment request created for ${invoiceNo}.`
+            : "Payment request created."
+        );
+      } catch (e) {
+        toast.error(getApiErrorMessage(e, "Could not create payment request"));
+      }
     },
     [queryClient]
   );
@@ -340,6 +501,30 @@ const VoucherPage = () => {
     setActiveModalKey(null);
     setEditingExpense(null);
   }, []);
+
+  const closeJournalModal = useCallback(() => {
+    setActiveModalKey(null);
+    setEditingJournal(null);
+  }, []);
+
+  const openJournalEdit = useCallback((row) => {
+    const raw = row?._raw;
+    if (!raw?._id) {
+      toast.error("This journal row is missing an id — cannot edit.");
+      return;
+    }
+    setEditingJournal(raw);
+    setActiveModalKey("journal-modal");
+  }, []);
+
+  const handleJournalSaved = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ["voucher-list", "journal"],
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["journal-next-voucher-no"],
+    });
+  }, [queryClient]);
 
   /** Opens a one-off file picker, validates, and PUTs only the new proof file
    *  to /expenseVouchers/update/:id. Mirrors the validation done inside
@@ -384,6 +569,150 @@ const VoucherPage = () => {
     [queryClient]
   );
 
+  const invalidateManufacturingList = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ["voucher-list", "manufacturing"],
+    });
+    invalidateProductAndStockQueries(queryClient);
+  }, [queryClient]);
+
+  const [mfgFailFormRow, setMfgFailFormRow] = useState(null);
+  const [mfgFailViewRow, setMfgFailViewRow] = useState(null);
+  const [mfgBlocked, setMfgBlocked] = useState({
+    open: false,
+    row: null,
+    issues: [],
+  });
+  const [mfgRechecking, setMfgRechecking] = useState(false);
+
+  const openFailManufacturingForm = useCallback((row) => {
+    setMfgFailFormRow(row);
+  }, []);
+
+  const openMfgBlockedModal = useCallback(async (row) => {
+    let issues = Array.isArray(row?.stockIssues)
+      ? row.stockIssues
+      : Array.isArray(row?._raw?.stockIssues)
+        ? row._raw.stockIssues
+        : [];
+    const id = String(row?._raw?._id ?? row?._id ?? "").trim();
+    if (!issues.length && id) {
+      try {
+        const { data } = await manufacturingVouchersApi.recheckStock(id);
+        if (!data?.ok && Array.isArray(data?.stockIssues)) {
+          issues = data.stockIssues;
+        }
+      } catch (e) {
+        toast.error(getApiErrorMessage(e, "Could not load stock details"));
+        return;
+      }
+    }
+    if (!issues.length) {
+      toast.error("No raw material shortage found for this batch.");
+      return;
+    }
+    setMfgBlocked({ open: true, row, issues });
+  }, []);
+
+  const closeMfgBlockedModal = useCallback(() => {
+    setMfgBlocked({ open: false, row: null, issues: [] });
+  }, []);
+
+  const recheckMfgBlockedStock = useCallback(async () => {
+    const id = String(mfgBlocked.row?._raw?._id ?? mfgBlocked.row?._id ?? "").trim();
+    if (!id) {
+      toast.error("Batch id missing — close and open this batch again.");
+      return;
+    }
+    setMfgRechecking(true);
+    try {
+      invalidateProductAndStockQueries(queryClient);
+      await queryClient.refetchQueries({ queryKey: ["products"] });
+
+      const { data } = await manufacturingVouchersApi.recheckStock(id);
+      const issues = data?.stockIssues || [];
+      if (data?.ok) {
+        toast.success("Stock is sufficient now. You can start manufacturing.");
+        closeMfgBlockedModal();
+        invalidateManufacturingList();
+      } else {
+        setMfgBlocked((prev) => ({ ...prev, issues }));
+        toast.error("Some raw materials are still low on stock.");
+      }
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Could not recheck stock"));
+    } finally {
+      setMfgRechecking(false);
+    }
+  }, [
+    mfgBlocked.row,
+    closeMfgBlockedModal,
+    invalidateManufacturingList,
+    queryClient,
+  ]);
+
+  const startManufacturingBatch = useCallback(
+    async (row) => {
+      const id = row?._id;
+      if (!id) {
+        toast.error("Batch id missing.");
+        return;
+      }
+      if (row?.stockBlocked) {
+        openMfgBlockedModal(row);
+        return;
+      }
+      try {
+        await manufacturingVouchersApi.start(id);
+        toast.success("Manufacturing started. Raw stock updated.");
+        invalidateManufacturingList();
+      } catch (e) {
+        const body = e?.response?.data;
+        const issues = Array.isArray(body?.stockIssues) ? body.stockIssues : [];
+        if (issues.length) {
+          openMfgBlockedModal({ ...row, stockIssues: issues, stockBlocked: true });
+        } else {
+          toast.error(getApiErrorMessage(e, "Could not start batch"));
+        }
+      }
+    },
+    [invalidateManufacturingList, openMfgBlockedModal]
+  );
+
+  const completeManufacturingBatch = useCallback(
+    async (row) => {
+      const id = row?._id;
+      if (!id) {
+        toast.error("Batch id missing.");
+        return;
+      }
+      try {
+        await manufacturingVouchersApi.complete(id);
+        toast.success("Batch completed. Finished product added to stock.");
+        invalidateManufacturingList();
+      } catch (e) {
+        toast.error(getApiErrorMessage(e, "Could not complete batch"));
+      }
+    },
+    [invalidateManufacturingList]
+  );
+
+  const deleteManufacturingBatch = useCallback(
+    async (row) => {
+      const id = row?._id;
+      if (!id) return;
+      if (!window.confirm("Delete this planned manufacturing batch?")) return;
+      try {
+        await manufacturingVouchersApi.delete(id);
+        toast.success("Batch deleted.");
+        invalidateManufacturingList();
+      } catch (e) {
+        toast.error(getApiErrorMessage(e, "Could not delete batch"));
+      }
+    },
+    [invalidateManufacturingList]
+  );
+
   const openDetails = useCallback(
     async (row) => {
       if (!config) return;
@@ -418,6 +747,20 @@ const VoucherPage = () => {
     [config, navigate]
   );
 
+  const openDetailsForTable = useCallback(
+    (row) => {
+      if (
+        voucherSlug === "manufacturing" &&
+        String(row?.Status ?? "") === "Failed"
+      ) {
+        setMfgFailViewRow(row);
+        return;
+      }
+      openDetails(row);
+    },
+    [voucherSlug, openDetails]
+  );
+
   const composedRenderRowCell = (key, value, row) => {
     if (config.renderRowCell) {
       return config.renderRowCell(
@@ -433,13 +776,25 @@ const VoucherPage = () => {
   const tableAction =
     config.buildTableAction?.({
       navigate,
-      openDetails,
+      openDetails: openDetailsForTable,
       openPurchaseModal,
+      openPurchaseReturnModal,
+      openSalesModal,
       deletePurchaseVoucher,
       deletePurchaseReturnVoucher,
+      deleteSalesVoucher,
+      createPaymentRequestForSale,
       markPaymentVoucherPaid,
+      markReceiptVoucherPaid,
       openExpenseEdit,
       attachExpenseProof,
+      openJournalEdit,
+      onVoucherDocument: handleDocument,
+      startManufacturingBatch,
+      completeManufacturingBatch,
+      deleteManufacturingBatch,
+      openFailManufacturingForm,
+      openMfgBlockedModal,
     }) ||
     config.tableAction ||
     defaultTableAction;
@@ -462,9 +817,20 @@ const VoucherPage = () => {
           openPurchaseModal(null, "create");
           return;
         }
+        if (field.action === "purchase-return-open") {
+          openPurchaseReturnModal(null, "create");
+          return;
+        }
+        if (field.action === "sales-open") {
+          openSalesModal(null, "create");
+          return;
+        }
         if (field.action === "navigate" && field.path) {
           navigate(field.path);
         } else if (field.action === "open-modal" && field.modalKey) {
+          if (field.modalKey === "journal-modal") {
+            setEditingJournal(null);
+          }
           setActiveModalKey(field.modalKey);
         } else if (field.onClick) {
           field.onClick();
@@ -632,9 +998,9 @@ const VoucherPage = () => {
           </div>
         )}
 
-        {isManufacturingPage && <ManufacturingOverview rows={displayedRows} />}
+        {isManufacturingPage && <ManufacturingOverview rows={dataRows} />}
 
-        {rowsLoading && !isManufacturingPage ? (
+        {rowsLoading ? (
           <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-light-border bg-white text-sm text-light dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
             Loading…
           </div>
@@ -736,12 +1102,25 @@ const VoucherPage = () => {
         {config.modals?.map((modalConfig) => {
           const { key, component: ModalComponent, props } = modalConfig;
           const isExpense = key === "expense-modal";
+          const isJournal = key === "journal-modal";
           return (
             <ModalComponent
               key={key}
               open={activeModalKey === key}
-              onClose={isExpense ? closeExpenseModal : () => setActiveModalKey(null)}
+              onClose={
+                isExpense
+                  ? closeExpenseModal
+                  : isJournal
+                    ? closeJournalModal
+                    : () => setActiveModalKey(null)
+              }
               {...(isExpense ? { expense: editingExpense } : {})}
+              {...(isJournal
+                ? {
+                    journal: editingJournal,
+                    onSaved: handleJournalSaved,
+                  }
+                : {})}
               {...(props || {})}
             />
           );
@@ -754,6 +1133,72 @@ const VoucherPage = () => {
             sourceRow={purchaseModal.sourceRow}
             mode={purchaseModal.mode}
           />
+        )}
+
+        {voucherSlug === "purchase-return" && (
+          <PurchaseReturnModal
+            open={purchaseReturnModal.open}
+            onClose={closePurchaseReturnModal}
+            sourceRow={purchaseReturnModal.sourceRow}
+            mode={purchaseReturnModal.mode}
+          />
+        )}
+
+        {voucherSlug === "sales" && (
+          <SalesVoucherModal
+            open={salesModal.open}
+            onClose={closeSalesModal}
+            sourceRow={salesModal.sourceRow}
+            mode={salesModal.mode}
+          />
+        )}
+
+        {isManufacturingPage && (
+          <>
+            <ManufacturingFailedModal
+              open={Boolean(mfgFailFormRow)}
+              row={mfgFailFormRow}
+              onClose={() => setMfgFailFormRow(null)}
+              onSaved={invalidateManufacturingList}
+            />
+            <ManufacturingFailedViewModal
+              open={Boolean(mfgFailViewRow)}
+              row={mfgFailViewRow}
+              onClose={() => setMfgFailViewRow(null)}
+            />
+            <ManufacturingBlockedModal
+              open={mfgBlocked.open}
+              onClose={closeMfgBlockedModal}
+              issues={mfgBlocked.issues}
+              onRecheck={recheckMfgBlockedStock}
+              rechecking={mfgRechecking}
+              onEdit={() => {
+                const rawStatus = String(
+                  mfgBlocked.row?._raw?.status ?? ""
+                ).trim();
+                if (
+                  rawStatus !== "Planned" &&
+                  rawStatus !== "Paused"
+                ) {
+                  toast.error(
+                    "This batch is already in progress — reduce materials via Fail or add stock in Product Master."
+                  );
+                  return;
+                }
+                const batchId = String(
+                  mfgBlocked.row?._raw?._id ?? mfgBlocked.row?._id ?? ""
+                ).trim();
+                closeMfgBlockedModal();
+                if (batchId) {
+                  navigate(
+                    `/dashboard/accounting-voucher/add-manufacturing?batchId=${encodeURIComponent(batchId)}`
+                  );
+                } else {
+                  navigate("/dashboard/accounting-voucher/add-manufacturing");
+                }
+              }}
+            />
+          </>
         )}
       </div>
     </DashboardLayout>

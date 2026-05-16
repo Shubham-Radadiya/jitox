@@ -310,7 +310,15 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   }, [productMetaById]);
 
   const isQuotation = formType === "quotation";
-  const pageTitle = isQuotation ? "Add Quotation" : "Purchase Voucher";
+  const isPurchaseReturn = formType === "purchase-return";
+  const isSales = formType === "sales";
+  const pageTitle = isQuotation
+    ? "Add Quotation"
+    : isPurchaseReturn
+      ? "Purchase Return Voucher"
+      : isSales
+        ? "Sales Voucher"
+        : "Purchase Voucher";
 
   const lineTotals = useMemo(() => {
     return productRows.reduce(
@@ -570,6 +578,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   if (layout === "invoice" && !isQuotation) {
     return (
       <InvoicePurchaseModalLayout
+        formType={formType}
         dropdownOptions={dropdownOptions}
         liveNow={liveNow}
         onClose={onClose}
@@ -638,7 +647,11 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {isQuotation
               ? "Capture line items, delivery, and pricing for your quotation."
-              : "Record party, delivery, products, and tax for this purchase entry."}
+              : isPurchaseReturn
+                ? "Record items being returned to the supplier — stock leaves on save."
+                : isSales
+                  ? "Record items being sold to the customer — stock leaves on save."
+                  : "Record party, delivery, products, and tax for this purchase entry."}
           </p>
         </div>
       )}

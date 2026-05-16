@@ -2,6 +2,7 @@ import mongoose, { Schema } from "mongoose";
 
 export interface IMarketingScheme extends mongoose.Document {
   schemeName: string;
+  schemeDescription: string;
   appliedProducts: string;
   schemeType: string;
   targetAudience: string;
@@ -13,6 +14,7 @@ export interface IMarketingScheme extends mongoose.Document {
 const marketingSchemeSchema = new Schema<IMarketingScheme>(
   {
     schemeName: { type: String, required: true, trim: true },
+    schemeDescription: { type: String, default: "", trim: true },
     appliedProducts: { type: String, default: "-" },
     schemeType: { type: String, default: "Cashback", trim: true },
     targetAudience: { type: String, default: "Farmer", trim: true },

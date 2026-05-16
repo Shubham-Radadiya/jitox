@@ -15,19 +15,13 @@ import {
   createEmptyProductForm,
   mapApiProductToForm,
   mergeDropdownOption,
+  unitForApiPayload,
 } from "../../utils/productMappers";
 import {
   mergeDefaultAndStoredExtras,
   persistFullOptions,
   readStoredExtras,
 } from "../../utils/dropdownExtrasStorage";
-
-function parseUnits(v) {
-  const n = Number(v);
-  if (Number.isFinite(n) && n > 0) return n;
-  const map = { kg: 1, ltr: 2, gm: 3, ml: 4 };
-  return map[String(v).toLowerCase()] ?? 1;
-}
 
 const slugCategory = (name) => {
   const s = String(name).trim().toLowerCase().replace(/\s+/g, "-");
@@ -435,6 +429,11 @@ const AddProductModal = ({
       toast.error("Group is required");
       return;
     }
+    const unitsValue = unitForApiPayload(form.units);
+    if (!unitsValue) {
+      toast.error("Unit is required");
+      return;
+    }
     const billingRatePerUnit = parseFloat(String(form.billingRate));
     if (!Number.isFinite(billingRatePerUnit)) {
       toast.error("Billing rate per unit is required");
@@ -451,7 +450,7 @@ const AddProductModal = ({
       productName: String(form.productName).trim(),
       category: String(form.category).trim(),
       group: String(form.group).trim(),
-      units: parseUnits(form.units),
+      units: unitsValue,
       billingRatePerUnit,
       alternateUnits: form.alternateUnits || undefined,
       packingStyle: form.packagingType || form.packingStyle || undefined,

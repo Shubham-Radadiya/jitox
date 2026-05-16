@@ -17,6 +17,27 @@
  */
 import http from "./axios.config.jsx";
 
+/**
+ * Multipart body for user create/update (optional `photo` file).
+ * Stringifies `permissions` because FormData fields are strings.
+ */
+export function buildUserMultipartFormData(payload, photoFile) {
+  const fd = new FormData();
+  Object.entries(payload).forEach(([key, val]) => {
+    if (val === undefined || val === null) return;
+    if (key === "permissions") {
+      fd.append(key, JSON.stringify(Array.isArray(val) ? val : []));
+      return;
+    }
+    if (key === "phone" && String(val).trim() === "") return;
+    fd.append(key, String(val));
+  });
+  if (photoFile && typeof File !== "undefined" && photoFile instanceof File) {
+    fd.append("photo", photoFile);
+  }
+  return fd;
+}
+
 const DU = "/dashboard-ui";
 const API = "/api";
 
@@ -31,9 +52,18 @@ export const authApi = {
 export const usersApi = {
   getAll: () => http.get("/users/"),
   getById: (id) => http.get(`/users/get-user/${encodeURIComponent(id)}`),
-  create: (body) => http.post("/users/create-user", body),
-  update: (id, body) =>
-    http.put(`/users/update-user/${encodeURIComponent(id)}`, body),
+  create: (body) => {
+    const isFd = typeof FormData !== "undefined" && body instanceof FormData;
+    return http.post("/users/create-user", body, isFd ? {} : undefined);
+  },
+  update: (id, body) => {
+    const isFd = typeof FormData !== "undefined" && body instanceof FormData;
+    return http.put(
+      `/users/update-user/${encodeURIComponent(id)}`,
+      body,
+      isFd ? {} : undefined
+    );
+  },
   delete: (id) =>
     http.delete(`/users/delete-user/${encodeURIComponent(id)}`),
 };
@@ -121,7 +151,12 @@ export const receiptVouchersApi = {
   getAll: (params) => http.get("/receiptVouchers/", { params }),
   getById: (id) =>
     http.get(`/receiptVouchers/get-receipt-by-id/${encodeURIComponent(id)}`),
+  getFormMeta: () => http.get("/receiptVouchers/form-meta"),
   create: (body) => http.post("/receiptVouchers/create", body),
+  update: (id, body) =>
+    http.put(`/receiptVouchers/update/${encodeURIComponent(id)}`, body),
+  delete: (id) =>
+    http.delete(`/receiptVouchers/delete/${encodeURIComponent(id)}`),
 };
 
 export const purchaseVouchersApi = {
@@ -156,6 +191,54 @@ export const purchaseReturnVouchersApi = {
     http.delete(
       `/purchaseReturnVouchers/delete-purchase-return-voucher/${encodeURIComponent(id)}`
     ),
+};
+
+export const salesVouchersApi = {
+  getAll: (params) => http.get("/salesVouchers/", { params }),
+  getById: (id) => http.get(`/salesVouchers/${encodeURIComponent(id)}`),
+  getFormMeta: () => http.get("/salesVouchers/form-meta"),
+  create: (body) => http.post("/salesVouchers/create-sales-voucher", body),
+  update: (id, body) =>
+    http.put(
+      `/salesVouchers/update-sales-voucher/${encodeURIComponent(id)}`,
+      body
+    ),
+  delete: (id) =>
+    http.delete(
+      `/salesVouchers/delete-sales-voucher/${encodeURIComponent(id)}`
+    ),
+};
+
+export const manufacturingVouchersApi = {
+  getAll: () => http.get("/manufacturingVouchers/"),
+  getFormMeta: () => http.get("/manufacturingVouchers/preview-numbers"),
+  getById: (id) =>
+    http.get(`/manufacturingVouchers/${encodeURIComponent(id)}`),
+  create: (body) =>
+    http.post("/manufacturingVouchers/create-manufacturing-voucher", body),
+  update: (id, body) =>
+    http.put(
+      `/manufacturingVouchers/update-manufacturing-voucher/${encodeURIComponent(id)}`,
+      body
+    ),
+  delete: (id) =>
+    http.delete(
+      `/manufacturingVouchers/delete-manufacturing-voucher/${encodeURIComponent(id)}`
+    ),
+  recheckStock: (id) =>
+    http.post(`/manufacturingVouchers/${encodeURIComponent(id)}/recheck-stock`),
+  start: (id) =>
+    http.post(`/manufacturingVouchers/${encodeURIComponent(id)}/start`),
+  complete: (id) =>
+    http.post(`/manufacturingVouchers/${encodeURIComponent(id)}/complete`),
+  fail: (id, body) => {
+    const isFd = typeof FormData !== "undefined" && body instanceof FormData;
+    return http.post(
+      `/manufacturingVouchers/${encodeURIComponent(id)}/fail`,
+      body,
+      isFd ? {} : undefined
+    );
+  },
 };
 
 export const paymentVouchersApi = {
@@ -196,6 +279,7 @@ export const cashVouchersApi = {
 
 export const journalVouchersApi = {
   getAll: (params) => http.get("/journalVouchers/", { params }),
+  getNextVoucherNo: () => http.get("/journalVouchers/next-voucher-no"),
   getById: (id) => http.get(`/journalVouchers/${encodeURIComponent(id)}`),
   create: (body) => http.post("/journalVouchers/create", body),
   update: (id, body) =>
@@ -236,6 +320,8 @@ export const dashboardUiApi = {
 
   getSchemes: (params) => http.get(`${DU}/schemes`, { params }),
   createScheme: (body) => http.post(`${DU}/schemes`, body),
+  updateScheme: (id, body) =>
+    http.put(`${DU}/schemes/${encodeURIComponent(id)}`, body),
   deleteScheme: (id) =>
     http.delete(`${DU}/schemes/${encodeURIComponent(id)}`),
 

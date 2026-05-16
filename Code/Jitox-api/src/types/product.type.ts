@@ -4,7 +4,7 @@ export interface IProduct extends Document {
   productName: String;
   category: String;
   group: String;
-  units: Number;
+  units: String;
   billingRatePerUnit: Number;
   alternateUnits: String;
   packingStyle: String;

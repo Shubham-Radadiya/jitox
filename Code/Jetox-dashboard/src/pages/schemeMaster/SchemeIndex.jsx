@@ -1,8 +1,14 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import DataTable from "../../components/ui/table/DataTable";
 import { Button } from "../../components/ui/CommanUI";
-import { Calendar, Search } from "lucide-react";
+import { Calendar, Search, Plus, X } from "lucide-react";
 import { IoEyeOutline, IoTrashOutline } from "react-icons/io5";
 import { TbEdit } from "react-icons/tb";
 import AddSchemeModal from "./AddSchemeModal";
@@ -11,8 +17,85 @@ import CommonDeleteModal from "../../components/ui/modals/CommonDeleteModal";
 import CommonDeleteSuccessModal from "../../components/ui/modals/CommonDeleteSuccessModal";
 import { dashboardUiService } from "../../services/dashboardUi.service";
 import toast from "react-hot-toast";
-import { TABLE_ACTION_ICON_BTN, tableTdClasses } from "../../utils/tableUi";
+import { TABLE_ACTION_ICON_BTN_DENSE, tableTdClasses, STATUS_CELL_INNER, schemeLifecycleBadgeClasses } from "../../utils/tableUi";
 import { mergePageAddButton } from "../../utils/pageAddButton";
+import { tableColumnKey } from "../../hooks/TableCustomHook";
+import { getSchemeLifecycleStatus } from "../../utils/schemeLifecycleStatus";
+import { stripJitoxDemoProductNamePrefix } from "./schemeProductDropdownUtils";
+
+const COLUMN_PICKER_MAX_WIDTH_PX = 224;
+
+/** localStorage: visible column keys in table order (survives reload). */
+const SCHEME_TABLE_COLUMNS_STORAGE_KEY =
+  "jetox.dashboard.schemeMaster.selectedColumnKeys";
+
+/** Full column set for scheme list (order preserved when toggling visibility). */
+const SCHEME_TABLE_BASE_COLUMNS = [
+  "Scheme Name",
+  "Scheme Description",
+  "Applied Products",
+  "Type",
+  "Target Audience",
+  "Offer Name",
+  "Start Date",
+  "End Date",
+  "Status",
+  { label: "Actions", key: "Actions" },
+];
+
+function readSchemeTableColumnsFromStorage() {
+  if (typeof window === "undefined") return SCHEME_TABLE_BASE_COLUMNS;
+  try {
+    const raw = localStorage.getItem(SCHEME_TABLE_COLUMNS_STORAGE_KEY);
+    if (!raw) return SCHEME_TABLE_BASE_COLUMNS;
+    const keys = JSON.parse(raw);
+    if (!Array.isArray(keys) || keys.length === 0)
+      return SCHEME_TABLE_BASE_COLUMNS;
+    const baseKeySet = new Set(
+      SCHEME_TABLE_BASE_COLUMNS.map((c) => tableColumnKey(c))
+    );
+    const filteredKeys = keys.filter(
+      (k) => typeof k === "string" && baseKeySet.has(k)
+    );
+    if (!filteredKeys.length) return SCHEME_TABLE_BASE_COLUMNS;
+    if (!filteredKeys.includes("Actions")) filteredKeys.push("Actions");
+    const visible = new Set(filteredKeys);
+    const ordered = SCHEME_TABLE_BASE_COLUMNS.filter((c) =>
+      visible.has(tableColumnKey(c))
+    );
+    if (ordered.length < 2) return SCHEME_TABLE_BASE_COLUMNS;
+    return ordered;
+  } catch {
+    return SCHEME_TABLE_BASE_COLUMNS;
+  }
+}
+
+function schemeBodyFromPayload(payload) {
+  return {
+    schemeName: payload["Scheme Name"] || payload.name,
+    schemeDescription: String(
+      payload.description ?? payload["Scheme Description"] ?? ""
+    ).trim(),
+    appliedProducts: (() => {
+      const raw = String(
+        payload.applicable ?? payload["Applied Products"] ?? ""
+      ).trim();
+      const s = stripJitoxDemoProductNamePrefix(raw);
+      return s || "-";
+    })(),
+    schemeType: payload.type || payload["Type"],
+    targetAudience: payload.targetAudience || payload["Target Audience"],
+    offerDetails: payload.offerDetails || payload["Offer Name"],
+    startDate:
+      payload.startDate?.format?.("DD MMM, YYYY") ||
+      payload["Start Date"] ||
+      "",
+    endDate:
+      payload.endDate?.format?.("DD MMM, YYYY") ||
+      payload["End Date"] ||
+      "",
+  };
+}
 
 const SchemeIndex = () => {
   const [schemes, setSchemes] = useState([]);
@@ -28,6 +111,102 @@ const SchemeIndex = () => {
   const [schemeSearch, setSchemeSearch] = useState("");
   const [audienceFilter, setAudienceFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+
+  const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
+  const [columnPickerPosition, setColumnPickerPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+  const columnPickerButtonRef = useRef(null);
+  const columnPickerPopupRef = useRef(null);
+
+  const [selectedColumns, setSelectedColumns] = useState(
+    readSchemeTableColumnsFromStorage
+  );
+
+  useEffect(() => {
+    try {
+      const keys = selectedColumns.map((c) => tableColumnKey(c));
+      localStorage.setItem(
+        SCHEME_TABLE_COLUMNS_STORAGE_KEY,
+        JSON.stringify(keys)
+      );
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [selectedColumns]);
+
+  useEffect(() => {
+    if (!isColumnPickerOpen) return undefined;
+
+    const handleClickOutside = (event) => {
+      const clickedInsidePopup = columnPickerPopupRef.current?.contains(
+        event.target
+      );
+      const clickedTrigger = columnPickerButtonRef.current?.contains(
+        event.target
+      );
+      if (!clickedInsidePopup && !clickedTrigger) {
+        setIsColumnPickerOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isColumnPickerOpen]);
+
+  const computeColumnPickerPosition = useCallback(() => {
+    const btn = columnPickerButtonRef.current;
+    if (!btn) return null;
+    const rect = btn.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const margin = 12;
+    const popoverW = Math.min(COLUMN_PICKER_MAX_WIDTH_PX, vw - 2 * margin);
+    const half = popoverW / 2;
+    const centerX = rect.left + rect.width / 2;
+    const clampedLeft = Math.min(
+      Math.max(centerX, half + margin),
+      vw - half - margin
+    );
+    return { top: rect.bottom + 8, left: clampedLeft };
+  }, []);
+
+  useEffect(() => {
+    if (!isColumnPickerOpen) return undefined;
+    const update = () => {
+      const next = computeColumnPickerPosition();
+      if (next) setColumnPickerPosition(next);
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [isColumnPickerOpen, computeColumnPickerPosition]);
+
+  const handleToggleSchemeColumn = useCallback((column) => {
+    const colKey = tableColumnKey(column);
+    if (colKey === "Actions" || colKey === "Action") return;
+    setSelectedColumns((prev) => {
+      const nextKeys = new Set(prev.map((c) => tableColumnKey(c)));
+      if (nextKeys.has(colKey)) nextKeys.delete(colKey);
+      else nextKeys.add(colKey);
+      nextKeys.add("Actions");
+      return SCHEME_TABLE_BASE_COLUMNS.filter((c) =>
+        nextKeys.has(tableColumnKey(c))
+      );
+    });
+  }, []);
+
+  const toggleColumnPicker = useCallback(() => {
+    if (!isColumnPickerOpen && columnPickerButtonRef.current) {
+      const next = computeColumnPickerPosition();
+      if (next) setColumnPickerPosition(next);
+    }
+    setIsColumnPickerOpen((prev) => !prev);
+  }, [isColumnPickerOpen, computeColumnPickerPosition]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,18 +226,27 @@ const SchemeIndex = () => {
     load();
   }, [load]);
 
-  const columns = useMemo(
-    () => [
-      "Scheme Name",
-      "Applied Products",
-      "Type",
-      "Target Audience",
-      "Offer Name",
-      "Start Date",
-      "End Date",
-      { label: "Actions", key: "Actions" },
-    ],
-    []
+  const renderSchemeActionsHeader = useCallback(
+    () => (
+      <div className="inline-flex">
+        <button
+          type="button"
+          ref={columnPickerButtonRef}
+          onClick={toggleColumnPicker}
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-light-border bg-white shadow-sm hover:bg-gray-50 hover:shadow-md dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
+          aria-expanded={isColumnPickerOpen}
+          aria-haspopup="dialog"
+          aria-label="Choose visible columns"
+        >
+          <Plus
+            size={16}
+            className="text-slate-800 dark:text-emerald-400"
+            strokeWidth={2.25}
+          />
+        </button>
+      </div>
+    ),
+    [isColumnPickerOpen, toggleColumnPicker]
   );
 
   const audienceOptions = useMemo(() => {
@@ -87,11 +275,11 @@ const SchemeIndex = () => {
     let list = schemes;
     const q = schemeSearch.trim().toLowerCase();
     if (q) {
-      list = list.filter((r) =>
-        String(r["Scheme Name"] ?? "")
-          .toLowerCase()
-          .includes(q)
-      );
+      list = list.filter((r) => {
+        const name = String(r["Scheme Name"] ?? "").toLowerCase();
+        const desc = String(r["Scheme Description"] ?? "").toLowerCase();
+        return name.includes(q) || desc.includes(q);
+      });
     }
     if (audienceFilter) {
       list = list.filter(
@@ -103,6 +291,15 @@ const SchemeIndex = () => {
     }
     return list;
   }, [schemes, schemeSearch, audienceFilter, typeFilter]);
+
+  const schemeRowsForTable = useMemo(
+    () =>
+      filteredSchemes.map((r) => ({
+        ...r,
+        Status: getSchemeLifecycleStatus(r),
+      })),
+    [filteredSchemes]
+  );
 
   const handleAdd = () => {
     setSelectedScheme(null);
@@ -128,12 +325,12 @@ const SchemeIndex = () => {
   };
 
   const renderAction = (row) => (
-    <td className={tableTdClasses("Actions")}>
-      <div className="inline-flex flex-nowrap items-center justify-center gap-2">
+    <td className={tableTdClasses("Actions", { dense: true })}>
+      <div className="inline-flex flex-nowrap items-center justify-center gap-1.5">
         <button
           type="button"
           title="View scheme"
-          className={TABLE_ACTION_ICON_BTN}
+          className={TABLE_ACTION_ICON_BTN_DENSE}
           onClick={(e) => {
             e.stopPropagation();
             handleView(row);
@@ -144,7 +341,7 @@ const SchemeIndex = () => {
         <button
           type="button"
           title="Edit scheme"
-          className={TABLE_ACTION_ICON_BTN}
+          className={TABLE_ACTION_ICON_BTN_DENSE}
           onClick={(e) => {
             e.stopPropagation();
             handleEdit(row);
@@ -155,7 +352,7 @@ const SchemeIndex = () => {
         <button
           type="button"
           title="Delete scheme"
-          className={`${TABLE_ACTION_ICON_BTN} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-300`}
+          className={`${TABLE_ACTION_ICON_BTN_DENSE} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-300`}
           onClick={(e) => {
             e.stopPropagation();
             handleDelete(row);
@@ -167,14 +364,29 @@ const SchemeIndex = () => {
     </td>
   );
 
-  const renderRowCell = (colKey, value) => (
-    <td
-      key={colKey}
-      className={`${tableTdClasses(colKey)} py-2.5! text-sm text-gray-600 dark:text-slate-200`}
-    >
-      {value ?? "-"}
-    </td>
-  );
+  const renderRowCell = (colKey, value) => {
+    if (colKey === "Status") {
+      const label = value ?? "—";
+      return (
+        <td
+          key={colKey}
+          className={`${tableTdClasses(colKey, { dense: true })} text-sm text-gray-600 dark:text-slate-200`}
+        >
+          <div className={STATUS_CELL_INNER}>
+            <span className={schemeLifecycleBadgeClasses(label)}>{label}</span>
+          </div>
+        </td>
+      );
+    }
+    return (
+      <td
+        key={colKey}
+        className={`${tableTdClasses(colKey, { dense: true })} text-sm text-gray-600 dark:text-slate-200`}
+      >
+        {value ?? "-"}
+      </td>
+    );
+  };
 
   const pageSize = 4;
   const showingFrom = filteredSchemes.length ? 1 : 0;
@@ -263,10 +475,11 @@ const SchemeIndex = () => {
 
           <div className="px-3 py-2.5 sm:px-5 sm:py-4">
             <DataTable
-              columns={columns}
-              data={loading ? [] : filteredSchemes}
+              columns={selectedColumns}
+              data={loading ? [] : schemeRowsForTable}
               renderRowCell={renderRowCell}
               renderAction={renderAction}
+              renderActionsHeader={renderSchemeActionsHeader}
               loading={loading}
               tableClassName="whitespace-nowrap text-sm"
             />
@@ -286,6 +499,68 @@ const SchemeIndex = () => {
           </div>
         </div>
 
+        {isColumnPickerOpen && (
+          <div className="fixed inset-0 z-[999]">
+            <div
+              ref={columnPickerPopupRef}
+              className="absolute w-[min(14rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 overflow-hidden rounded-lg border border-light-border bg-white shadow-lg dark:border-slate-600 dark:bg-slate-900 dark:shadow-xl dark:shadow-black/40"
+              style={{
+                top: columnPickerPosition.top,
+                left: columnPickerPosition.left,
+              }}
+              role="dialog"
+              aria-label="Add column"
+            >
+              <div className="flex justify-between border-b border-light-border bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-800">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Add Column
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsColumnPickerOpen(false)}
+                  className="rounded-md p-0.5 text-slate-600 transition hover:bg-slate-200/90 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex max-h-60 flex-col gap-2 overflow-y-auto p-3 dark:bg-slate-900">
+                {SCHEME_TABLE_BASE_COLUMNS.map((column, colIdx) => {
+                  const colKey = tableColumnKey(column);
+                  const colLabel =
+                    typeof column === "string"
+                      ? column
+                      : column?.label ?? column?.key ?? colKey;
+                  const isActions =
+                    colKey === "Actions" || colKey === "Action";
+                  const isChecked =
+                    isActions ||
+                    selectedColumns.some(
+                      (c) => tableColumnKey(c) === colKey
+                    );
+                  return (
+                    <label
+                      key={colKey ? `col-${colKey}` : `col-idx-${colIdx}`}
+                      className="flex cursor-pointer items-center gap-3 rounded-md px-1 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        disabled={isActions}
+                        onChange={() => handleToggleSchemeColumn(column)}
+                        className="h-4 w-4 rounded border-slate-300 text-primary accent-primary focus:ring-primary/30 dark:border-slate-500 dark:bg-slate-900"
+                      />
+                      <span className="text-sm text-slate-800 dark:text-slate-100">
+                        {colLabel}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         <AddSchemeModal
           open={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
@@ -293,25 +568,28 @@ const SchemeIndex = () => {
           mode={modalMode}
           onSuccess={async (payload) => {
             try {
+              const body = schemeBodyFromPayload(payload);
+              let nextSelected = payload;
+
               if (modalMode === "add") {
-                await dashboardUiService.createScheme({
-                  schemeName: payload["Scheme Name"] || payload.name,
-                  appliedProducts: payload.applicable || payload["Applied Products"],
-                  schemeType: payload.type || payload["Type"],
-                  targetAudience: payload.targetAudience || payload["Target Audience"],
-                  offerDetails: payload.offerDetails || payload["Offer Name"],
-                  startDate:
-                    payload.startDate?.format?.("DD MMM, YYYY") ||
-                    payload["Start Date"] ||
-                    "",
-                  endDate:
-                    payload.endDate?.format?.("DD MMM, YYYY") ||
-                    payload["End Date"] ||
-                    "",
-                });
+                const { data } = await dashboardUiService.createScheme(body);
                 toast.success("Scheme added");
+                if (data?.scheme) nextSelected = { ...payload, ...data.scheme };
+              } else if (modalMode === "edit") {
+                const id = String(payload?.id ?? selectedScheme?.id ?? "");
+                if (!id) {
+                  toast.error("Missing scheme id");
+                  return;
+                }
+                const { data } = await dashboardUiService.updateScheme(
+                  id,
+                  body
+                );
+                toast.success("Scheme updated");
+                if (data?.scheme) nextSelected = { ...payload, ...data.scheme };
               }
-              setSelectedScheme(payload);
+
+              setSelectedScheme(nextSelected);
               setIsAddModalOpen(false);
               setIsSuccessModalOpen(true);
               await load();
@@ -324,6 +602,11 @@ const SchemeIndex = () => {
         <SchemeSuccessModal
           open={isSuccessModalOpen}
           onClose={() => setIsSuccessModalOpen(false)}
+          onEditAgain={() => {
+            setIsSuccessModalOpen(false);
+            setModalMode(selectedScheme?.id ? "edit" : "add");
+            setIsAddModalOpen(true);
+          }}
           scheme={selectedScheme}
           mode={modalMode}
         />

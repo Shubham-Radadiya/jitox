@@ -52,6 +52,78 @@ export function mapPurchaseReturnAggregateRow(v) {
   };
 }
 
+export function mapManufacturingRow(v) {
+  const id = v._id;
+  const finished =
+    v.finishedProduct && typeof v.finishedProduct === "object"
+      ? v.finishedProduct
+      : null;
+  const productName = finished?.productName || "—";
+  const qty = Number(v.quantityToProduce);
+  const unit = String(v.produceUnit || "").trim();
+  const status = v.status || "Planned";
+  const stockIssues = Array.isArray(v.stockIssues) ? v.stockIssues : [];
+  const stockBlocked = Boolean(v.stockBlocked) || stockIssues.length > 0;
+  const displayStatus =
+    status === "Paused" || (stockBlocked && status === "Planned")
+      ? "Paused"
+      : status;
+  const displayDate = v.completedAt || v.startedAt || v.mfgDate;
+  const dateIso = displayDate
+    ? dayjs(displayDate).format("YYYY-MM-DD")
+    : "—";
+  const costPerUnit = Number(v.landingCostPerUnit);
+  const grandTotal = Number(v.grandTotal);
+  let qtyMade = "—";
+  if (status === "Failed" && (!Number.isFinite(qty) || qty <= 0)) {
+    qtyMade = "0";
+  } else if (Number.isFinite(qty) && qty > 0) {
+    qtyMade = unit ? `${qty} ${unit}` : String(qty);
+  }
+  return {
+    _id: id,
+    _raw: v,
+    "Batch ID": v.batchCode || v.voucherNo || "—",
+    "Product Name": productName,
+    Date: dateIso,
+    "Qty Made": qtyMade,
+    "Cost/Unit":
+      Number.isFinite(costPerUnit) && costPerUnit > 0
+        ? fmtRupee(costPerUnit)
+        : status === "Failed"
+          ? "—"
+          : fmtRupee(costPerUnit),
+    "Total Cost":
+      Number.isFinite(grandTotal) && grandTotal > 0
+        ? fmtRupee(grandTotal)
+        : status === "Failed"
+          ? fmtRupee(0)
+          : fmtRupee(grandTotal),
+    Status: displayStatus,
+    stockBlocked,
+    stockIssues,
+  };
+}
+
+export function mapSalesAggregateRow(v) {
+  const id = v._id;
+  const date = v.voucherDate ? dayjs(v.voucherDate).format("YYYY-MM-DD") : "";
+  const totalQty = Array.isArray(v.items)
+    ? v.items.reduce((s, it) => s + (Number(it?.quantity) || 0), 0)
+    : 0;
+  return {
+    _id: id,
+    _raw: v,
+    "Invoice No.": v.voucherNo || v.invoiceNo || "—",
+    Date: date,
+    "Party Name": v.partyName || "—",
+    Qty: totalQty ? String(totalQty) : "—",
+    Amount: v.totalAmount != null ? fmtRupee(v.totalAmount) : "—",
+    "Payment Status": v.paymentStatus || "Pending",
+    "Order Status": v.orderStatus || "Processing",
+  };
+}
+
 export function mapDashboardOrderRow(r) {
   return {
     _id: r._id,
@@ -265,6 +337,165 @@ export function purchaseDocToDetailShape(doc) {
       finalPayable: totalLabel,
       reference: d.transportDetails || "",
     },
+  };
+}
+
+/**
+ * Format INR consistently with the backend (`formatInr` in
+ * `services/dashboardDynamic.service.ts`): rounds and uses `en-IN` grouping.
+ */
+function fmtInr(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return `₹${Math.round(x).toLocaleString("en-IN")}`;
+}
+
+/**
+ * Shape expected by `OrderDetailsDrawer` (reused by `SalesDetailsDrawer`).
+ *
+ * Mirrors the shape `fetchQuotationOrderPayload` returns on the backend —
+ * always emit formatted strings with `"—"` fallbacks so every row in the
+ * Payment Details / Dispatch / Delivery sections renders, even when the
+ * underlying voucher field is missing. This keeps the sales voucher view
+ * visually identical to the dashboard's order drawer.
+ */
+export function salesDocToOrderDetailShape(doc) {
+  const d = doc;
+  if (!d) return null;
+
+  const createdSource = d.voucherDate || d.createdAt;
+  const createdAt = createdSource
+    ? new Date(createdSource).toLocaleString("en-IN", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "";
+
+  const products = (d.items || []).map((it, i) => {
+    const p = it.product;
+    const name =
+      p && typeof p === "object" && p.productName
+        ? p.productName
+        : String(p || `Item ${i + 1}`);
+    const qtyNum = Number(it.quantity);
+    const qty = `${Number.isFinite(qtyNum) ? qtyNum : it.quantity ?? ""} ${it.unit || ""}`.trim();
+    const rateNum = Number(it.rateParUnit) || 0;
+    const subNum =
+      Number(it.subtotal) ||
+      (Number.isFinite(qtyNum) ? qtyNum * rateNum : 0);
+    return {
+      name,
+      qty: qty || "—",
+      rate: fmtInr(rateNum),
+      subtotal: fmtInr(subNum),
+    };
+  });
+
+  const productsTotal = fmtInr(
+    (d.items || []).reduce((s, i) => s + (Number(i?.subtotal) || 0), 0)
+  );
+
+  const shippingAddress =
+    String(d.shipTo ?? "").trim() ||
+    String(d.shipToAndBillTo ?? "").trim() ||
+    String(d.billTo ?? "").trim();
+
+  const manager = {
+    fullName: d.orderby || "—",
+    region: d.region || "",
+    area: d.area || "",
+  };
+
+  const client = {
+    fullName: d.partyName || "—",
+    phone: d.partyPhone || d.phone || "",
+    email: d.partyEmail || d.email || "",
+    shippingAddress,
+  };
+
+  const payment = {
+    subTotal: fmtInr(Number(d.basePrice) || 0),
+    tax: fmtInr(Number(d.gstAmount) || 0),
+    discount: d.discount != null ? fmtInr(d.discount) : "₹0",
+    mode: d.paymentMode || "—",
+    transactionId: d.transactionId || "—",
+    grandTotal: fmtInr(Number(d.totalAmount) || 0),
+  };
+
+  const dispatch = {
+    status: d.dispatchStatus || "—",
+  };
+
+  const delivery = {
+    trackingNumber: d.trackingNumber || d.transportDetails || "—",
+    courier: d.courier || d.deliveryAt || "—",
+  };
+
+  /**
+   * Invoice payload for `InvoiceModal` — mirrors the shape produced by
+   * `fetchQuotationOrderPayload` on the backend so the modal renders the
+   * same way it does from the dashboard's "Generate Invoice" button.
+   */
+  const totalAmount = Number(d.totalAmount) || 0;
+  const paidAmount = Number(d.paidAmount) || 0;
+  const outstanding = Math.max(0, totalAmount - paidAmount);
+  const invoiceDate = d.voucherDate
+    ? new Date(d.voucherDate).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "";
+
+  const invoice = {
+    companyName: d.companyName || "Jitox Agro",
+    website: d.companyWebsite || "",
+    email: d.companyEmail || "",
+    phone: d.companyPhone || "",
+    taxAddress: d.companyAddress || "",
+    billedTo: {
+      name: d.partyName || "—",
+      address: shippingAddress,
+      phone: d.partyPhone || d.phone || "",
+    },
+    invoiceNo: d.invoiceNo || d.voucherNo || "—",
+    reference: d.voucherNo || "",
+    orderId: d.voucherNo || "",
+    invoiceDate,
+    invoiceTotalLabel: fmtInr(totalAmount),
+    paymentMode: d.paymentMode || "—",
+    paymentStatusBadge: d.paymentStatus || "Pending",
+    lines: products.map((p) => ({
+      detail: p.name,
+      qty: p.qty,
+      rate: p.rate,
+      amount: p.subtotal,
+    })),
+    subtotal: fmtInr(Number(d.basePrice) || 0),
+    taxPct: "",
+    taxAmount: fmtInr(Number(d.gstAmount) || 0),
+    discount: d.discount != null ? fmtInr(d.discount) : "₹0",
+    paidAmount: fmtInr(paidAmount),
+    outstanding: fmtInr(outstanding),
+    finalPayable: fmtInr(totalAmount),
+    terms: d.termsAndConditions || "Please pay within the agreed credit period.",
+  };
+
+  return {
+    voucherNo: d.voucherNo || "",
+    invoiceNo: d.invoiceNo || "",
+    createdAt,
+    paymentStatus: d.paymentStatus || "",
+    orderStatus: d.orderStatus || "",
+    manager,
+    client,
+    products,
+    productsTotal,
+    payment,
+    dispatch,
+    delivery,
+    invoice,
+    narration: d.narration || d.remarks || "",
   };
 }
 

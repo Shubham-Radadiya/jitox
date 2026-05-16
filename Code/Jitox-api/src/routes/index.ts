@@ -4,6 +4,8 @@ import accountRouter from "./account.routes";
 import productRoute from "./product.routes";
 import purchaseVoucherRoute from "./purchaseVoucher.routes";
 import purchaseReturnVoucherRoute from "./purchaseReturnVoucher.routes";
+import salesVoucherRoute from "./salesVoucher.routes";
+import manufacturingVoucherRoute from "./manufacturingVoucher.routes";
 import paymentVoucherRoute from "./paymentVoucher.routes";
 import receiptVoucherRoute from "./reciptVoucher.routes";
 import expenseVoucherRoute from "./expenseVoucher.routes";
@@ -28,6 +30,8 @@ export const setupRoutes = (app: Express) => {
   app.use("/products", productRoute);
   app.use("/purchaseVouchers", purchaseVoucherRoute);
   app.use("/purchaseReturnVouchers", purchaseReturnVoucherRoute);
+  app.use("/salesVouchers", salesVoucherRoute);
+  app.use("/manufacturingVouchers", manufacturingVoucherRoute);
   app.use("/paymentVouchers", paymentVoucherRoute);
   app.use("/receiptVouchers", receiptVoucherRoute);
   app.use("/expenseVouchers", expenseVoucherRoute);

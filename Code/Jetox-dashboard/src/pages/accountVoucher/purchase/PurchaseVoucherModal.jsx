@@ -9,6 +9,7 @@ import {
 } from "./voucherFormConstants";
 import { purchaseVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
+import { invalidateProductAndStockQueries } from "../../../utils/invalidateStockQueries";
 import { purchasePayloadToCreateBody } from "./purchasePayloadToApi";
 
 function savedVoucherNoFromResponse(res, fallbackNo) {
@@ -126,6 +127,7 @@ export default function PurchaseVoucherModal({
       await queryClient.invalidateQueries({
         queryKey: ["purchase-voucher-detail", voucherId],
       });
+      invalidateProductAndStockQueries(queryClient);
       toast.success(
         kind === "new"
           ? `Saved ${savedNo}. Form cleared for a new entry.`

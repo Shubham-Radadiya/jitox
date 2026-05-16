@@ -80,6 +80,8 @@ const DataTable = ({
   tableClassName = "",
   maxHeight = "none",
   renderFooter,
+  /** When set, replaces the default Actions/Action header (e.g. column picker + button). */
+  renderActionsHeader,
   /** When false, data is shown as-is (e.g. row selection tables). */
   enableExcelColumnFilters = !enableSelect,
   /** When true, Excel-style headers use left alignment and a leading layout (custom cells should add `!text-left` if they override `tableTdClasses`). */
@@ -159,6 +161,16 @@ const DataTable = ({
     }
 
     if (!key || key === "Actions" || key === "Action" || key === "Select") {
+      if (
+        renderActionsHeader &&
+        (key === "Actions" || key === "Action")
+      ) {
+        return (
+          <React.Fragment key={`h-${key}`}>
+            {tableHeader(renderActionsHeader(col), key)}
+          </React.Fragment>
+        );
+      }
       return (
         <React.Fragment key={`h-${key}`}>
           {typeof col === "string"
@@ -268,6 +280,17 @@ const DataTable = ({
               .map((col, idx) => {
                 const ck = tableColumnKey(col) || `col-${idx}`;
                 if (enableExcelColumnFilters) return renderExcelHeader(col);
+                const k = tableColumnKey(col);
+                if (
+                  renderActionsHeader &&
+                  (k === "Actions" || k === "Action")
+                ) {
+                  return (
+                    <Fragment key={ck}>
+                      {tableHeader(renderActionsHeader(col), k)}
+                    </Fragment>
+                  );
+                }
                 return (
                   <Fragment key={ck}>
                     {typeof col === "string"

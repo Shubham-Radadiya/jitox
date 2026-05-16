@@ -1,10 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import dayjs from "dayjs";
+import { Download } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CommonModal,
   InputField,
   CommonDropdown,
   Button,
 } from "../../../components/ui/CommanUI";
+import { cashVouchersApi } from "../../../services/api";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 const bankOptions = [
   { label: "Select Bank", value: "" },
@@ -12,43 +18,204 @@ const bankOptions = [
   { label: "ICICI Bank", value: "icici" },
 ];
 
+/** Matches Jitox-api `proofUpload` / `singleProofUpload` (same as expense proof). */
+const ACCEPTED_PROOF_TYPES =
+  ".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf";
+const MAX_PROOF_BYTES = 20 * 1024 * 1024;
+const ACCEPTED_MIME = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+]);
+const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|pdf)$/i;
+
+function bankLabelFromValue(options, value) {
+  const opt = options.find((o) => o.value === value);
+  return opt?.label && opt.label !== "Select Bank" ? opt.label : "";
+}
+
+function isProofTypeAllowed(file) {
+  if (!file) return false;
+  if (file.type && ACCEPTED_MIME.has(String(file.type).toLowerCase())) return true;
+  return ACCEPTED_EXT_RE.test(String(file.name || ""));
+}
+
+const UPLOAD_INPUT_ID = "cash-voucher-attachment";
+
+const emptyForm = () => ({
+  voucherNumber: "",
+  voucherDate: "",
+  creditTo: "",
+  amount: "",
+  narration: "",
+});
+
 const CashTransferModal = ({ open, onClose }) => {
-  const [form, setForm] = useState({
-    voucherNumber: "Auto",
-    date: "",
-    debitFrom: "Cash auto",
-    creditTo: "",
-    amount: "",
-    narration: "",
-  });
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState(emptyForm);
+  const [proofFile, setProofFile] = useState(null);
+  const [proofObjectUrl, setProofObjectUrl] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        ...emptyForm(),
+        voucherNumber: `CV-${Date.now()}`,
+        voucherDate: dayjs().format("YYYY-MM-DD"),
+      });
+      setProofFile(null);
+      setSaving(false);
+      setIsDragging(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setForm(emptyForm());
+    setProofFile(null);
+    setSaving(false);
+    setIsDragging(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [open]);
+
+  useEffect(() => {
+    if (!proofFile) {
+      setProofObjectUrl("");
+      return undefined;
+    }
+    const url = URL.createObjectURL(proofFile);
+    setProofObjectUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [proofFile]);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const acceptProofFile = (file) => {
+    if (!file) {
+      setProofFile(null);
+      return;
+    }
+    if (!isProofTypeAllowed(file)) {
+      toast.error("Only JPG, JPEG, PNG, WEBP, or PDF files are allowed.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (file.size > MAX_PROOF_BYTES) {
+      toast.error("Attachment must be 20 MB or smaller.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setProofFile(file);
+  };
+
+  const handleProofPick = (e) => {
+    acceptProofFile(e.target.files?.[0] || null);
+  };
+
+  const handleProofDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    acceptProofFile(e.dataTransfer?.files?.[0] || null);
+  };
+
+  const removeProof = () => {
+    setProofFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const validate = () => {
+    if (!String(form.voucherDate || "").trim()) return "Pick a voucher date.";
+    const bankName = bankLabelFromValue(bankOptions, form.creditTo);
+    if (!bankName) return "Select the bank to credit.";
+    const n = Number(form.amount);
+    if (!Number.isFinite(n) || n <= 0) return "Enter a valid amount.";
+    const narr = String(form.narration || "").trim();
+    if (!narr) return "Add a narration or remark.";
+    return null;
+  };
+
+  const handleSave = async () => {
+    const err = validate();
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    const bankName = bankLabelFromValue(bankOptions, form.creditTo);
+    const narr = String(form.narration || "").trim();
+    const body = new FormData();
+    body.append("voucherNumber", String(form.voucherNumber ?? "").trim());
+    body.append("voucherDate", String(form.voucherDate || "").trim());
+    body.append("amount", String(Number(form.amount)));
+    body.append("debitFrom", "Cash");
+    body.append("creditTo", bankName);
+    body.append("narration", narr);
+    body.append("particulars", narr);
+    if (proofFile) body.append("attachmentsFile", proofFile);
+
+    try {
+      setSaving(true);
+      await cashVouchersApi.create(body);
+      await queryClient.invalidateQueries({ queryKey: ["voucher-list", "cash"] });
+      toast.success("Cash voucher saved.");
+      onClose();
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Could not save cash voucher"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const footer = (
     <>
-      <Button label="Cancel" variant="outline" className="w-28" onClick={onClose} />
-      <Button label="Save" variant="primary" className="w-28" />
+      <Button
+        label="Cancel"
+        variant="outline"
+        className="w-28"
+        onClick={onClose}
+        disabled={saving}
+      />
+      <Button
+        label={saving ? "Saving…" : "Save"}
+        variant="primary"
+        className="w-28"
+        onClick={handleSave}
+        disabled={saving}
+      />
     </>
   );
 
   return (
-    <CommonModal open={open} onClose={onClose} title="Cash to Bank Transfer" width="780px" footer={footer}>
+    <CommonModal
+      open={open}
+      onClose={onClose}
+      title="Cash to Bank Transfer"
+      width="780px"
+      footer={footer}
+    >
       <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <InputField label="Voucher Number" value={form.voucherNumber} disabled placeholder="Auto" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InputField
+            label="Voucher Number"
+            value={form.voucherNumber}
+            onChange={(e) => updateField("voucherNumber", e.target.value)}
+            placeholder="e.g. CV-001 (leave blank to auto-generate on save)"
+          />
           <InputField
             label="Date"
             type="date"
-            value={form.date}
-            onChange={(e) => updateField("date", e.target.value)}
-            placeholder="Auto"
+            value={form.voucherDate}
+            onChange={(e) => updateField("voucherDate", e.target.value)}
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <InputField label="Debit From" value={form.debitFrom} disabled />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <InputField label="Debit From" value="Cash" disabled />
           <CommonDropdown
             label="Credit To"
             addNavigateTo="/dashboard/account"
@@ -76,18 +243,73 @@ const CashTransferModal = ({ open, onClose }) => {
         />
 
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-dark">Attachment (Optional)</label>
-          <div className="border border-dashed border-light-border rounded-xl bg-rowBg px-4 py-3 flex gap-3 items-center justify-center text-center">
-            <Button
-              label="Upload"
-              variant="outline"
-              className="w-32 bg-white !text-gray-900 shadow-sm hover:!text-white dark:bg-slate-800 dark:!text-white dark:shadow-none dark:border-slate-500 dark:hover:!text-white"
+          <span className="text-xs font-medium text-dark">Attachment (optional)</span>
+          <label
+            htmlFor={UPLOAD_INPUT_ID}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!isDragging) setIsDragging(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+            }}
+            onDrop={handleProofDrop}
+            className={`relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-4 text-center transition ${
+              isDragging
+                ? "border-primary bg-primary/5 dark:bg-emerald-950/30"
+                : "border-light-border bg-rowBg"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              id={UPLOAD_INPUT_ID}
+              type="file"
+              accept={ACCEPTED_PROOF_TYPES}
+              onChange={handleProofPick}
+              className="sr-only"
             />
-            <div>
-            <div className="text-xs text-light">Choose images or drag & drop it here.</div>
-            <div className="text-[11px] text-light">JPG, JPEG, PNG and WEBP, Max 20 MB.</div>
-            </div>
-          </div>
+            <span className="inline-flex h-9 w-32 items-center justify-center rounded-lg border border-light-border bg-white text-sm font-medium text-gray-900 shadow-sm transition hover:bg-primary hover:text-white dark:border-slate-500 dark:bg-slate-800 dark:text-white">
+              {proofFile ? "Change file" : "Upload"}
+            </span>
+            {proofFile ? (
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-dark">
+                <span className="break-all">
+                  Selected: <span className="font-medium">{proofFile.name}</span>
+                </span>
+                {proofObjectUrl ? (
+                  <a
+                    href={proofObjectUrl}
+                    download={proofFile.name}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-light-border bg-white text-primary transition hover:bg-primary hover:text-white dark:border-slate-600 dark:bg-slate-800 dark:text-emerald-400 dark:hover:text-white"
+                    aria-label="Download selected file"
+                    title="Download"
+                  >
+                    <Download size={14} />
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  className="text-primary underline-offset-2 hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    removeProof();
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-light">Choose a file or drag &amp; drop it here.</p>
+            )}
+            <p className="text-[11px] text-light">
+              JPG, JPEG, PNG, WEBP and PDF, Max 20 MB.
+            </p>
+          </label>
         </div>
       </div>
     </CommonModal>
@@ -95,5 +317,3 @@ const CashTransferModal = ({ open, onClose }) => {
 };
 
 export default CashTransferModal;
-
-

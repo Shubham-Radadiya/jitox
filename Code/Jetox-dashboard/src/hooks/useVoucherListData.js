@@ -2,17 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import {
   purchaseVouchersApi,
   purchaseReturnVouchersApi,
+  salesVouchersApi,
   paymentVouchersApi,
   receiptVouchersApi,
   expenseVouchersApi,
   cashVouchersApi,
   journalVouchersApi,
   quotationsApi,
-  dashboardUiApi,
+  manufacturingVouchersApi,
 } from "../services/api";
 import {
+  mapManufacturingRow,
   mapPurchaseAggregateRow,
   mapPurchaseReturnAggregateRow,
+  mapSalesAggregateRow,
   mapPaymentVoucherRow,
   mapAccountingReceiptRow,
   mapExpenseRow,
@@ -20,10 +23,9 @@ import {
   mapBankVoucherRow,
   mapJournalRow,
   mapQuotationRow,
-  mapDashboardOrderRow,
 } from "../utils/voucherRowMappers";
 
-const STATIC_EMPTY_SLUGS = new Set(["sales-return", "manufacturing"]);
+const STATIC_EMPTY_SLUGS = new Set(["sales-return"]);
 
 async function loadVoucherRows(slug) {
   if (STATIC_EMPTY_SLUGS.has(slug)) return [];
@@ -40,9 +42,9 @@ async function loadVoucherRows(slug) {
       return list.map(mapPurchaseReturnAggregateRow);
     }
     case "sales": {
-      const { data } = await dashboardUiApi.getOrders({});
-      const list = Array.isArray(data?.orders) ? data.orders : [];
-      return list.map(mapDashboardOrderRow);
+      const { data } = await salesVouchersApi.getAll();
+      const list = Array.isArray(data?.data) ? data.data : [];
+      return list.map(mapSalesAggregateRow);
     }
     case "payment": {
       const { data } = await paymentVouchersApi.getAll();
@@ -82,6 +84,15 @@ async function loadVoucherRows(slug) {
       const { data } = await quotationsApi.getAll();
       const list = Array.isArray(data?.data) ? data.data : [];
       return list.map(mapQuotationRow);
+    }
+    case "manufacturing": {
+      const { data } = await manufacturingVouchersApi.getAll();
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+      return list.map(mapManufacturingRow);
     }
     default:
       return [];

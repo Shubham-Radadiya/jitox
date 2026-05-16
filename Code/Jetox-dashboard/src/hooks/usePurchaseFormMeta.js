@@ -27,10 +27,12 @@ export const emptyMeta = {
 
 /**
  * Master dropdowns for purchase voucher / invoice (accounts, products, employees).
+ * @param {{ enabled?: boolean }} [opts] — pass `{ enabled: modalOpen }` to fetch only when needed (shared cache key).
  */
-export function usePurchaseFormMeta() {
+export function usePurchaseFormMeta({ enabled = true } = {}) {
   return useQuery({
     queryKey: ["purchase-form-meta"],
+    enabled,
     queryFn: async () => {
       const { data } = await dashboardUiApi.getPurchaseFormMeta();
       if (!data || typeof data !== "object") return { ...emptyMeta };

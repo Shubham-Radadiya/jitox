@@ -94,6 +94,7 @@ export const Button = ({
   disabled = false,
   icon: Icon,
   className = "",
+  ...rest
 }) => {
   const sizeStyle =
     size === "sm"
@@ -112,6 +113,7 @@ export const Button = ({
 
   return (
     <button
+      {...rest}
       type={type}
       onClick={onClick}
       disabled={disabled}

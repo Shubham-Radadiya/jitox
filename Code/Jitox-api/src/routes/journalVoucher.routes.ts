@@ -2,6 +2,7 @@ import express from "express";
 import {
   createJournalVoucher,
   getAllJournalVouchers,
+  getNextJournalVoucherNo,
   updateJournalVoucher,
   getJournalVoucherById,
   deleteJournalVoucher,
@@ -11,6 +12,7 @@ const router = express.Router();
 
 router.post("/create", createJournalVoucher);
 router.get("/", getAllJournalVouchers);
+router.get("/next-voucher-no", getNextJournalVoucherNo);
 router.get("/:id", getJournalVoucherById);
 router.put("/update/:id", updateJournalVoucher);
 router.delete("/delete/:id", deleteJournalVoucher);

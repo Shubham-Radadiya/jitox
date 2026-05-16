@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { MODULE_ACCESS_OPTIONS } from "../../constants/accessModules";
 import AddressForm from "../../components/address/AddressForm";
 import { EMPTY_ADDRESS } from "../../utils/addressFormat";
+import { buildUserMultipartFormData } from "../../services/api";
 
 const ROLE_OPTIONS = [
   { label: "Admin", value: "admin" },
@@ -49,6 +50,7 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
 
   const [selectedPerms, setSelectedPerms] = useState(() => new Set(["dashboard"]));
   const [imagePreview, setImagePreview] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
   const fileInputRef = useRef(null);
   const [errors, setErrors] = useState({});
   const [addrErrors, setAddrErrors] = useState({});
@@ -72,6 +74,7 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
     });
     setSelectedPerms(new Set(["dashboard"]));
     setImagePreview(null);
+    setPhotoFile(null);
     setErrors({});
     setAddrErrors({});
     setAddress({ ...EMPTY_ADDRESS, city: "", state: "" });
@@ -109,8 +112,9 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
+      setPhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => setImagePreview(reader.result);
       reader.readAsDataURL(file);
@@ -162,7 +166,8 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
       permissions,
       streetAddress: address.streetAddress.trim(),
       area: address.area.trim(),
-      city: (address.city || form.region || "").trim(),
+      city: String(address.city || "").trim(),
+      region: String(form.region || "").trim(),
       taluka: address.taluka.trim(),
       district: (address.district || form.assignedAreas || "").trim(),
       state: address.state.trim(),
@@ -170,9 +175,11 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
       pincode: String(address.pincode || "").replace(/\D/g, ""),
     };
 
+    const body = buildUserMultipartFormData(payload, photoFile);
+
     setSaving(true);
     try {
-      await onCreated(payload);
+      await onCreated(body);
       onClose();
     } catch (err) {
       const msg =
@@ -315,7 +322,7 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
               />
             </div>
             <CommonDropdown
-              label="Region (stored as city)"
+              label="Region"
               addNavigateTo="/dashboard/user-master"
               placeholder="Select Region"
               value={form.region}

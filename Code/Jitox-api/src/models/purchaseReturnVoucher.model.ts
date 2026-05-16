@@ -10,6 +10,12 @@ const PurchaseReturnItemSchema = new Schema<IPurchaseItem>(
     category: { type: String, trim: true },
     unit: { type: String, trim: true },
     subtotal: { type: Number, required: true },
+    remarks: { type: String, trim: true },
+    hsn: { type: String, trim: true },
+    batch: { type: String, trim: true },
+    expDate: { type: String, trim: true },
+    mfgDate: { type: String, trim: true },
+    mrp: { type: String, trim: true },
   },
   { _id: false }
 );

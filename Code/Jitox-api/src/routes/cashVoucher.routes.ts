@@ -4,11 +4,15 @@ import {
   getAllCashVouchers,
   getCashVoucherById,
 } from "../controllers/cashVoucher.controller";
-import { upload } from "../middleware/multer.middleware";
+import { singleProofUpload } from "../middleware/multer.middleware";
 
 const router = express.Router();
 
-router.post("/create", upload.single("attachmentsFile"), createCashVoucher);
+router.post(
+  "/create",
+  singleProofUpload("attachmentsFile"),
+  createCashVoucher
+);
 router.get("/", getAllCashVouchers);
 router.get("/:id", getCashVoucherById);
 

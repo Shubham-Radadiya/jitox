@@ -22,6 +22,23 @@ import {
 import { toPublicUser } from "../utils/userAddress.dto";
 import type { IUser } from "../types/user.type";
 
+/** FormData sends JSON arrays as strings — normalize before `sanitizePermissionList`. */
+function permissionsFromMultipart(raw: unknown): unknown {
+  if (raw === undefined) return undefined;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (!t) return [];
+    try {
+      const v = JSON.parse(t) as unknown;
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  return raw;
+}
+
 const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
 
 const displayName = (user: InstanceType<typeof User>): string => {
@@ -212,7 +229,9 @@ export const createUser = async (
       throw new AppError(HttpStatusCode.BAD_REQUEST, "User already exists.");
     }
 
-    let permissionsStored = sanitizePermissionList(req.body.permissions);
+    let permissionsStored = sanitizePermissionList(
+      permissionsFromMultipart(req.body.permissions) ?? req.body.permissions
+    );
     if (parsedRole === Role.admin) {
       permissionsStored = [];
     } else if (permissionsStored.length === 0) {
@@ -221,6 +240,7 @@ export const createUser = async (
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    const region = trimAddressPart(req.body.region);
 
     const user = new User({
       email: emailNormalized,
@@ -240,6 +260,10 @@ export const createUser = async (
       state: addr.state,
       country: addr.country,
       pincode: addr.pincode,
+      ...(region ? { region } : {}),
+      ...(req.file
+        ? { profilePhoto: `/uploads/${req.file.filename}` }
+        : {}),
     });
 
     await user.save();
@@ -268,6 +292,8 @@ export const createUser = async (
         area: pub.area,
         country: pub.country,
         pincode: pub.pincode,
+        region: user.region,
+        profilePhoto: user.profilePhoto,
       },
     });
   } catch (error) {
@@ -323,7 +349,10 @@ export const updateUser = async (
       user.role = parsed;
     }
     if (req.body.permissions !== undefined) {
-      let nextPerms = sanitizePermissionList(req.body.permissions);
+      const raw = permissionsFromMultipart(req.body.permissions);
+      let nextPerms = sanitizePermissionList(
+        raw !== undefined ? raw : req.body.permissions
+      );
       if (user.role === Role.admin) {
         user.permissions = [];
       } else {
@@ -391,6 +420,14 @@ export const updateUser = async (
       user.pincode = addr.pincode;
     }
 
+    if (req.body.region !== undefined) {
+      const r = trimAddressPart(req.body.region);
+      user.region = r || undefined;
+    }
+    if (req.file) {
+      user.profilePhoto = `/uploads/${req.file.filename}`;
+    }
+
     if (!name && (firstName !== undefined || lastName !== undefined)) {
       const combined = [user.firstName, user.lastName]
         .filter(Boolean)
@@ -434,6 +471,8 @@ export const updateUser = async (
         area: pub.area,
         country: pub.country,
         pincode: pub.pincode,
+        region: updatedUser.region,
+        profilePhoto: updatedUser.profilePhoto,
       },
     });
   } catch (error) {

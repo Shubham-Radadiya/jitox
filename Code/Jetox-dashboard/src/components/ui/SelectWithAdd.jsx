@@ -26,6 +26,7 @@ import toast from "react-hot-toast";
  * - `searchable` — filter options; list scrolls, "+ Add" stays fixed at bottom
  * - `searchPlaceholder` — defaults to "Search…"
  * - `menuPlacement` — `"bottom"` (default) or `"top"` to open the panel above the trigger; top placement uses a fixed-position portal so parent `overflow:hidden` does not clip the menu
+ * - `menuPortal` — when `true`, bottom-opening menus are portaled (`fixed`, high z-index); use inside modals so lists are not clipped by footers / overflow
  * - `onAddClick` — called when "+ Add" is clicked; combine with `renderAddModal` for modal flows
  * - `addNavigateTo` — dashboard path (e.g. `/dashboard/product`); used if neither `renderAddModal` nor `onAddClick` is set
  * - `addLabel` — default "+ Add"
@@ -70,6 +71,8 @@ export function SelectWithAdd({
   compactValue = false,
   /** Open list above trigger — use in dense tables / near bottom of scroll areas */
   menuPlacement = "bottom",
+  /** Render menu in a body portal (fixed + high z-index) — use inside modals with overflow/footers */
+  menuPortal = false,
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -82,7 +85,7 @@ export function SelectWithAdd({
   const menuPortalRef = useRef(null);
   const listboxId = useId();
 
-  /** Fixed coords when menu opens upward — rendered via portal to escape overflow clipping */
+  /** Fixed coords — portaled to `document.body` when opening up, or down with `menuPortal` */
   const [fixedMenuStyle, setFixedMenuStyle] = useState(null);
 
   const showAdd = !hideAdd;
@@ -258,12 +261,18 @@ export function SelectWithAdd({
         : "text-[13px]";
 
   const openUp = menuPlacement === "top";
+  const useFixedMenuPortal = openUp || menuPortal;
 
   useLayoutEffect(() => {
-    if (!open || !openUp) {
+    if (!open) {
       setFixedMenuStyle(null);
       return undefined;
     }
+    if (!useFixedMenuPortal) {
+      setFixedMenuStyle(null);
+      return undefined;
+    }
+    const MENU_Z = 220;
     const update = () => {
       const el = triggerRef.current;
       if (!el || typeof window === "undefined") return;
@@ -272,15 +281,30 @@ export function SelectWithAdd({
       const maxDefault = window.matchMedia("(min-width:640px)").matches
         ? 288
         : 240;
-      const rawAbove = rect.top - gap - 10;
-      const maxH = Math.min(maxDefault, Math.max(80, rawAbove));
+
+      if (openUp) {
+        const rawAbove = rect.top - gap - 10;
+        const maxH = Math.min(maxDefault, Math.max(80, rawAbove));
+        setFixedMenuStyle({
+          position: "fixed",
+          left: rect.left,
+          width: rect.width,
+          bottom: window.innerHeight - rect.top + gap,
+          maxHeight: maxH,
+          zIndex: MENU_Z,
+        });
+        return;
+      }
+
+      const spaceBelow = window.innerHeight - rect.bottom - gap - 12;
+      const maxH = Math.min(maxDefault, Math.max(120, spaceBelow));
       setFixedMenuStyle({
         position: "fixed",
         left: rect.left,
+        top: rect.bottom + gap,
         width: rect.width,
-        bottom: window.innerHeight - rect.top + gap,
         maxHeight: maxH,
-        zIndex: 200,
+        zIndex: MENU_Z,
       });
     };
     update();
@@ -291,7 +315,7 @@ export function SelectWithAdd({
       window.removeEventListener("resize", update);
       setFixedMenuStyle(null);
     };
-  }, [open, openUp, menuPlacement]);
+  }, [open, openUp, menuPortal, useFixedMenuPortal]);
 
   const valueTextCls = filterBar
     ? `text-sm leading-snug truncate ${
@@ -457,7 +481,7 @@ export function SelectWithAdd({
       </button>
 
       {open &&
-        openUp &&
+        useFixedMenuPortal &&
         fixedMenuStyle &&
         typeof document !== "undefined" &&
         createPortal(
@@ -478,14 +502,14 @@ export function SelectWithAdd({
           document.body
         )}
 
-      {open && !openUp && (
+      {open && !useFixedMenuPortal && (
         <div
           id={listboxId}
           role="listbox"
           tabIndex={-1}
           ref={listRef}
           onKeyDown={onMenuKeyDown}
-          className={`absolute top-full left-0 z-50 mt-1.5 w-full max-h-60 sm:max-h-72 ${menuPanelCls}`}
+          className={`absolute top-full left-0 z-[120] mt-1.5 w-full max-h-60 sm:max-h-72 ${menuPanelCls}`}
         >
           {menuInner}
         </div>
