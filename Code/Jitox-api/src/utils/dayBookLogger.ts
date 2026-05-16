@@ -20,6 +20,39 @@ const toAmountString = (value: string | number | undefined | null): string => {
 };
 
 /**
+ * Day book list shows one row per voucher — amount belongs in debit OR credit,
+ * not both. Callers often pass the same total twice (double-entry); we split by type.
+ */
+export function resolveDayBookAmounts(
+  voucherType: string,
+  debitAmount: string | number,
+  creditAmount: string | number
+): { debitAmount: string; creditAmount: string } {
+  const d = toAmountString(debitAmount);
+  const c = toAmountString(creditAmount);
+  const amt =
+    d !== "0" ? d : c !== "0" ? c : "0";
+
+  if (d !== c || amt === "0") {
+    return { debitAmount: d, creditAmount: c };
+  }
+
+  const t = String(voucherType || "").trim().toLowerCase();
+
+  if (t === "receipt" || t === "sales") {
+    return { debitAmount: "0", creditAmount: amt };
+  }
+  if (t === "purchase return") {
+    return { debitAmount: "0", creditAmount: amt };
+  }
+  if (t === "payment" || t === "purchase" || t === "expense") {
+    return { debitAmount: amt, creditAmount: "0" };
+  }
+
+  return { debitAmount: amt, creditAmount: "0" };
+}
+
+/**
  * Upsert a day book entry keyed by `voucherNumber`. Used by voucher create /
  * update flows so the day book always mirrors the latest voucher state without
  * the caller having to know whether a row already exists.
@@ -33,6 +66,11 @@ export const logDayBookEntry = async (
   if (!entry || !entry.voucherNumber) return;
 
   try {
+    const { debitAmount, creditAmount } = resolveDayBookAmounts(
+      entry.voucherType,
+      entry.debitAmount,
+      entry.creditAmount
+    );
     await DayBook.findOneAndUpdate(
       { voucherNumber: entry.voucherNumber },
       {
@@ -40,8 +78,8 @@ export const logDayBookEntry = async (
           voucherNumber: entry.voucherNumber,
           voucherType: entry.voucherType,
           particulars: entry.particulars,
-          debitAmount: toAmountString(entry.debitAmount),
-          creditAmount: toAmountString(entry.creditAmount),
+          debitAmount,
+          creditAmount,
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }

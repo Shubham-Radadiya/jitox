@@ -4,7 +4,75 @@ import { validateAndRespond } from "../utils/validateAndRespond";
 import { IProductItem } from "../types/quatation.type";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
-import { sendSuccess } from "../utils/apiResponse";
+import { sendCreated, sendSuccess } from "../utils/apiResponse";
+
+async function computeNextQuotationVoucherNo(): Promise<string> {
+  const docs = await Quotation.find().select("voucherNo").lean();
+  let max = 0;
+  const patterns = [/^QT-(\d+)$/i, /^JITOX-DEMO-QT-(\d+)$/i, /^V(\d+)$/i];
+  for (const d of docs) {
+    const v = String(d?.voucherNo ?? "").trim();
+    for (const re of patterns) {
+      const m = re.exec(v);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (Number.isFinite(n)) max = Math.max(max, n);
+      }
+    }
+  }
+  const next = max + 1;
+  return `QT-${String(next).padStart(3, "0")}`;
+}
+
+async function resolveUniqueQuotationVoucherNo(
+  requested?: string
+): Promise<string> {
+  const base = String(requested || "").trim();
+  if (base) {
+    const taken = await Quotation.findOne({ voucherNo: base });
+    if (!taken) return base;
+  }
+  for (let i = 0; i < 60; i++) {
+    const candidate = await computeNextQuotationVoucherNo();
+    const taken = await Quotation.findOne({ voucherNo: candidate });
+    if (!taken) return candidate;
+  }
+  return `QT-${Date.now()}`;
+}
+
+async function resolveUniqueInvoiceNo(
+  requested: string | undefined,
+  voucherNo: string
+): Promise<string> {
+  let candidate = String(requested || "").trim();
+  if (!candidate) candidate = `${voucherNo}-INV`;
+  for (let i = 0; i < 40; i++) {
+    const taken = await Quotation.findOne({ invoiceNo: candidate });
+    if (!taken) return candidate;
+    candidate = `${voucherNo}-INV-${i + 2}`;
+  }
+  return `${voucherNo}-INV-${Date.now()}`;
+}
+
+function normalizeQuotationItems(items: IProductItem[]): IProductItem[] {
+  return items.map((item) => {
+    const quantity = Number(item.quantity) || 0;
+    const rateParUnit = Number(item.rateParUnit) || 0;
+    const subtotal =
+      Number(item.subtotal) || quantity * rateParUnit;
+    const amount = Number(item.amount) || subtotal;
+    return {
+      product: item.product,
+      quantity,
+      rateParUnit,
+      amount,
+      group: item.group || "",
+      category: item.category || "",
+      unit: item.unit || "Nos",
+      subtotal,
+    };
+  });
+}
 
 export const createQuotation = async (
   req: Request,
@@ -29,28 +97,14 @@ export const createQuotation = async (
       stockDetails,
     } = req.body;
 
-    const requiredFields = [
-      "partyName",
-      "voucherNo",
-      "voucherDate",
-      "items",
-    ] as const;
+    const requiredFields = ["partyName", "voucherDate", "items"] as const;
 
     validateAndRespond(req.body, requiredFields, res);
 
-    const existingVoucher = await Quotation.findOne({ voucherNo });
-    if (existingVoucher) {
+    if (!Array.isArray(items) || items.length === 0) {
       throw new AppError(
         HttpStatusCode.BAD_REQUEST,
-        "Voucher number already exists."
-      );
-    }
-
-    const existingInvoice = await Quotation.findOne({ invoiceNo });
-    if (existingInvoice) {
-      throw new AppError(
-        HttpStatusCode.BAD_REQUEST,
-        "Invoice number already exists."
+        "At least one line item is required."
       );
     }
 
@@ -63,29 +117,36 @@ export const createQuotation = async (
       );
     }
 
+    const resolvedVoucherNo = await resolveUniqueQuotationVoucherNo(voucherNo);
+    const resolvedInvoiceNo = await resolveUniqueInvoiceNo(
+      invoiceNo,
+      resolvedVoucherNo
+    );
+    const normalizedItems = normalizeQuotationItems(items);
+
     const newQuotation = new Quotation({
       partyName,
       transportDetails,
       deliveryAt,
       orderby,
       shipToAndBillTo,
-      voucherNo,
+      voucherNo: resolvedVoucherNo,
       voucherDate,
-      items,
-      invoiceNo,
+      items: normalizedItems,
+      invoiceNo: resolvedInvoiceNo,
       gstAmount,
       totalAmount,
       paymentMode,
       basePrice,
       dueDate,
       stockDetails,
+      paidAmount: 0,
+      dashboardTab: "pending",
+      dashboardOrderStatus: "Processing",
     });
 
     const savedQuotation = await newQuotation.save();
-    res.status(201).json({
-      message: "Quotation created successfully.",
-      data: savedQuotation,
-    });
+    sendCreated(res, savedQuotation, "Quotation created successfully.");
   } catch (error) {
     console.error("Create Quoation Error:", error);
     throw error;
@@ -99,7 +160,7 @@ export const getAllQuotations = async (
   try {
     const { partyName, dueDate, dateFrom, dateTo } = req.query;
 
-    const matchStage: any = {};
+    const matchStage: Record<string, unknown> = {};
 
     if (partyName) {
       matchStage.partyName = { $regex: partyName as string, $options: "i" };
@@ -145,6 +206,9 @@ export const getAllQuotations = async (
           gstAmount: 1,
           paymentMode: 1,
           basePrice: 1,
+          paidAmount: 1,
+          dashboardTab: 1,
+          dashboardOrderStatus: 1,
           createdAt: 1,
           updatedAt: 1,
           "productDetails.productName": 1,
@@ -181,7 +245,7 @@ export const getQuotationById = async (
       throw new AppError(HttpStatusCode.NOT_FOUND, "No quotations found.");
     }
 
-    res.status(200).json(quotations);
+    sendSuccess(res, quotations);
   } catch (error) {
     console.error("Get Quoation by ID Error:", error);
     throw error;
@@ -194,7 +258,37 @@ export const updateQuotation = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
+
+    if (Array.isArray(updateData.items)) {
+      updateData.items = normalizeQuotationItems(updateData.items);
+    }
+
+    if (updateData.voucherNo) {
+      const clash = await Quotation.findOne({
+        voucherNo: updateData.voucherNo,
+        _id: { $ne: id },
+      });
+      if (clash) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "Voucher number already exists."
+        );
+      }
+    }
+
+    if (updateData.invoiceNo) {
+      const clash = await Quotation.findOne({
+        invoiceNo: updateData.invoiceNo,
+        _id: { $ne: id },
+      });
+      if (clash) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "Invoice number already exists."
+        );
+      }
+    }
 
     const updatedQuotation = await Quotation.findByIdAndUpdate(id, updateData, {
       new: true,
@@ -204,10 +298,7 @@ export const updateQuotation = async (
       throw new AppError(HttpStatusCode.NOT_FOUND, "No quotations found.");
     }
 
-    res.status(200).json({
-      message: "Quotation updated successfully.",
-      data: updatedQuotation,
-    });
+    sendSuccess(res, updatedQuotation, "Quotation updated successfully.");
   } catch (error) {
     console.error("Update Quoation Error:", error);
     throw error;
@@ -226,7 +317,7 @@ export const deleteQuotation = async (
       throw new AppError(HttpStatusCode.NOT_FOUND, "No quotations found.");
     }
 
-    res.status(200).json({ message: "Quotation deleted successfully." });
+    sendSuccess(res, { ok: true }, "Quotation deleted successfully.");
   } catch (error) {
     console.error("Delete Quoation Error:", error);
     throw error;

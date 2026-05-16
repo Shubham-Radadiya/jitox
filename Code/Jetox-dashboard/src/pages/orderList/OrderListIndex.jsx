@@ -24,6 +24,10 @@ import {
 } from "../../utils/tableUi";
 import OrderDetailsDrawer from "./OrderDetailsDrawer";
 import InvoiceModal from "./InvoiceModal";
+import {
+  ORDER_SORT_OPTIONS,
+  sortOrderRows,
+} from "../../utils/orderListSort";
 
 /** Matches Product Master summary cards (gradient panel + value pill). */
 const ORDER_SUMMARY_METRIC_CARD = {
@@ -58,6 +62,7 @@ const OrderListIndex = () => {
   const [selectedRow, setSelectedRow] = useState(null);
   const [detail, setDetail] = useState(null);
   const [orderDateRange, setOrderDateRange] = useState(null);
+  const [orderSort, setOrderSort] = useState("newest");
 
   const columns = useMemo(
     () => [
@@ -136,6 +141,11 @@ const OrderListIndex = () => {
       toast.error(getApiErrorMessage(ordersErrObj, "Could not load orders"));
     }
   }, [ordersError, ordersErrObj]);
+
+  const sortedOrders = useMemo(
+    () => sortOrderRows(orders, orderSort),
+    [orders, orderSort]
+  );
 
   const payMutation = useMutation({
     mutationFn: (id) => dashboardUiApi.payOrder(id),
@@ -443,20 +453,21 @@ const OrderListIndex = () => {
               </button>
               {sortOpen && (
                 <div className="absolute right-0 mt-1.5 w-44 bg-white shadow-md border border-gray-200 rounded-lg text-sm py-1 z-50 dark:bg-slate-900 dark:border-slate-600">
-                  {[
-                    "Newest First",
-                    "Oldest First",
-                    "Highest Amount",
-                    "Lowest Amount",
-                    "Delivery Date",
-                  ].map((opt) => (
+                  {ORDER_SORT_OPTIONS.map((opt) => (
                     <button
-                      key={opt}
+                      key={opt.value}
                       type="button"
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                      onClick={() => setSortOpen(false)}
+                      className={`w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700 dark:text-slate-200 dark:hover:bg-slate-800 ${
+                        orderSort === opt.value
+                          ? "bg-emerald-50 dark:bg-emerald-950/40"
+                          : ""
+                      }`}
+                      onClick={() => {
+                        setOrderSort(opt.value);
+                        setSortOpen(false);
+                      }}
                     >
-                      {opt}
+                      {opt.label}
                     </button>
                   ))}
                 </div>
@@ -472,12 +483,12 @@ const OrderListIndex = () => {
           <TableContent
             variant="ordersDense"
             columns={columns}
-            data={loading ? [] : orders}
+            data={loading ? [] : sortedOrders}
             renderRowCell={renderRowCell}
             renderAction={renderAction}
           />
         </OrdersTableShell>
-        {!loading && orders.length === 0 && (
+        {!loading && sortedOrders.length === 0 && (
           <div className="px-3 py-4 text-center text-xs text-slate-500 border border-t-0 border-slate-200/90 rounded-b-lg bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
             No orders found.
           </div>

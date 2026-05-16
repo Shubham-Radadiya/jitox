@@ -3,6 +3,7 @@ import {
   purchaseReturnVouchersApi,
   salesVouchersApi,
   journalVouchersApi,
+  paymentVouchersApi,
   accountsApi,
   manufacturingVouchersApi,
 } from "../../services/api";
@@ -160,5 +161,25 @@ export async function fetchJournalDetail(id) {
         : "—",
     remarks: String(j.remarks || "").trim() || "—",
     status: j.status || "—",
+  };
+}
+
+/** Shape for `PaymentDetailsDrawer`. */
+export async function fetchPaymentDetail(id) {
+  const vRes = await paymentVouchersApi.getById(id);
+  const p = vRes?.data;
+  if (!p || !p._id) return null;
+
+  const rawAmt = String(p.amount ?? "").replace(/,/g, "");
+  const amt = rawAmt !== "" && Number.isFinite(Number(rawAmt)) ? Number(rawAmt) : null;
+
+  return {
+    voucherNo: p.voucherNo || "—",
+    dateLabel: p.date ? dayjs(p.date).format("DD MMM YYYY") : "—",
+    partyLabel: String(p.paymentTo || "").trim() || "—",
+    modeLabel: String(p.paymentThrough || "").trim() || "—",
+    amountLabel: amt != null ? fmtRupee(amt) : "—",
+    remarks: String(p.remarks || "").trim() || "—",
+    status: p.status || "—",
   };
 }

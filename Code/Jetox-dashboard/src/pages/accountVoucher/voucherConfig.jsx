@@ -8,6 +8,7 @@ import {
   fetchPurchaseReturnDetail,
   fetchSalesOrderDetail,
   fetchJournalDetail,
+  fetchPaymentDetail,
   fetchManufacturingDetail,
 } from "./voucherDetailFetchers.jsx";
 import { parseRupeeCell, fmtRupee } from "../../utils/voucherRowMappers";
@@ -47,6 +48,7 @@ import CashTransferModal from "./modals/CashTransferModal";
 import BankToCashModal from "./modals/BankToCashModal";
 import JournalModal from "./modals/JournalModal";
 import JournalDetailsDrawer from "./JournalDetailsDrawer";
+import PaymentDetailsDrawer from "./PaymentDetailsDrawer";
 import ManufacturingDetailsDrawer from "./manufacturing/ManufacturingDetailsDrawer";
 
 dayjs.extend(customParseFormat);
@@ -941,6 +943,8 @@ export const voucherConfigs = {
     title: "Payment Voucher",
     columns: paymentColumns,
     rowId: "Voucher No",
+    fetchDetail: fetchPaymentDetail,
+    detailsComponent: PaymentDetailsDrawer,
     modals: [{ key: "payment-modal", component: PaymentModal }],
     filterFields: [
       voucherAddButton({

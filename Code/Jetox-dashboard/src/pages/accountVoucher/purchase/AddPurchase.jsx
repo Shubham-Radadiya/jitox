@@ -6,9 +6,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import DashboardLayout from "../../../layouts/DashboardLayout";
 import { Button } from "../../../components/ui/CommanUI";
 import PurchaseVoucherForm from "./PurchaseVoucherForm";
-import { purchaseVouchersApi } from "../../../services/api";
+import { purchaseVouchersApi, quotationsApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { purchasePayloadToCreateBody } from "./purchasePayloadToApi";
+import { quotationPayloadToCreateBody } from "./quotationPayloadToApi";
 
 const AddPurchase = ({ formType = "purchase" }) => {
   const navigate = useNavigate();
@@ -57,15 +58,13 @@ const AddPurchase = ({ formType = "purchase" }) => {
             className="w-full sm:w-40 text-white dark:text-white"
             onClick={async () => {
               const payload = formRef.current?.gatherPayload?.();
-              if (isQuotation) {
-                toast("Quotation API wiring — use quotation module.");
-                return;
-              }
               if (!payload) {
                 toast.error("Form is not ready.");
                 return;
               }
-              const body = purchasePayloadToCreateBody(payload);
+              const body = isQuotation
+                ? quotationPayloadToCreateBody(payload)
+                : purchasePayloadToCreateBody(payload);
               if (!body.items?.length) {
                 toast.error("Add at least one line with a product, quantity, and rate.");
                 return;
@@ -75,6 +74,29 @@ const AddPurchase = ({ formType = "purchase" }) => {
                 return;
               }
               try {
+                if (isQuotation) {
+                  const res = await quotationsApi.create(body);
+                  const saved = res?.data;
+                  const savedNo = String(
+                    (saved && typeof saved === "object"
+                      ? saved.voucherNo
+                      : null) ??
+                      body.voucherNo ??
+                      "quotation"
+                  );
+                  await queryClient.invalidateQueries({
+                    queryKey: ["voucher-list", "quotation"],
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: ["dashboard", "orders"],
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: ["purchase-form-meta"],
+                  });
+                  toast.success(`Quotation ${savedNo} saved.`);
+                  navigate("/dashboard/accounting-voucher/quotation");
+                  return;
+                }
                 const res = await purchaseVouchersApi.create(body);
                 const d = res?.data;
                 const savedNo =
@@ -90,7 +112,14 @@ const AddPurchase = ({ formType = "purchase" }) => {
                 toast.success(`Saved ${savedNo}.`);
                 navigate("/dashboard/accounting-voucher/purchase");
               } catch (e) {
-                toast.error(getApiErrorMessage(e, "Could not save purchase voucher"));
+                toast.error(
+                  getApiErrorMessage(
+                    e,
+                    isQuotation
+                      ? "Could not save quotation"
+                      : "Could not save purchase voucher"
+                  )
+                );
               }
             }}
           />

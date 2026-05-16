@@ -134,7 +134,9 @@ const JournalModal = ({ open, onClose, onSaved, journal }) => {
     isError: accountsError,
     error: accountsErr,
   } = useQuery({
-    queryKey: ["accounts"],
+    // Raw account list for dropdowns — do not share ["accounts"] with Account Master
+    // (that cache stores table rows mapped via mapAccountToRow).
+    queryKey: ["accounts", "raw"],
     queryFn: async () => {
       try {
         const { data } = await accountsApi.getAll({});
@@ -267,8 +269,8 @@ const JournalModal = ({ open, onClose, onSaved, journal }) => {
       width="720px"
       footer={footer}
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InputField
             label="Voucher Number"
             value={form.voucherNo}
@@ -277,6 +279,15 @@ const JournalModal = ({ open, onClose, onSaved, journal }) => {
             readOnly={voucherReadOnly}
             inputClassName={voucherReadOnly ? "text-slate-400" : undefined}
           />
+          <InputField
+            label="Date"
+            type="date"
+            value={form.date}
+            onChange={(e) => updateField("date", e.target.value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <CommonDropdown
             label="By (debit account)"
             addNavigateTo="/dashboard/account"
@@ -290,6 +301,18 @@ const JournalModal = ({ open, onClose, onSaved, journal }) => {
             menuPortal
             disabled={accountsLoading && accountOptions.length === 0}
           />
+          <InputField
+            label="Amount (debit = credit)"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.amount}
+            onChange={(e) => updateField("amount", e.target.value)}
+            placeholder="Amount to move between accounts"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <CommonDropdown
             label="To (credit account)"
             addNavigateTo="/dashboard/account"
@@ -313,28 +336,11 @@ const JournalModal = ({ open, onClose, onSaved, journal }) => {
           />
         </div>
 
-        <div className="flex flex-col gap-4">
-          <InputField
-            label="Date"
-            type="date"
-            value={form.date}
-            onChange={(e) => updateField("date", e.target.value)}
-          />
-          <InputField
-            label="Amount (debit = credit)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.amount}
-            onChange={(e) => updateField("amount", e.target.value)}
-            placeholder="Amount to move between accounts"
-          />
-          {accountsRaw.length === 0 && !accountsLoading ? (
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              No accounts found. Add accounts under Account Master first.
-            </p>
-          ) : null}
-        </div>
+        {accountsRaw.length === 0 && !accountsLoading ? (
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            No accounts found. Add accounts under Account Master first.
+          </p>
+        ) : null}
       </div>
     </CommonModal>
   );

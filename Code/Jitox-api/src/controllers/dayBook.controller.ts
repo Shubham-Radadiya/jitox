@@ -4,6 +4,21 @@ import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
+import { resolveDayBookAmounts } from "../utils/dayBookLogger";
+import type { IDayBook } from "../types/dayBook";
+
+function serializeDayBookRow(doc: IDayBook | Record<string, unknown>) {
+  const plain =
+    typeof (doc as IDayBook).toObject === "function"
+      ? (doc as IDayBook).toObject()
+      : { ...(doc as Record<string, unknown>) };
+  const { debitAmount, creditAmount } = resolveDayBookAmounts(
+    String(plain.voucherType ?? ""),
+    plain.debitAmount as string | number,
+    plain.creditAmount as string | number
+  );
+  return { ...plain, debitAmount, creditAmount };
+}
 
 export const createDayBook = async (
   req: Request,
@@ -36,10 +51,15 @@ export const createDayBook = async (
       );
     }
 
+    const sides = resolveDayBookAmounts(
+      voucherType,
+      debitAmount,
+      creditAmount
+    );
     const newDayBook = new DayBook({
       voucherNumber,
-      debitAmount,
-      creditAmount,
+      debitAmount: sides.debitAmount,
+      creditAmount: sides.creditAmount,
       voucherType,
       particulars,
     });
@@ -75,7 +95,7 @@ export const getAllDayBooks = async (
     const dayBook = await DayBook.find(filter).sort({ createdAt: -1 });
     sendSuccess(
       res,
-      dayBook,
+      dayBook.map(serializeDayBookRow),
       dayBook.length ? "" : "No day book entries found."
     );
   } catch (error) {
@@ -96,7 +116,7 @@ export const getDayBookById = async (
       throw new AppError(HttpStatusCode.NOT_FOUND, "Cash DayBook found");
     }
 
-    res.status(200).json(dayBook);
+    res.status(200).json(serializeDayBookRow(dayBook));
   } catch (error) {
     console.error("Get Expense DayBook By ID Error:", error);
     throw error;

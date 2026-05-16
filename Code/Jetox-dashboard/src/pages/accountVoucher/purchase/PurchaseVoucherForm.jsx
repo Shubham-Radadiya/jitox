@@ -136,12 +136,15 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   useEffect(() => {
     if (prefill?.voucherNo != null && String(prefill.voucherNo).trim() !== "")
       return;
-    const next = meta?.nextPurchaseVoucherNo;
+    const next =
+      formType === "quotation"
+        ? meta?.nextQuotationVoucherNo
+        : meta?.nextPurchaseVoucherNo;
     if (typeof next !== "string" || !next.trim()) return;
     if (nextVoucherAppliedRef.current) return;
     setVoucherNo(next.trim());
     nextVoucherAppliedRef.current = true;
-  }, [meta?.nextPurchaseVoucherNo, prefill]);
+  }, [meta?.nextPurchaseVoucherNo, meta?.nextQuotationVoucherNo, formType, prefill]);
 
   const dropdownOptions = useMemo(() => {
     const gstBase = meta?.gst?.length ? meta.gst : emptyMeta.gst;

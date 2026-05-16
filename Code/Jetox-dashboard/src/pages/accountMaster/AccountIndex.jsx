@@ -225,7 +225,7 @@ const AccountIndex = () => {
     isError,
     error,
   } = useQuery({
-    queryKey: ["accounts"],
+    queryKey: ["accounts", "table"],
     queryFn: async () => {
       try {
         const res = await accountsApi.getAll({});

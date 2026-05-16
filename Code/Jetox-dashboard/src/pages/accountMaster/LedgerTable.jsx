@@ -20,15 +20,13 @@ import {
   paymentVouchersApi,
   receiptVouchersApi,
   journalVouchersApi,
-  purchaseVouchersApi,
-  purchaseReturnVouchersApi,
   expenseVouchersApi,
   cashVouchersApi,
 } from "../../services/api";
 import { getApiErrorMessage, isEmptyListNotFound } from "../../utils/apiError";
 import {
   accountOpeningMeta,
-  buildPartyTransactionEntries,
+  buildPartyMoneyLedgerEntries,
   normalizeList,
 } from "../../utils/partyLedgerTx";
 import { fmtRupee } from "../../utils/voucherRowMappers";
@@ -79,8 +77,6 @@ const LedgerTable = () => {
           { data: paymentRes },
           { data: receiptRes },
           { data: journalRes },
-          { data: purchaseRes },
-          { data: purchaseReturnRes },
           { data: expenseRes },
           { data: cashRes },
         ] = await Promise.all([
@@ -88,8 +84,6 @@ const LedgerTable = () => {
           paymentVouchersApi.getAll({}),
           receiptVouchersApi.getAll({}),
           journalVouchersApi.getAll({}),
-          purchaseVouchersApi.getAll({}),
-          purchaseReturnVouchersApi.getAll({}),
           expenseVouchersApi.getAll({}),
           cashVouchersApi.getAll({}),
         ]);
@@ -98,8 +92,6 @@ const LedgerTable = () => {
           payments: normalizeList(paymentRes),
           receipts: normalizeList(receiptRes),
           journals: normalizeList(journalRes),
-          purchases: normalizeList(purchaseRes),
-          purchaseReturns: normalizeList(purchaseReturnRes),
           expenses: normalizeList(expenseRes),
           cashVouchers: normalizeList(cashRes),
         };
@@ -126,7 +118,7 @@ const LedgerTable = () => {
     const openingDateIso = deriveAccountOpeningDate(account);
     const { openingAmount, openingIsDebit } = accountOpeningMeta(account);
 
-    const merged = buildPartyTransactionEntries(account, accountId, ledgerSource)
+    const merged = buildPartyMoneyLedgerEntries(account, accountId, ledgerSource)
       .map((r) => ({
         _id: r._id,
         dateIso: r.dateIso,

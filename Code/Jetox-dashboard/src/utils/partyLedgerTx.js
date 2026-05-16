@@ -1,11 +1,13 @@
 /**
- * Single place for party (account) ledger debit/credit rules so Day book ledger
- * and statement PDF stay aligned.
+ * Party ledger debit/credit rules — shared by Day book ledger (per account) and
+ * Account Master statement PDFs.
  *
- * Convention for this party’s book:
- * - Payment to party, Purchase return, Expense paid to party, Cash when party is debitFrom → Debit
- * - Receipt from party, Purchase (bill), Cash when party is creditTo → Credit
- * - Journal: debitAmount when account is paymentBy; creditAmount when account is paymentTo
+ * Money movement (payment, receipt, journal, cash, bank, expense):
+ * - Payment to party, Expense paid to party, Cash/Bank when party is debitFrom → Debit
+ * - Receipt from party, Cash/Bank when party is creditTo → Credit
+ * - Journal: debit when account is paymentBy; credit when account is paymentTo
+ *
+ * Trade vouchers (purchase, purchase return) — statement PDF only when moneyOnly is false.
  */
 
 import { parseRupeeCell } from "./voucherRowMappers";
@@ -33,17 +35,75 @@ function toIsoDate(value) {
   return d.toISOString().slice(0, 10);
 }
 
+function partyNamesFromAccount(account) {
+  return {
+    accountName: String(account.businessName || "").trim().toLowerCase(),
+    personName: String(account.name || "").trim().toLowerCase(),
+  };
+}
+
+function matchesPartyName(accountName, personName, raw) {
+  const n = String(raw || "").trim().toLowerCase();
+  return n && (n === accountName || n === personName);
+}
+
+/** Align with Bank voucher list: credit side is Cash, debit is not Cash. */
+function cashVoucherDisplayType(cv) {
+  const credit = String(cv.creditTo || "").trim().toLowerCase();
+  const debit = String(cv.debitFrom || "").trim().toLowerCase();
+  if (credit === "cash" && debit !== "cash") return "Bank";
+  return "Cash";
+}
+
+function mapCashAndBankVoucherRows(cashVouchers, accountName, personName) {
+  return (cashVouchers || [])
+    .filter((cv) => {
+      const df = String(cv.debitFrom || "").trim().toLowerCase();
+      const ct = String(cv.creditTo || "").trim().toLowerCase();
+      return (
+        (df && (df === accountName || df === personName)) ||
+        (ct && (ct === accountName || ct === personName))
+      );
+    })
+    .map((cv) => {
+      const df = String(cv.debitFrom || "").trim().toLowerCase();
+      const ct = String(cv.creditTo || "").trim().toLowerCase();
+      const amt = parseRupeeCell(cv.amount);
+      let debit = 0;
+      let credit = 0;
+      if (df === accountName || df === personName) debit = amt;
+      else if (ct === accountName || ct === personName) credit = amt;
+      const voucherType = cashVoucherDisplayType(cv);
+      return {
+        kind: voucherType === "Bank" ? "bank" : "cash",
+        _id: cv._id,
+        raw: cv,
+        date: cv.voucherDate || cv.createdAt,
+        dateIso: toIsoDate(cv.voucherDate || cv.createdAt),
+        voucherType,
+        voucherNo: cv.voucherNumber || "—",
+        particulars:
+          String(cv.narration || "").trim() ||
+          String(cv.particulars || "").trim() ||
+          `Debit: ${cv.debitFrom || "—"} · Credit: ${cv.creditTo || "—"}`,
+        debit,
+        credit,
+      };
+    });
+}
+
 /**
+ * @param {{ moneyOnly?: boolean }} [options] — Day book ledger uses moneyOnly: true
  * @returns {Array<{ kind: string, _id: any, raw: any, date: any, dateIso: string, voucherType: string, voucherNo: string, particulars: string, debit: number, credit: number }>}
  */
-export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
-  const accountName = String(account.businessName || "").trim().toLowerCase();
-  const personName = String(account.name || "").trim().toLowerCase();
-
-  const matchesPartyName = (raw) => {
-    const n = String(raw || "").trim().toLowerCase();
-    return n && (n === accountName || n === personName);
-  };
+export function buildPartyTransactionEntries(
+  account,
+  accountId,
+  ledgerSource,
+  options = {}
+) {
+  const { moneyOnly = false } = options;
+  const { accountName, personName } = partyNamesFromAccount(account);
 
   const payRows = (ledgerSource.payments || [])
     .filter((p) => {
@@ -89,7 +149,6 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
     )
     .map((j) => {
       const isBy = String(j.paymentBy || "") === accountId;
-      const isTo = String(j.paymentTo || "") === accountId;
       return {
         kind: "journal",
         _id: j._id,
@@ -99,48 +158,53 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
         voucherType: "Journal",
         voucherNo: j.voucherNo || "—",
         particulars:
-          j.remarks || (isBy ? "Journal (payment by)" : "Journal (payment to)"),
+          j.remarks ||
+          (isBy ? "Journal (payment by)" : "Journal (payment to)"),
         debit: isBy ? parseRupeeCell(j.debitAmount) : 0,
-        credit: isTo ? parseRupeeCell(j.creditAmount) : 0,
+        credit: isBy ? 0 : parseRupeeCell(j.creditAmount),
       };
     });
 
-  const purchaseRows = (ledgerSource.purchases || [])
-    .filter((pv) => matchesPartyName(pv.partyName))
-    .map((pv) => ({
-      kind: "purchase",
-      _id: pv._id,
-      raw: pv,
-      date: pv.voucherDate || pv.createdAt,
-      dateIso: toIsoDate(pv.voucherDate || pv.createdAt),
-      voucherType: "Purchase",
-      voucherNo: pv.voucherNo || "—",
-      particulars:
-        String(pv.transportDetails || "").trim() ||
-        `Purchase · ${String(pv.partyName || "").trim() || "Party"}`,
-      debit: 0,
-      credit: parseRupeeCell(pv.totalAmount),
-    }));
+  const purchaseRows = moneyOnly
+    ? []
+    : (ledgerSource.purchases || [])
+        .filter((pv) => matchesPartyName(accountName, personName, pv.partyName))
+        .map((pv) => ({
+          kind: "purchase",
+          _id: pv._id,
+          raw: pv,
+          date: pv.voucherDate || pv.createdAt,
+          dateIso: toIsoDate(pv.voucherDate || pv.createdAt),
+          voucherType: "Purchase",
+          voucherNo: pv.voucherNo || "—",
+          particulars:
+            String(pv.transportDetails || "").trim() ||
+            `Purchase · ${String(pv.partyName || "").trim() || "Party"}`,
+          debit: 0,
+          credit: parseRupeeCell(pv.totalAmount),
+        }));
 
-  const purchaseReturnRows = (ledgerSource.purchaseReturns || [])
-    .filter((pv) => matchesPartyName(pv.partyName))
-    .map((pv) => ({
-      kind: "purchaseReturn",
-      _id: pv._id,
-      raw: pv,
-      date: pv.voucherDate || pv.createdAt,
-      dateIso: toIsoDate(pv.voucherDate || pv.createdAt),
-      voucherType: "Purchase Return",
-      voucherNo: pv.voucherNo || "—",
-      particulars:
-        String(pv.transportDetails || "").trim() ||
-        `Purchase return · ${String(pv.partyName || "").trim() || "Party"}`,
-      debit: parseRupeeCell(pv.totalAmount),
-      credit: 0,
-    }));
+  const purchaseReturnRows = moneyOnly
+    ? []
+    : (ledgerSource.purchaseReturns || [])
+        .filter((pv) => matchesPartyName(accountName, personName, pv.partyName))
+        .map((pv) => ({
+          kind: "purchaseReturn",
+          _id: pv._id,
+          raw: pv,
+          date: pv.voucherDate || pv.createdAt,
+          dateIso: toIsoDate(pv.voucherDate || pv.createdAt),
+          voucherType: "Purchase Return",
+          voucherNo: pv.voucherNo || "—",
+          particulars:
+            String(pv.transportDetails || "").trim() ||
+            `Purchase return · ${String(pv.partyName || "").trim() || "Party"}`,
+          debit: parseRupeeCell(pv.totalAmount),
+          credit: 0,
+        }));
 
   const expenseRows = (ledgerSource.expenses || [])
-    .filter((ex) => matchesPartyName(ex.paidTo))
+    .filter((ex) => matchesPartyName(accountName, personName, ex.paidTo))
     .map((ex) => ({
       kind: "expense",
       _id: ex._id,
@@ -156,39 +220,11 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
       credit: 0,
     }));
 
-  const cashRows = (ledgerSource.cashVouchers || [])
-    .filter((cv) => {
-      const df = String(cv.debitFrom || "").trim().toLowerCase();
-      const ct = String(cv.creditTo || "").trim().toLowerCase();
-      return (
-        (df && (df === accountName || df === personName)) ||
-        (ct && (ct === accountName || ct === personName))
-      );
-    })
-    .map((cv) => {
-      const df = String(cv.debitFrom || "").trim().toLowerCase();
-      const ct = String(cv.creditTo || "").trim().toLowerCase();
-      const amt = parseRupeeCell(cv.amount);
-      let debit = 0;
-      let credit = 0;
-      if (df === accountName || df === personName) debit = amt;
-      else if (ct === accountName || ct === personName) credit = amt;
-      return {
-        kind: "cash",
-        _id: cv._id,
-        raw: cv,
-        date: cv.voucherDate || cv.createdAt,
-        dateIso: toIsoDate(cv.voucherDate || cv.createdAt),
-        voucherType: "Cash",
-        voucherNo: cv.voucherNumber || "—",
-        particulars:
-          String(cv.narration || "").trim() ||
-          String(cv.particulars || "").trim() ||
-          `Debit: ${cv.debitFrom || "—"} · Credit: ${cv.creditTo || "—"}`,
-        debit,
-        credit,
-      };
-    });
+  const cashAndBankRows = mapCashAndBankVoucherRows(
+    ledgerSource.cashVouchers,
+    accountName,
+    personName
+  );
 
   return [
     ...payRows,
@@ -197,9 +233,16 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
     ...purchaseRows,
     ...purchaseReturnRows,
     ...expenseRows,
-    ...cashRows,
+    ...cashAndBankRows,
   ].sort(
     (a, b) =>
       new Date(a.dateIso || 0).getTime() - new Date(b.dateIso || 0).getTime()
   );
+}
+
+/** Day book ledger (per account) — money transfer vouchers only. */
+export function buildPartyMoneyLedgerEntries(account, accountId, ledgerSource) {
+  return buildPartyTransactionEntries(account, accountId, ledgerSource, {
+    moneyOnly: true,
+  });
 }

@@ -20,6 +20,10 @@ import { getApiErrorMessage } from "../../utils/apiError";
 import { useEffect } from "react";
 import { downloadSalarySlipPdf, formatInr } from "../../utils/hrmPrint";
 
+function sumSalaryLines(lines) {
+  return (lines || []).reduce((s, x) => s + Math.max(0, Number(x.amount) || 0), 0);
+}
+
 const API_BASE =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL
     ? import.meta.env.VITE_API_BASE_URL
@@ -209,15 +213,28 @@ export default function EmployeeProfilePage() {
                 </div>
                 <div className="bg-slate-50/90 px-2.5 py-2.5 sm:col-span-2 dark:bg-slate-800/50">
                   <ProfileField icon={Wallet} label="Salary structure">
-                    <>
-                      Basic {formatInr(data.salaryStructure?.basic)}
-                      {data.salaryStructure?.allowances?.length
-                        ? ` · +${data.salaryStructure.allowances.length} allowance(s)`
-                        : ""}
-                      {data.salaryStructure?.deductions?.length
-                        ? ` · −${data.salaryStructure.deductions.length} deduction(s)`
-                        : ""}
-                    </>
+                    {(() => {
+                      const structure = data.salaryStructure;
+                      const allowanceTotal = sumSalaryLines(structure?.allowances);
+                      const deductionTotal = sumSalaryLines(structure?.deductions);
+                      const basic = Math.max(0, Number(structure?.basic) || 0);
+                      const net = Math.max(
+                        0,
+                        basic + allowanceTotal - deductionTotal
+                      );
+                      return (
+                        <>
+                          Basic {formatInr(basic)}
+                          {allowanceTotal > 0
+                            ? ` · +${formatInr(allowanceTotal)} allowances`
+                            : ""}
+                          {deductionTotal > 0
+                            ? ` · −${formatInr(deductionTotal)} deductions`
+                            : ""}
+                          {` · Net ${formatInr(net)}`}
+                        </>
+                      );
+                    })()}
                   </ProfileField>
                 </div>
               </div>

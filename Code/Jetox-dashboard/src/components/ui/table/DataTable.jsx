@@ -241,6 +241,9 @@ const DataTable = ({
       ? renderFooter(displayedRows)
       : null;
 
+  /** `border-collapse` breaks `position: sticky` on `<tfoot>` inside a scroll area. */
+  const stickyTableFooter = limitHeight && Boolean(footerNode);
+
   const rawLen = Array.isArray(data) ? data.length : 0;
   const showFilterEmpty =
     enableExcelColumnFilters &&
@@ -256,7 +259,15 @@ const DataTable = ({
       } ${TABLE_WRAPPER_CLASS} ${className}`}
       style={limitHeight ? { maxHeight } : undefined}
     >
-      <table className={`${TABLE_ELEMENT_CLASS} ${tableClassName}`}>
+      <table
+        className={[
+          TABLE_ELEMENT_CLASS,
+          stickyTableFooter ? "border-separate border-spacing-0" : "",
+          tableClassName,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <thead className="sticky top-0 z-2">
           <tr>
             {enableSelect && (

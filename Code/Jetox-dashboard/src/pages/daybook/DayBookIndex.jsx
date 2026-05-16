@@ -21,14 +21,17 @@ import {
   buildStandalonePrintableHtml,
   downloadHtmlDocumentAsPdf,
 } from "../../utils/printAndExport";
+import {
+  formatDayBookAmountCell,
+  resolveDayBookAmounts,
+} from "../../utils/dayBookSides";
 
 function mapDayBookRow(doc) {
-  const credit = String(doc.creditAmount ?? "").replace(/,/g, "");
-  const debit = String(doc.debitAmount ?? "").replace(/,/g, "");
-  const fmt = (n) => {
-    const x = Number(n);
-    return Number.isFinite(x) ? x.toLocaleString("en-IN") : n;
-  };
+  const { debitAmount, creditAmount } = resolveDayBookAmounts(
+    doc.voucherType,
+    doc.debitAmount,
+    doc.creditAmount
+  );
   const ts = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
   return {
     _id: doc._id || doc.id,
@@ -38,8 +41,8 @@ function mapDayBookRow(doc) {
     Particulars: doc.particulars || "—",
     "Voucher Type": doc.voucherType || "—",
     "Voucher No": doc.voucherNumber || "—",
-    "Credit (₹)": fmt(credit),
-    "Debit (₹)": fmt(debit),
+    "Credit (₹)": formatDayBookAmountCell(creditAmount),
+    "Debit (₹)": formatDayBookAmountCell(debitAmount),
     _sortTs: ts,
     _raw: doc,
   };
@@ -172,21 +175,28 @@ const DayBookIndex = () => {
   );
 
   const renderFooter = (displayedRows = []) => {
-    const totalCredit = displayedRows.reduce((sum, row) => {
-      const n = Number(String(row["Credit (₹)"]).replace(/,/g, ""));
-      return sum + (Number.isFinite(n) ? n : 0);
-    }, 0);
-    const totalDebit = displayedRows.reduce((sum, row) => {
-      const n = Number(String(row["Debit (₹)"]).replace(/,/g, ""));
-      return sum + (Number.isFinite(n) ? n : 0);
-    }, 0);
+    const parseCell = (v) => {
+      if (v == null || v === "—") return 0;
+      const n = Number(String(v).replace(/,/g, ""));
+      return Number.isFinite(n) ? n : 0;
+    };
+    const totalCredit = displayedRows.reduce(
+      (sum, row) => sum + parseCell(row["Credit (₹)"]),
+      0
+    );
+    const totalDebit = displayedRows.reduce(
+      (sum, row) => sum + parseCell(row["Debit (₹)"]),
+      0
+    );
+    const fmtTotal = (n) =>
+      `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
     const footerTop =
-      "border-t-2 border-t-slate-200 dark:border-t-slate-600";
+      "border-t-2 border-t-slate-300 dark:border-t-slate-500";
     return (
-      <tfoot className="sticky bottom-0 z-20 bg-headBg dark:bg-slate-800">
+      <tfoot className="sticky bottom-0 z-20 border-t-2 border-slate-300 bg-headBg dark:border-slate-500 dark:bg-slate-800 [&_tr>td]:border-t-2 [&_tr>td]:border-slate-300 dark:[&_tr>td]:border-slate-500">
         <tr>
           {columns.map((col) => {
-            if (col === "Date") {
+            if (col === "Voucher No") {
               return (
                 <td
                   key={col}
@@ -208,7 +218,7 @@ const DayBookIndex = () => {
                     extra: footerTop,
                   })}
                 >
-                  {totalCredit.toLocaleString("en-IN")}
+                  {fmtTotal(totalCredit)}
                 </td>
               );
             }
@@ -221,7 +231,7 @@ const DayBookIndex = () => {
                     extra: footerTop,
                   })}
                 >
-                  {totalDebit.toLocaleString("en-IN")}
+                  {fmtTotal(totalDebit)}
                 </td>
               );
             }
@@ -261,7 +271,7 @@ const DayBookIndex = () => {
               data={rows}
               renderAction={renderProductActions}
               renderFooter={rows.length ? renderFooter : undefined}
-              maxHeight="calc(100vh - 20rem)"
+              maxHeight="calc(100vh - 10rem)"
               tableClassName="text-sm"
             />
           )}

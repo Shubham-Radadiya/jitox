@@ -231,6 +231,12 @@ export function mapJournalRow(v) {
 }
 
 export function mapQuotationRow(q) {
+  const status =
+    q.dashboardOrderStatus ||
+    (q.dashboardTab
+      ? String(q.dashboardTab).replace(/([A-Z])/g, " $1").trim()
+      : "") ||
+    "Processing";
   return {
     _id: q._id,
     _raw: q,
@@ -240,7 +246,7 @@ export function mapQuotationRow(q) {
       : "—",
     Client: q.partyName || "—",
     Amount: q.totalAmount != null ? fmtRupee(q.totalAmount) : "—",
-    Status: "—",
+    Status: status,
   };
 }
 

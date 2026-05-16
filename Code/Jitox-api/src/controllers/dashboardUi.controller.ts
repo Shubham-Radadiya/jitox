@@ -73,6 +73,25 @@ async function computeNextPurchaseVoucherNo(): Promise<string> {
   return `V${String(next).padStart(width, "0")}`;
 }
 
+/** Next quotation voucher no. in `QT-001` form (also scans demo-prefixed codes). */
+async function computeNextQuotationVoucherNo(): Promise<string> {
+  const docs = await Quotation.find().select("voucherNo").lean();
+  let max = 0;
+  const patterns = [/^QT-(\d+)$/i, /^JITOX-DEMO-QT-(\d+)$/i];
+  for (const d of docs) {
+    const v = String(d?.voucherNo ?? "").trim();
+    for (const re of patterns) {
+      const m = re.exec(v);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (Number.isFinite(n)) max = Math.max(max, n);
+      }
+    }
+  }
+  const next = max + 1;
+  return `QT-${String(next).padStart(3, "0")}`;
+}
+
 async function sumModelField(model: any, field: string): Promise<number> {
   const rows = (await model.aggregate([
     { $group: { _id: null, t: { $sum: { $ifNull: [`$${field}`, 0] } } } },
@@ -536,6 +555,13 @@ export const getPurchaseFormMeta = async (
       console.error("computeNextPurchaseVoucherNo", e);
     }
 
+    let nextQuotationVoucherNo = "QT-001";
+    try {
+      nextQuotationVoucherNo = await computeNextQuotationVoucherNo();
+    } catch (e) {
+      console.error("computeNextQuotationVoucherNo", e);
+    }
+
     sendSuccess(res, {
       parties,
       partyCreditHints,
@@ -548,6 +574,7 @@ export const getPurchaseFormMeta = async (
       terms,
       gst,
       nextPurchaseVoucherNo,
+      nextQuotationVoucherNo,
     });
   } catch (e) {
     console.error("getPurchaseFormMeta", e);
