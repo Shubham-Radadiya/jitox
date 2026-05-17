@@ -1,0 +1,34 @@
+# Render Blueprint — deploy from dashboard: New > Blueprint > connect repo
+# Or create two services manually using the settings below.
+
+services:
+  - type: web
+    name: jitox-api
+    runtime: node
+    rootDir: Code/Jitox-api
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+
+  - type: web
+    name: jitox-dashboard
+    runtime: static
+    rootDir: Code/Jetox-dashboard
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

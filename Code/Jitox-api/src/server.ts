@@ -15,10 +15,15 @@ const envFile =
     ? ".env.production"
     : ".env.development";
 
-dotenv.config({ path: envFile });
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
 const app: Express = express();
 const PORT = Number(process.env.PORT) || 4000;
+const HOST = process.env.HOST || "0.0.0.0";
+
+app.get("/", (_req, res) => {
+  res.json({ ok: true, service: "jitox-api" });
+});
 
 app.use(cors());
 
@@ -32,6 +37,9 @@ const httpServer = http.createServer(app);
 initSocketIO(httpServer);
 
 const start = async () => {
+  console.log(
+    `[jitox-api] starting NODE_ENV=${process.env.NODE_ENV} PORT=${PORT} MONGO_URI=${process.env.MONGO_URI ? "set" : "MISSING"}`
+  );
   await connectDB();
   if (process.env.NODE_ENV === "development") {
     await ensureDefaultUsers();
@@ -43,8 +51,8 @@ const start = async () => {
       }
     }
   }
-  httpServer.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
   });
 };
 

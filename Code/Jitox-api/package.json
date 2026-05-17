@@ -2,10 +2,14 @@
   "name": "Jitox-api",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=20 <24"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
     "dev": "cross-env NODE_ENV=development nodemon src/server.ts",
-    "start": "cross-env NODE_ENV=production ts-node src/server.ts",
+    "start": "node dist/server.js",
     "seed:demo": "cross-env NODE_ENV=development ts-node src/seed/runDemoSeed.ts",
     "migrate:address": "cross-env NODE_ENV=development ts-node src/migrations/migrateAddressFields.ts"
   },
