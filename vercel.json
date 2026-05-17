@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --prefix Code/Jetox-dashboard",
+  "buildCommand": "npm run build --prefix Code/Jetox-dashboard",
+  "outputDirectory": "Code/Jetox-dashboard/dist",
+  "framework": "vite",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
