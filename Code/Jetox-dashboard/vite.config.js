@@ -72,22 +72,5 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       include: ["redux-thunk", "html2canvas", "jspdf"],
     },
-    build: {
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            const norm = id.split("\\").join("/");
-            if (!norm.includes("node_modules")) return;
-            if (norm.includes("antd") || norm.includes("@ant-design")) return "antd";
-            if (norm.includes("@tanstack")) return "tanstack";
-            if (norm.includes("react-router")) return "react-router";
-            if (norm.includes("react-dom")) return "react-dom";
-            if (norm.includes("node_modules/react/")) return "react";
-            if (norm.includes("leaflet")) return "leaflet";
-            return "vendor";
-          },
-        },
-      },
-    },
   };
 });
