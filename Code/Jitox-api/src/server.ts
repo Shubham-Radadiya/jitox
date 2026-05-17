@@ -41,9 +41,13 @@ const start = async () => {
     `[jitox-api] starting NODE_ENV=${process.env.NODE_ENV} PORT=${PORT} MONGO_URI=${process.env.MONGO_URI ? "set" : "MISSING"}`
   );
   await connectDB();
-  if (process.env.NODE_ENV === "development") {
+
+  const isDev = process.env.NODE_ENV === "development";
+  const allowBootstrap = process.env.ALLOW_BOOTSTRAP_USERS === "true";
+
+  if (isDev || allowBootstrap) {
     await ensureDefaultUsers();
-    if (process.env.SEED_DEMO_DATA !== "false") {
+    if (isDev && process.env.SEED_DEMO_DATA !== "false") {
       try {
         await seedDemoData();
       } catch (e) {
