@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import dayjs from "dayjs";
 import { Download } from "lucide-react";
@@ -11,14 +11,16 @@ import {
 } from "../../../components/ui/CommanUI";
 import { cashVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
+import {
+  emptyMeta,
+  usePurchaseFormMeta,
+} from "../../../hooks/usePurchaseFormMeta";
+import {
+  buildAccountPartyOptions,
+  CASH_LEDGER_OPTION,
+  partyLabelFromOptions,
+} from "./cashBankPartyOptions";
 
-const bankOptions = [
-  { label: "Select Bank", value: "" },
-  { label: "HDFC Bank", value: "hdfc" },
-  { label: "ICICI Bank", value: "icici" },
-];
-
-/** Matches Jitox-api `proofUpload` / `singleProofUpload` (same as expense proof). */
 const ACCEPTED_PROOF_TYPES =
   ".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf";
 const MAX_PROOF_BYTES = 20 * 1024 * 1024;
@@ -31,11 +33,6 @@ const ACCEPTED_MIME = new Set([
 ]);
 const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|pdf)$/i;
 
-function bankLabelFromValue(options, value) {
-  const opt = options.find((o) => o.value === value);
-  return opt?.label && opt.label !== "Select Bank" ? opt.label : "";
-}
-
 function isProofTypeAllowed(file) {
   if (!file) return false;
   if (file.type && ACCEPTED_MIME.has(String(file.type).toLowerCase())) return true;
@@ -47,6 +44,7 @@ const UPLOAD_INPUT_ID = "cash-voucher-attachment";
 const emptyForm = () => ({
   voucherNumber: "",
   voucherDate: "",
+  debitFrom: CASH_LEDGER_OPTION.value,
   creditTo: "",
   amount: "",
   narration: "",
@@ -54,12 +52,29 @@ const emptyForm = () => ({
 
 const CashTransferModal = ({ open, onClose }) => {
   const queryClient = useQueryClient();
+  const { data: meta, isError: metaError } = usePurchaseFormMeta({
+    enabled: open,
+  });
+  const creditPartyOptions = useMemo(
+    () =>
+      buildAccountPartyOptions(
+        meta?.parties?.length ? meta.parties : emptyMeta.parties
+      ),
+    [meta]
+  );
+
   const [form, setForm] = useState(emptyForm);
   const [proofFile, setProofFile] = useState(null);
   const [proofObjectUrl, setProofObjectUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (metaError) {
+      toast.error("Could not load accounts. Check API and try again.");
+    }
+  }, [metaError]);
 
   useEffect(() => {
     if (open) {
@@ -131,8 +146,12 @@ const CashTransferModal = ({ open, onClose }) => {
 
   const validate = () => {
     if (!String(form.voucherDate || "").trim()) return "Pick a voucher date.";
-    const bankName = bankLabelFromValue(bankOptions, form.creditTo);
-    if (!bankName) return "Select the bank to credit.";
+    const debit = CASH_LEDGER_OPTION.label;
+    const credit = partyLabelFromOptions(creditPartyOptions, form.creditTo);
+    if (!credit) return "Select credit to (bank / account).";
+    if (debit.toLowerCase() === credit.toLowerCase()) {
+      return "Debit from and credit to must be different.";
+    }
     const n = Number(form.amount);
     if (!Number.isFinite(n) || n <= 0) return "Enter a valid amount.";
     const narr = String(form.narration || "").trim();
@@ -146,14 +165,15 @@ const CashTransferModal = ({ open, onClose }) => {
       toast.error(err);
       return;
     }
-    const bankName = bankLabelFromValue(bankOptions, form.creditTo);
+    const debitName = CASH_LEDGER_OPTION.label;
+    const creditName = partyLabelFromOptions(creditPartyOptions, form.creditTo);
     const narr = String(form.narration || "").trim();
     const body = new FormData();
     body.append("voucherNumber", String(form.voucherNumber ?? "").trim());
     body.append("voucherDate", String(form.voucherDate || "").trim());
     body.append("amount", String(Number(form.amount)));
-    body.append("debitFrom", "Cash");
-    body.append("creditTo", bankName);
+    body.append("debitFrom", debitName);
+    body.append("creditTo", creditName);
     body.append("narration", narr);
     body.append("particulars", narr);
     if (proofFile) body.append("attachmentsFile", proofFile);
@@ -161,7 +181,10 @@ const CashTransferModal = ({ open, onClose }) => {
     try {
       setSaving(true);
       await cashVouchersApi.create(body);
-      await queryClient.invalidateQueries({ queryKey: ["voucher-list", "cash"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["voucher-list", "cash"] }),
+        queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+      ]);
       toast.success("Cash voucher saved.");
       onClose();
     } catch (e) {
@@ -215,14 +238,26 @@ const CashTransferModal = ({ open, onClose }) => {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <InputField label="Debit From" value="Cash" disabled />
+          <InputField
+            label="Debit From"
+            value={CASH_LEDGER_OPTION.label}
+            disabled
+            readOnly
+          />
           <CommonDropdown
-            label="Credit To"
+            label="Credit To (Bank / Account)"
+            searchable
+            searchPlaceholder="Search account…"
             addNavigateTo="/dashboard/account"
-            options={bankOptions}
+            options={creditPartyOptions}
             value={form.creditTo}
             onChange={(value) => updateField("creditTo", value)}
-            placeholder="Dropdown: Select Bank"
+            placeholder={
+              creditPartyOptions.length
+                ? "Select bank or account"
+                : "Add accounts in Account Master"
+            }
+            menuPortal
           />
           <InputField
             label="Amount"

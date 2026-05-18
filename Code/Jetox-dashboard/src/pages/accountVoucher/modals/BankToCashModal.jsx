@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import dayjs from "dayjs";
 import { Download } from "lucide-react";
@@ -11,14 +11,15 @@ import {
 } from "../../../components/ui/CommanUI";
 import { cashVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
-
-const bankOptions = [
-  { label: "Select Bank", value: "" },
-  { label: "HDFC Bank", value: "hdfc" },
-  { label: "ICICI Bank", value: "icici" },
-  { label: "SBI Bank", value: "sbi" },
-  { label: "Axis Bank", value: "axis" },
-];
+import {
+  emptyMeta,
+  usePurchaseFormMeta,
+} from "../../../hooks/usePurchaseFormMeta";
+import {
+  buildAccountPartyOptions,
+  CASH_LEDGER_OPTION,
+  partyLabelFromOptions,
+} from "./cashBankPartyOptions";
 
 const ACCEPTED_PROOF_TYPES =
   ".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf";
@@ -34,11 +35,6 @@ const ACCEPTED_EXT_RE = /\.(jpe?g|png|webp|pdf)$/i;
 
 const UPLOAD_INPUT_ID = "bank-voucher-attachment";
 
-function bankLabelFromValue(options, value) {
-  const opt = options.find((o) => o.value === value);
-  return opt?.label && opt.label !== "Select Bank" ? opt.label : "";
-}
-
 function isProofTypeAllowed(file) {
   if (!file) return false;
   if (file.type && ACCEPTED_MIME.has(String(file.type).toLowerCase())) return true;
@@ -49,18 +45,36 @@ const emptyForm = () => ({
   voucherNumber: "",
   voucherDate: "",
   debitFrom: "",
+  creditTo: CASH_LEDGER_OPTION.value,
   amount: "",
   narration: "",
 });
 
 const BankToCashModal = ({ open, onClose }) => {
   const queryClient = useQueryClient();
+  const { data: meta, isError: metaError } = usePurchaseFormMeta({
+    enabled: open,
+  });
+  const debitPartyOptions = useMemo(
+    () =>
+      buildAccountPartyOptions(
+        meta?.parties?.length ? meta.parties : emptyMeta.parties
+      ),
+    [meta]
+  );
+
   const [form, setForm] = useState(emptyForm);
   const [proofFile, setProofFile] = useState(null);
   const [proofObjectUrl, setProofObjectUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (metaError) {
+      toast.error("Could not load accounts. Check API and try again.");
+    }
+  }, [metaError]);
 
   useEffect(() => {
     if (open) {
@@ -132,8 +146,12 @@ const BankToCashModal = ({ open, onClose }) => {
 
   const validate = () => {
     if (!String(form.voucherDate || "").trim()) return "Pick a voucher date.";
-    const bankName = bankLabelFromValue(bankOptions, form.debitFrom);
-    if (!bankName) return "Select the bank to debit.";
+    const debit = partyLabelFromOptions(debitPartyOptions, form.debitFrom);
+    const credit = CASH_LEDGER_OPTION.label;
+    if (!debit) return "Select debit from (bank / account).";
+    if (debit.toLowerCase() === credit.toLowerCase()) {
+      return "Debit from and credit to must be different.";
+    }
     const n = Number(form.amount);
     if (!Number.isFinite(n) || n <= 0) return "Enter a valid amount.";
     const narr = String(form.narration || "").trim();
@@ -147,14 +165,15 @@ const BankToCashModal = ({ open, onClose }) => {
       toast.error(err);
       return;
     }
-    const bankName = bankLabelFromValue(bankOptions, form.debitFrom);
+    const debitName = partyLabelFromOptions(debitPartyOptions, form.debitFrom);
+    const creditName = CASH_LEDGER_OPTION.label;
     const narr = String(form.narration || "").trim();
     const body = new FormData();
     body.append("voucherNumber", String(form.voucherNumber ?? "").trim());
     body.append("voucherDate", String(form.voucherDate || "").trim());
     body.append("amount", String(Number(form.amount)));
-    body.append("debitFrom", bankName);
-    body.append("creditTo", "Cash");
+    body.append("debitFrom", debitName);
+    body.append("creditTo", creditName);
     body.append("narration", narr);
     body.append("particulars", narr);
     if (proofFile) body.append("attachmentsFile", proofFile);
@@ -162,7 +181,10 @@ const BankToCashModal = ({ open, onClose }) => {
     try {
       setSaving(true);
       await cashVouchersApi.create(body);
-      await queryClient.invalidateQueries({ queryKey: ["voucher-list", "bank"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["voucher-list", "bank"] }),
+        queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+      ]);
       toast.success("Bank voucher saved.");
       onClose();
     } catch (e) {
@@ -217,14 +239,26 @@ const BankToCashModal = ({ open, onClose }) => {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <CommonDropdown
-            label="Debit From"
+            label="Debit From (Bank / Account)"
+            searchable
+            searchPlaceholder="Search account…"
             addNavigateTo="/dashboard/account"
-            options={bankOptions}
+            options={debitPartyOptions}
             value={form.debitFrom}
             onChange={(value) => updateField("debitFrom", value)}
-            placeholder="Dropdown: Select Bank"
+            placeholder={
+              debitPartyOptions.length
+                ? "Select bank or account"
+                : "Add accounts in Account Master"
+            }
+            menuPortal
           />
-          <InputField label="Credit To" value="Cash" disabled />
+          <InputField
+            label="Credit To"
+            value={CASH_LEDGER_OPTION.label}
+            disabled
+            readOnly
+          />
           <InputField
             label="Amount"
             type="number"

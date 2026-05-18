@@ -6,6 +6,10 @@ import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+import {
+  applyPaymentToAccountBalance,
+  parsePaymentAmount,
+} from "../utils/applyPaymentToAccountBalance";
 
 /** Fields accepted from PUT body when updating a payment voucher. */
 const PAYMENT_VOUCHER_PATCH_KEYS = [
@@ -18,16 +22,40 @@ const PAYMENT_VOUCHER_PATCH_KEYS = [
   "status",
 ] as const;
 
-/**
- * Parse the freeform `amount` string ("₹1,200" / "1200" / 1200) into a number
- * we can use to reconcile a linked sales voucher's `paidAmount`.
- */
 function parseAmountToNumber(value: unknown): number {
-  if (value == null) return 0;
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const cleaned = String(value).replace(/[^\d.-]/g, "");
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : 0;
+  return parsePaymentAmount(value);
+}
+
+async function reconcileAccountFromPaymentChange(
+  previousStatus: string,
+  nextStatus: string,
+  prevPaymentTo: string,
+  prevAmount: unknown,
+  nextPaymentTo: string,
+  nextAmount: unknown
+): Promise<void> {
+  const wasPaid = previousStatus === "Paid";
+  const isPaid = nextStatus === "Paid";
+
+  if (wasPaid && !isPaid) {
+    await applyPaymentToAccountBalance(prevPaymentTo, prevAmount, "reverse");
+    return;
+  }
+  if (!wasPaid && isPaid) {
+    await applyPaymentToAccountBalance(nextPaymentTo, nextAmount, "apply");
+    return;
+  }
+  if (wasPaid && isPaid) {
+    const toChanged =
+      String(prevPaymentTo || "").trim().toLowerCase() !==
+      String(nextPaymentTo || "").trim().toLowerCase();
+    const amtChanged =
+      parsePaymentAmount(prevAmount) !== parsePaymentAmount(nextAmount);
+    if (toChanged || amtChanged) {
+      await applyPaymentToAccountBalance(prevPaymentTo, prevAmount, "reverse");
+      await applyPaymentToAccountBalance(nextPaymentTo, nextAmount, "apply");
+    }
+  }
 }
 
 /**
@@ -131,6 +159,14 @@ export const createPaymentVoucher = async (
       await SalesVoucher.findByIdAndUpdate(linkedSalesId, {
         $set: { paymentRequestId: savedVoucher._id },
       });
+    }
+
+    if (String(savedVoucher.status || "") === "Paid") {
+      await applyPaymentToAccountBalance(
+        String(savedVoucher.paymentTo || ""),
+        savedVoucher.amount,
+        "apply"
+      );
     }
 
     await logDayBookEntry({
@@ -249,6 +285,8 @@ export const updatePaymentVoucher = async (
     }
 
     const previousStatus = String(voucher.status || "");
+    const prevPaymentTo = String(voucher.paymentTo || "");
+    const prevAmount = voucher.amount;
     const patch: Record<string, unknown> = {};
     for (const key of PAYMENT_VOUCHER_PATCH_KEYS) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -259,13 +297,23 @@ export const updatePaymentVoucher = async (
     voucher.set(patch);
     await voucher.save();
 
+    const nextStatus = String(voucher.status || "");
+
+    await reconcileAccountFromPaymentChange(
+      previousStatus,
+      nextStatus,
+      prevPaymentTo,
+      prevAmount,
+      String(voucher.paymentTo || ""),
+      voucher.amount
+    );
+
     /**
      * Keep the originating sales voucher in sync. When this payment flips
      * Pending → Paid we mark the sale Paid and bump its `paidAmount`.
      * When it flips Paid → Pending (rare, but supported), we reverse the
      * reconciliation so the sale's outstanding shows up again.
      */
-    const nextStatus = String(voucher.status || "");
     if (voucher.sourceSalesId && previousStatus !== nextStatus) {
       const sale = await SalesVoucher.findById(voucher.sourceSalesId);
       if (sale) {
@@ -323,6 +371,14 @@ export const deletePaymentVoucher = async (
      * payment had already reconciled the sale (status was "Paid"), also
      * revert the sale's `paidAmount` / `paymentStatus`.
      */
+    if (String((deleted as any).status || "") === "Paid") {
+      await applyPaymentToAccountBalance(
+        String((deleted as any).paymentTo || ""),
+        (deleted as any).amount,
+        "reverse"
+      );
+    }
+
     if ((deleted as any).sourceSalesId) {
       const sale = await SalesVoucher.findById((deleted as any).sourceSalesId);
       if (sale) {

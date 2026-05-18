@@ -8,6 +8,7 @@ import { Button } from "../../../components/ui/CommanUI";
 import PurchaseVoucherForm from "./PurchaseVoucherForm";
 import { purchaseVouchersApi, quotationsApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
+import { invalidateProductAndStockQueries } from "../../../utils/invalidateStockQueries";
 import { purchasePayloadToCreateBody } from "./purchasePayloadToApi";
 import { quotationPayloadToCreateBody } from "./quotationPayloadToApi";
 
@@ -109,6 +110,7 @@ const AddPurchase = ({ formType = "purchase" }) => {
                 await queryClient.invalidateQueries({
                   queryKey: ["purchase-form-meta"],
                 });
+                invalidateProductAndStockQueries(queryClient);
                 toast.success(`Saved ${savedNo}.`);
                 navigate("/dashboard/accounting-voucher/purchase");
               } catch (e) {

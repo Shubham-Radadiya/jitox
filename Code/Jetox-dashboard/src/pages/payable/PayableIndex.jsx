@@ -99,15 +99,7 @@ const PayableIndex = () => {
   };
 
   const renderAction = (row) => {
-    if (row.Status === "Paid") {
-      return (
-        <td
-          className={`${tableTdClasses("Action")} text-gray-400 dark:text-slate-500`}
-        >
-          —
-        </td>
-      );
-    }
+    const isPaid = String(row.Status || "").toLowerCase() === "paid";
     return (
       <td className={tableTdClasses("Action")}>
         <div className="flex items-center justify-center gap-2">
@@ -122,27 +114,40 @@ const PayableIndex = () => {
           >
             <IoEyeOutline size={18} strokeWidth={2} />
           </button>
-          <button
-            type="button"
-            title="Pay now"
-            className={TABLE_ACTION_ICON_BTN}
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePayNow(row);
-            }}
-          >
-            <CreditCard size={18} strokeWidth={2} />
-          </button>
+          {!isPaid ? (
+            <button
+              type="button"
+              title="Pay now"
+              className={TABLE_ACTION_ICON_BTN}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePayNow(row);
+              }}
+            >
+              <CreditCard size={18} strokeWidth={2} />
+            </button>
+          ) : null}
         </div>
       </td>
     );
   };
 
+  const parsePayableAmount = (row) => {
+    if (typeof row?.amountValue === "number" && Number.isFinite(row.amountValue)) {
+      return row.amountValue;
+    }
+    const n = Number(
+      String(row?.["Amount (₹)"] ?? "")
+        .replace(/[₹,\s]/g, "")
+    );
+    return Number.isFinite(n) ? n : 0;
+  };
+
   const renderFooter = (displayedRows = []) => {
-    const sum = displayedRows.reduce((acc, r) => {
-      const n = Number(String(r["Amount (₹)"] ?? "").replace(/,/g, ""));
-      return acc + (Number.isFinite(n) ? n : 0);
-    }, 0);
+    const sum = displayedRows.reduce(
+      (acc, r) => acc + parsePayableAmount(r),
+      0
+    );
     const footerTop =
       "border-t-2 border-t-slate-200 dark:border-t-slate-600";
     return (

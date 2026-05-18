@@ -4,6 +4,30 @@ import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
+import {
+  applyExpenseToAccountBalance,
+  parsePaymentAmount,
+} from "../utils/applyPaymentToAccountBalance";
+import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+
+async function reconcileExpenseAccountChange(
+  prevPaidTo: string,
+  prevAmount: unknown,
+  nextPaidTo: string,
+  nextAmount: unknown
+): Promise<void> {
+  const prevTo = String(prevPaidTo || "").trim();
+  const nextTo = String(nextPaidTo || "").trim();
+  const prevAmt = parsePaymentAmount(prevAmount);
+  const nextAmt = parsePaymentAmount(nextAmount);
+
+  if (prevTo && prevAmt > 0) {
+    await applyExpenseToAccountBalance(prevPaidTo, prevAmount, "reverse");
+  }
+  if (nextTo && nextAmt > 0) {
+    await applyExpenseToAccountBalance(nextPaidTo, nextAmount, "apply");
+  }
+}
 
 export const createExpenseVoucher = async (
   req: Request,
@@ -40,6 +64,21 @@ export const createExpenseVoucher = async (
     });
 
     const savedVoucher = await newVoucher.save();
+
+    await applyExpenseToAccountBalance(
+      String(savedVoucher.paidTo || ""),
+      savedVoucher.amount,
+      "apply"
+    );
+
+    const expId = String(savedVoucher._id || "");
+    await logDayBookEntry({
+      voucherNumber: expId ? `EXP-${expId.slice(-6).toUpperCase()}` : "EXP",
+      voucherType: "Expense",
+      particulars: `${savedVoucher.expenseType || "Expense"} — ${savedVoucher.paidTo || "party"}`,
+      debitAmount: savedVoucher.amount as unknown as string,
+      creditAmount: savedVoucher.amount as unknown as string,
+    });
 
     res.status(201).json({
       message: "Expense Voucher created successfully.",
@@ -110,6 +149,17 @@ export const updateExpenseVoucher = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const existing = await ExpenseVoucher.findById(id);
+    if (!existing) {
+      throw new AppError(
+        HttpStatusCode.NOT_FOUND,
+        "Expense Voucher not found."
+      );
+    }
+
+    const prevPaidTo = String(existing.paidTo || "");
+    const prevAmount = existing.amount;
+
     const updateData = { ...req.body };
 
     if (req.file) {
@@ -131,6 +181,30 @@ export const updateExpenseVoucher = async (
         "Expense Voucher not found."
       );
     }
+
+    const paidToChanged =
+      String(prevPaidTo).trim().toLowerCase() !==
+      String(updatedVoucher.paidTo || "").trim().toLowerCase();
+    const amtChanged =
+      parsePaymentAmount(prevAmount) !== parsePaymentAmount(updatedVoucher.amount);
+
+    if (paidToChanged || amtChanged) {
+      await reconcileExpenseAccountChange(
+        prevPaidTo,
+        prevAmount,
+        String(updatedVoucher.paidTo || ""),
+        updatedVoucher.amount
+      );
+    }
+
+    const expId = String(updatedVoucher._id || "");
+    await logDayBookEntry({
+      voucherNumber: expId ? `EXP-${expId.slice(-6).toUpperCase()}` : "EXP",
+      voucherType: "Expense",
+      particulars: `${updatedVoucher.expenseType || "Expense"} — ${updatedVoucher.paidTo || "party"}`,
+      debitAmount: updatedVoucher.amount as unknown as string,
+      creditAmount: updatedVoucher.amount as unknown as string,
+    });
 
     res.status(200).json({
       message: "Expense Voucher updated successfully.",
@@ -157,6 +231,17 @@ export const deleteExpenseVoucher = async (
         "Expense Voucher not found."
       );
     }
+
+    await applyExpenseToAccountBalance(
+      String(deletedVoucher.paidTo || ""),
+      deletedVoucher.amount,
+      "reverse"
+    );
+
+    const expId = String(deletedVoucher._id || "");
+    await removeDayBookEntry(
+      expId ? `EXP-${expId.slice(-6).toUpperCase()}` : "EXP"
+    );
 
     res.status(200).json({ message: "Expense Voucher deleted successfully." });
   } catch (error) {

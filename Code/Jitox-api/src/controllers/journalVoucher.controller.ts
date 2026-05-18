@@ -4,6 +4,32 @@ import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
+import { applyJournalToAccountBalances } from "../utils/applyPaymentToAccountBalance";
+import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+
+/** Reverse the old journal line, then apply the new one (edit). */
+async function reconcileJournalAccounts(
+  prev: { paymentBy: unknown; paymentTo: unknown; amount: unknown },
+  next: { paymentBy: unknown; paymentTo: unknown; amount: unknown }
+): Promise<void> {
+  const changed =
+    String(prev.paymentBy) !== String(next.paymentBy) ||
+    String(prev.paymentTo) !== String(next.paymentTo) ||
+    Number(prev.amount) !== Number(next.amount);
+  if (!changed) return;
+  await applyJournalToAccountBalances(
+    prev.paymentBy,
+    prev.paymentTo,
+    prev.amount,
+    "reverse"
+  );
+  await applyJournalToAccountBalances(
+    next.paymentBy,
+    next.paymentTo,
+    next.amount,
+    "apply"
+  );
+}
 
 /**
  * Next journal voucher no. in `JITOX-DEMO-JV-001` form — scans existing
@@ -50,7 +76,6 @@ export const createJournalVoucher = async (
       debitAmount,
       creditAmount,
       remarks,
-      status = "Pending",
     } = req.body;
     const requiredFields = [
       "voucherNo",
@@ -116,10 +141,25 @@ export const createJournalVoucher = async (
       debitAmount,
       creditAmount,
       remarks,
-      status,
+      status: "Paid",
     });
 
     const savedVoucher = await newVoucher.save();
+
+    await applyJournalToAccountBalances(
+      savedVoucher.paymentBy,
+      savedVoucher.paymentTo,
+      savedVoucher.debitAmount,
+      "apply"
+    );
+
+    await logDayBookEntry({
+      voucherNumber: String(savedVoucher.voucherNo),
+      voucherType: "Journal",
+      particulars: `${savedVoucher.remarks || "Journal entry"}`,
+      debitAmount: savedVoucher.debitAmount as unknown as string,
+      creditAmount: savedVoucher.creditAmount as unknown as string,
+    });
 
     res.status(201).json({
       message: "Journal voucher created successfully.",
@@ -214,10 +254,6 @@ export const updateJournalVoucher = async (
         : Number(existing.creditAmount);
     const remarks =
       b.remarks != null ? String(b.remarks) : existing.remarks ?? "";
-    const status =
-      b.status != null && String(b.status).trim() !== ""
-        ? String(b.status).trim()
-        : existing.status ?? "Pending";
 
     if (!Number.isFinite(debitNum) || !Number.isFinite(creditNum) || debitNum <= 0) {
       throw new AppError(
@@ -264,6 +300,8 @@ export const updateJournalVoucher = async (
       );
     }
 
+    const prevWasPosted = String(existing.status || "") === "Paid";
+
     const updatedVoucher = await JournalVoucher.findByIdAndUpdate(
       id,
       {
@@ -274,10 +312,42 @@ export const updateJournalVoucher = async (
         debitAmount: debitNum,
         creditAmount: creditNum,
         remarks,
-        status,
+        status: "Paid",
       },
       { new: true }
     );
+
+    if (updatedVoucher) {
+      if (prevWasPosted) {
+        await reconcileJournalAccounts(
+          {
+            paymentBy: existing.paymentBy,
+            paymentTo: existing.paymentTo,
+            amount: existing.debitAmount,
+          },
+          {
+            paymentBy: updatedVoucher.paymentBy,
+            paymentTo: updatedVoucher.paymentTo,
+            amount: updatedVoucher.debitAmount,
+          }
+        );
+      } else {
+        await applyJournalToAccountBalances(
+          updatedVoucher.paymentBy,
+          updatedVoucher.paymentTo,
+          updatedVoucher.debitAmount,
+          "apply"
+        );
+      }
+
+      await logDayBookEntry({
+        voucherNumber: String(updatedVoucher.voucherNo),
+        voucherType: "Journal",
+        particulars: `${updatedVoucher.remarks || "Journal entry"}`,
+        debitAmount: updatedVoucher.debitAmount as unknown as string,
+        creditAmount: updatedVoucher.creditAmount as unknown as string,
+      });
+    }
 
     res.status(200).json({
       message: "Journal voucher updated successfully.",
@@ -302,6 +372,17 @@ export const deleteJournalVoucher = async (
         "Journal voucher not found."
       );
     }
+
+    if (String(deletedVoucher.status || "") === "Paid") {
+      await applyJournalToAccountBalances(
+        deletedVoucher.paymentBy,
+        deletedVoucher.paymentTo,
+        deletedVoucher.debitAmount,
+        "reverse"
+      );
+      await removeDayBookEntry(String(deletedVoucher.voucherNo));
+    }
+
     res.status(200).json({ message: "Journal voucher deleted successfully." });
   } catch (error) {
     console.error("Delete Journal Voucher Error:", error);

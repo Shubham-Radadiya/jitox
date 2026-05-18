@@ -95,7 +95,7 @@ export function purchasePayloadToCreateBody(payload) {
     paymentMode: mapPaymentMode(payload.termsPayment),
     basePrice: lineTaxableTotal,
     stockDetails: {
-      stockQuantity: Boolean(payload.stockToggle),
+      stockQuantity: payload.stockToggle !== false,
       generetePurchaseBill: false,
       updateStockAfterOrderPlaced: false,
     },

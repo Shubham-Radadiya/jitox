@@ -35,6 +35,7 @@ import PurchaseReturnModal from "./purchase/PurchaseReturnModal";
 import SalesVoucherModal from "./purchase/SalesVoucherModal";
 import {
   expenseVouchersApi,
+  journalVouchersApi,
   paymentVouchersApi,
   purchaseReturnVouchersApi,
   purchaseVouchersApi,
@@ -361,6 +362,7 @@ const VoucherPage = () => {
         queryClient.invalidateQueries({
           queryKey: ["voucher-list", "sales"],
         }),
+        queryClient.invalidateQueries({ queryKey: ["accounts"] }),
       ]);
     },
     [queryClient]
@@ -380,6 +382,7 @@ const VoucherPage = () => {
         queryClient.invalidateQueries({
           queryKey: ["voucher-list", "sales"],
         }),
+        queryClient.invalidateQueries({ queryKey: ["accounts"] }),
       ]);
     },
     [queryClient]
@@ -392,6 +395,7 @@ const VoucherPage = () => {
       await queryClient.invalidateQueries({
         queryKey: ["voucher-list", "purchase-return"],
       });
+      invalidateProductAndStockQueries(queryClient);
     },
     [queryClient]
   );
@@ -403,6 +407,7 @@ const VoucherPage = () => {
       await queryClient.invalidateQueries({
         queryKey: ["voucher-list", "sales"],
       });
+      invalidateProductAndStockQueries(queryClient);
     },
     [queryClient]
   );
@@ -524,6 +529,7 @@ const VoucherPage = () => {
     void queryClient.invalidateQueries({
       queryKey: ["journal-next-voucher-no"],
     });
+    void queryClient.invalidateQueries({ queryKey: ["accounts"] });
   }, [queryClient]);
 
   /** Opens a one-off file picker, validates, and PUTs only the new proof file

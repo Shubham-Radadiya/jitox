@@ -27,6 +27,8 @@ const accountSchema = new Schema<IAccount>(
     pincode: { type: String, trim: true },
     district: { type: String, trim: true },
     amount: { type: Number, required: true },
+    /** Frozen opening for ledger row 1; `amount` is current balance after payments. */
+    openingAmount: { type: Number },
     balenceType: {
       type: String,
       trim: true,

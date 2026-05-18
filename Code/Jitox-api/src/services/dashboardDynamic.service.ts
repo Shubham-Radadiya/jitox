@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import {
   Quotation,
   PaymentVoucher,
+  ReceiptVoucher,
   Product,
   Employee,
   MarketingScheme,
@@ -15,6 +16,7 @@ import {
   type EmployeeSeed,
 } from "../data/employeeTracking.seed";
 import { productLineAmount, resolveProductUnit } from "../utils/productUnit";
+import { applyPaymentToAccountBalance } from "../utils/applyPaymentToAccountBalance";
 
 function parseRupeeAmount(s: string): number {
   const n = Number(
@@ -445,6 +447,74 @@ export async function fetchPayablesList(query: Record<string, unknown>) {
   return { payables: list, totalPayables: total };
 }
 
+const MONTH_SHORT_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** Sum of all receipt voucher amounts (matches Receivable summary page). */
+export async function totalReceiptVouchersAmount(): Promise<number> {
+  const docs = await ReceiptVoucher.find().select("amount").lean();
+  return docs.reduce(
+    (s, d) => s + parsePaymentAmount((d as { amount?: unknown }).amount),
+    0
+  );
+}
+
+/** Monthly receipt vs payment totals for the dashboard chart (calendar year). */
+export async function buildReceivablesPayablesMonthlyChart(
+  year = new Date().getFullYear()
+): Promise<{
+  months: string[];
+  receivables: number[];
+  payables: number[];
+}> {
+  const start = new Date(year, 0, 1);
+  const end = new Date(year + 1, 0, 1);
+  const receivables = Array(12).fill(0) as number[];
+  const payables = Array(12).fill(0) as number[];
+
+  const [payments, receipts] = await Promise.all([
+    PaymentVoucher.find({ date: { $gte: start, $lt: end } })
+      .select("date amount")
+      .lean(),
+    ReceiptVoucher.find({ date: { $gte: start, $lt: end } })
+      .select("date amount")
+      .lean(),
+  ]);
+
+  for (const p of payments) {
+    if (!p.date) continue;
+    const m = new Date(p.date as Date).getMonth();
+    if (m >= 0 && m < 12) {
+      payables[m] += parsePaymentAmount((p as { amount?: unknown }).amount);
+    }
+  }
+  for (const r of receipts) {
+    if (!r.date) continue;
+    const m = new Date(r.date as Date).getMonth();
+    if (m >= 0 && m < 12) {
+      receivables[m] += parsePaymentAmount((r as { amount?: unknown }).amount);
+    }
+  }
+
+  return {
+    months: [...MONTH_SHORT_LABELS],
+    receivables: receivables.map((n) => Math.round(n)),
+    payables: payables.map((n) => Math.round(n)),
+  };
+}
+
 export async function applyPayablePayment(body: Record<string, unknown>) {
   const vn = String(body.voucherNumber || body.voucherNo || "").trim();
   const throughRaw = String(body.paymentThrough || "").toLowerCase();
@@ -455,7 +525,9 @@ export async function applyPayablePayment(body: Record<string, unknown>) {
         : "Bank"
       : "Bank";
   if (vn) {
-    await PaymentVoucher.findOneAndUpdate(
+    const existing = await PaymentVoucher.findOne({ voucherNo: vn }).lean();
+    const wasPaid = existing && String(existing.status || "") === "Paid";
+    const updated = await PaymentVoucher.findOneAndUpdate(
       { voucherNo: vn },
       {
         $set: {
@@ -463,8 +535,16 @@ export async function applyPayablePayment(body: Record<string, unknown>) {
           paymentThrough,
           remarks: String(body.narration ?? ""),
         },
-      }
+      },
+      { new: true }
     );
+    if (updated && !wasPaid) {
+      await applyPaymentToAccountBalance(
+        String(updated.paymentTo || body.paymentTo || ""),
+        updated.amount ?? body.amount,
+        "apply"
+      );
+    }
   }
   return {
     ok: true,

@@ -99,7 +99,9 @@ export default function PurchaseReturnModal({
   const prefill = useMemo(() => {
     if (!open) return null;
     if (mode === "create" || continuingAsNew) {
-      return nextReturnVoucherNo ? { voucherNo: nextReturnVoucherNo } : null;
+      return nextReturnVoucherNo
+        ? { voucherNo: nextReturnVoucherNo, stockToggle: true }
+        : { stockToggle: true };
     }
     if (!voucherDoc) return null;
     const base = mapPurchaseApiDocToPrefill(voucherDoc);

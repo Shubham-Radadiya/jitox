@@ -4,6 +4,8 @@ import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
+import { applyCashBankTransferToAccounts } from "../utils/applyPaymentToAccountBalance";
+import { logDayBookEntry } from "../utils/dayBookLogger";
 
 export const createCashVoucher = async (
   req: Request,
@@ -70,8 +72,30 @@ export const createCashVoucher = async (
 
     const savedVoucher = await newCashVoucher.save();
 
+    await applyCashBankTransferToAccounts(
+      savedVoucher.debitFrom,
+      savedVoucher.creditTo,
+      savedVoucher.amount,
+      "apply"
+    );
+
+    const vn = String(savedVoucher.voucherNumber || "CASH");
+    const narr = String(savedVoucher.narration || savedVoucher.particulars || "").trim();
+    await logDayBookEntry({
+      voucherNumber: vn,
+      voucherType:
+        String(savedVoucher.creditTo || "").trim().toLowerCase() === "cash"
+          ? "Bank"
+          : "Cash",
+      particulars:
+        narr ||
+        `Transfer · Debit ${savedVoucher.debitFrom} · Credit ${savedVoucher.creditTo}`,
+      debitAmount: savedVoucher.amount as unknown as string,
+      creditAmount: savedVoucher.amount as unknown as string,
+    });
+
     res.status(201).json({
-      message: "Expense Voucher created successfully.",
+      message: "Cash voucher created successfully.",
       voucher: savedVoucher,
     });
   } catch (error) {

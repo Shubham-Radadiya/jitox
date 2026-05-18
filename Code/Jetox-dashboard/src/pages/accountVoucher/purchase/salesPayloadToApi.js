@@ -94,7 +94,8 @@ export function salesPayloadToCreateBody(payload) {
     paymentMode: mapPaymentMode(payload.termsPayment),
     basePrice: lineTaxableTotal,
     stockDetails: {
-      stockQuantity: Boolean(payload.stockToggle),
+      /** Sales reduce product qty on save when toggle is on (default). */
+      stockQuantity: payload.stockToggle !== false,
       generetePurchaseBill: false,
       updateStockAfterOrderPlaced: false,
     },

@@ -6,6 +6,10 @@ import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+import {
+  applyReceiptToAccountBalance,
+  parsePaymentAmount,
+} from "../utils/applyPaymentToAccountBalance";
 
 const RECEIPT_VOUCHER_PATCH_KEYS = [
   "voucherNo",
@@ -18,11 +22,39 @@ const RECEIPT_VOUCHER_PATCH_KEYS = [
 ] as const;
 
 function parseAmountToNumber(value: unknown): number {
-  if (value == null) return 0;
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const cleaned = String(value).replace(/[^\d.-]/g, "");
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : 0;
+  return parsePaymentAmount(value);
+}
+
+async function reconcileAccountFromReceiptChange(
+  previousStatus: string,
+  nextStatus: string,
+  prevReceiptFrom: string,
+  prevAmount: unknown,
+  nextReceiptFrom: string,
+  nextAmount: unknown
+): Promise<void> {
+  const wasPaid = previousStatus === "Paid";
+  const isPaid = nextStatus === "Paid";
+
+  if (wasPaid && !isPaid) {
+    await applyReceiptToAccountBalance(prevReceiptFrom, prevAmount, "reverse");
+    return;
+  }
+  if (!wasPaid && isPaid) {
+    await applyReceiptToAccountBalance(nextReceiptFrom, nextAmount, "apply");
+    return;
+  }
+  if (wasPaid && isPaid) {
+    const toChanged =
+      String(prevReceiptFrom || "").trim().toLowerCase() !==
+      String(nextReceiptFrom || "").trim().toLowerCase();
+    const amtChanged =
+      parsePaymentAmount(prevAmount) !== parsePaymentAmount(nextAmount);
+    if (toChanged || amtChanged) {
+      await applyReceiptToAccountBalance(prevReceiptFrom, prevAmount, "reverse");
+      await applyReceiptToAccountBalance(nextReceiptFrom, nextAmount, "apply");
+    }
+  }
 }
 
 async function computeNextReceiptVoucherNo(): Promise<string> {
@@ -142,6 +174,14 @@ export const createReceiptVoucher = async (
     });
 
     const savedVoucher = await newVoucher.save();
+
+    if (nextStatus === "Paid") {
+      await applyReceiptToAccountBalance(
+        String(savedVoucher.receiptFrom || ""),
+        savedVoucher.amount,
+        "apply"
+      );
+    }
 
     if (linkedSalesId && nextStatus === "Paid") {
       await applyReceiptToLinkedSale(savedVoucher, "apply");
@@ -272,6 +312,8 @@ export const updateReceiptVoucher = async (
     }
 
     const previousStatus = String(voucher.status || "");
+    const prevReceiptFrom = String(voucher.receiptFrom || "");
+    const prevAmount = voucher.amount;
     const patch: Record<string, unknown> = {};
     for (const key of RECEIPT_VOUCHER_PATCH_KEYS) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -283,6 +325,16 @@ export const updateReceiptVoucher = async (
     await voucher.save();
 
     const nextStatus = String(voucher.status || "");
+
+    await reconcileAccountFromReceiptChange(
+      previousStatus,
+      nextStatus,
+      prevReceiptFrom,
+      prevAmount,
+      String(voucher.receiptFrom || ""),
+      voucher.amount
+    );
+
     if (voucher.sourceSalesId && previousStatus !== nextStatus) {
       if (nextStatus === "Paid" && previousStatus !== "Paid") {
         await applyReceiptToLinkedSale(voucher, "apply");
@@ -320,6 +372,17 @@ export const deleteReceiptVoucher = async (
       throw new AppError(
         HttpStatusCode.NOT_FOUND,
         "Receipt voucher not found."
+      );
+    }
+
+    if (
+      String((deleted as InstanceType<typeof ReceiptVoucher>).status || "") ===
+      "Paid"
+    ) {
+      await applyReceiptToAccountBalance(
+        String((deleted as InstanceType<typeof ReceiptVoucher>).receiptFrom || ""),
+        (deleted as InstanceType<typeof ReceiptVoucher>).amount,
+        "reverse"
       );
     }
 

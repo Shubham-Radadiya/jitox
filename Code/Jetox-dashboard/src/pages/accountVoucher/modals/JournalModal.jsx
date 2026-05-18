@@ -210,7 +210,6 @@ const JournalModal = ({ open, onClose, onSaved, journal }) => {
       debitAmount: amountNum,
       creditAmount: amountNum,
       remarks: form.remarks?.trim() || "",
-      status: isEdit ? journal?.status || "Pending" : "Pending",
     };
 
     setSaving(true);
@@ -326,15 +325,16 @@ const JournalModal = ({ open, onClose, onSaved, journal }) => {
             menuPortal
             disabled={accountsLoading && accountOptions.length === 0}
           />
-          <InputField
-            label="Narration / Remark"
-            multiline
-            rows={3}
-            value={form.remarks}
-            onChange={(e) => updateField("remarks", e.target.value)}
-            placeholder="Reason for this journal entry"
-          />
         </div>
+
+        <InputField
+          label="Narration / Remark"
+          multiline
+          rows={3}
+          value={form.remarks}
+          onChange={(e) => updateField("remarks", e.target.value)}
+          placeholder="Reason for this journal entry"
+        />
 
         {accountsRaw.length === 0 && !accountsLoading ? (
           <p className="text-sm text-amber-700 dark:text-amber-300">

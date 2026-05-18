@@ -124,6 +124,9 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
         queryClient.invalidateQueries({ queryKey: ["voucher-list", "receipt"] }),
         queryClient.invalidateQueries({ queryKey: ["receiptVouchers"] }),
         queryClient.invalidateQueries({ queryKey: ["receipt-voucher-form-meta"] }),
+        body.status === "Paid"
+          ? queryClient.invalidateQueries({ queryKey: ["accounts"] })
+          : Promise.resolve(),
         sourceSalesId
           ? queryClient.invalidateQueries({ queryKey: ["voucher-list", "sales"] })
           : Promise.resolve(),
@@ -190,6 +193,7 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
             onChange={(value) => updateField("receiptThrough", value)}
             placeholder="Cash or Bank"
             hideAdd
+            menuPortal
           />
           <CommonDropdown
             label="Receipt From"
@@ -200,6 +204,7 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
             searchable
             searchPlaceholder="Search party…"
             addNavigateTo="/dashboard/account"
+            menuPortal
           />
           <InputField
             label="Amount (₹)"
@@ -219,6 +224,7 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
             onChange={(v) => updateField("status", v)}
             placeholder="Received"
             hideAdd
+            menuPortal
           />
           <InputField
             label="Narration / Remark"

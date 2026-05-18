@@ -21,7 +21,11 @@ export function normalizeList(payload) {
 }
 
 export function accountOpeningMeta(account) {
-  const openingAmount = parseRupeeCell(account.amount);
+  const openingSource =
+    account.openingAmount != null && account.openingAmount !== ""
+      ? account.openingAmount
+      : account.amount;
+  const openingAmount = parseRupeeCell(openingSource);
   /** Matches LedgerTable: everything except explicit "credit" is treated as debit opening. */
   const openingIsDebit =
     String(account.balenceType || "").toLowerCase() !== "credit";
@@ -45,6 +49,11 @@ function partyNamesFromAccount(account) {
 function matchesPartyName(accountName, personName, raw) {
   const n = String(raw || "").trim().toLowerCase();
   return n && (n === accountName || n === personName);
+}
+
+/** Money vouchers affect the ledger only after they are settled (Paid). */
+function isSettledMoneyVoucher(v) {
+  return String(v?.status || "").trim().toLowerCase() === "paid";
 }
 
 /** Align with Bank voucher list: credit side is Cash, debit is not Cash. */
@@ -107,6 +116,7 @@ export function buildPartyTransactionEntries(
 
   const payRows = (ledgerSource.payments || [])
     .filter((p) => {
+      if (!isSettledMoneyVoucher(p)) return false;
       const to = String(p.paymentTo || "").trim().toLowerCase();
       return to && (to === accountName || to === personName);
     })
@@ -125,6 +135,7 @@ export function buildPartyTransactionEntries(
 
   const receiptRows = (ledgerSource.receipts || [])
     .filter((r) => {
+      if (!isSettledMoneyVoucher(r)) return false;
       const from = String(r.receiptFrom || "").trim().toLowerCase();
       return from && (from === accountName || from === personName);
     })

@@ -114,6 +114,9 @@ const PaymentModal = ({ open, onClose }) => {
       await queryClient.invalidateQueries({
         queryKey: ["payment-voucher-form-meta"],
       });
+      if (body.status === "Paid") {
+        await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      }
       toast.success(`Payment voucher ${savedNo} saved.`);
       onClose();
     } catch (e) {
@@ -175,6 +178,7 @@ const PaymentModal = ({ open, onClose }) => {
             onChange={(value) => updateField("paymentThrough", value)}
             placeholder="Cash or Bank"
             hideAdd
+            menuPortal
           />
           <CommonDropdown
             label="Payment To"
@@ -187,6 +191,7 @@ const PaymentModal = ({ open, onClose }) => {
             searchable
             searchPlaceholder="Search party…"
             addNavigateTo="/dashboard/account"
+            menuPortal
           />
           <InputField
             label="Amount (₹)"
@@ -206,6 +211,7 @@ const PaymentModal = ({ open, onClose }) => {
             onChange={(v) => updateField("status", v)}
             placeholder="Pending"
             hideAdd
+            menuPortal
           />
           <InputField
             label="Remarks"

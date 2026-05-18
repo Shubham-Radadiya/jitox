@@ -26,6 +26,8 @@ export interface IAccount extends Document {
   country?: string;
   pincode?: string;
   amount: number;
+  /** Ledger opening row — not reduced by payment vouchers. */
+  openingAmount?: number;
   // fileName: string;
   balenceType: "Credit" | "Debit";
   documentUpload?: string;

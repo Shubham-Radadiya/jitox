@@ -208,9 +208,12 @@ const ExpenseModal = ({ open, onClose, expense = null }) => {
       } else {
         await expenseVouchersApi.create(body);
       }
-      await queryClient.invalidateQueries({
-        queryKey: ["voucher-list", "expenses"],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "expenses"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+      ]);
       toast.success(
         isEditMode ? "Expense voucher updated." : "Expense voucher saved."
       );
@@ -265,6 +268,7 @@ const ExpenseModal = ({ open, onClose, expense = null }) => {
             onChange={(value) => updateField("expenseType", value)}
             placeholder="Fuel, Travel, Supplies…"
             hideAdd
+            menuPortal
           />
         </div>
 
@@ -285,6 +289,7 @@ const ExpenseModal = ({ open, onClose, expense = null }) => {
             searchable
             searchPlaceholder="Search party…"
             addNavigateTo="/dashboard/account"
+            menuPortal
           />
         </div>
 
@@ -296,6 +301,7 @@ const ExpenseModal = ({ open, onClose, expense = null }) => {
             onChange={(value) => updateField("paymentMode", value)}
             placeholder="Cash / UPI / NEFT / Card"
             hideAdd
+            menuPortal
           />
           <InputField
             label="Amount (₹)"

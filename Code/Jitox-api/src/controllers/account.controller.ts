@@ -132,6 +132,9 @@ export const createAccount = async (
       accountData.documentUpload = req.file.path;
     }
 
+    const opening = Number(accountData.amount);
+    accountData.openingAmount = Number.isFinite(opening) ? opening : 0;
+
     const newAccount = new Account(accountData);
     const savedAccount = await newAccount.save();
 

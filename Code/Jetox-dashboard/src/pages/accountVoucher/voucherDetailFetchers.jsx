@@ -4,9 +4,11 @@ import {
   salesVouchersApi,
   journalVouchersApi,
   paymentVouchersApi,
+  receiptVouchersApi,
   accountsApi,
   manufacturingVouchersApi,
 } from "../../services/api";
+import { buildPaymentReceiptData } from "../../utils/paymentReceipt";
 import dayjs from "dayjs";
 import {
   purchaseDocToDetailShape,
@@ -162,6 +164,14 @@ export async function fetchJournalDetail(id) {
     remarks: String(j.remarks || "").trim() || "—",
     status: j.status || "—",
   };
+}
+
+/** Shape for `ReceiptPaymentView` (printable payment receipt). */
+export async function fetchReceiptDetail(id) {
+  const vRes = await receiptVouchersApi.getById(id);
+  const p = vRes?.data;
+  if (!p || !p._id) return null;
+  return buildPaymentReceiptData(p);
 }
 
 /** Shape for `PaymentDetailsDrawer`. */

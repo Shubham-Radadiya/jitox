@@ -88,7 +88,9 @@ export default function SalesVoucherModal({
   const prefill = useMemo(() => {
     if (!open) return null;
     if (mode === "create" || continuingAsNew) {
-      return nextSalesVoucherNo ? { voucherNo: nextSalesVoucherNo } : null;
+      return nextSalesVoucherNo
+        ? { voucherNo: nextSalesVoucherNo, stockToggle: true }
+        : { stockToggle: true };
     }
     if (!voucherDoc) return null;
     const base = mapPurchaseApiDocToPrefill(voucherDoc);

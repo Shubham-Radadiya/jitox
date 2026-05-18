@@ -94,7 +94,8 @@ export function purchaseReturnPayloadToCreateBody(payload) {
     paymentMode: mapPaymentMode(payload.termsPayment),
     basePrice: lineTaxableTotal,
     stockDetails: {
-      stockQuantity: Boolean(payload.stockToggle),
+      /** Returns always reduce product qty on save (matches API model default). */
+      stockQuantity: payload.stockToggle !== false,
       generetePurchaseBill: false,
       updateStockAfterOrderPlaced: false,
     },

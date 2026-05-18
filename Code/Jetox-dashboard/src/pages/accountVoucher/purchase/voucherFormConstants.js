@@ -169,6 +169,6 @@ export function mapPurchaseApiDocToPrefill(doc) {
     termsPayment,
     gstRate,
     productRows,
-    stockToggle: Boolean(doc.stockDetails?.stockQuantity),
+    stockToggle: doc.stockDetails?.stockQuantity !== false,
   };
 }

@@ -9,6 +9,7 @@ import {
   fetchSalesOrderDetail,
   fetchJournalDetail,
   fetchPaymentDetail,
+  fetchReceiptDetail,
   fetchManufacturingDetail,
 } from "./voucherDetailFetchers.jsx";
 import { parseRupeeCell, fmtRupee } from "../../utils/voucherRowMappers";
@@ -49,6 +50,7 @@ import BankToCashModal from "./modals/BankToCashModal";
 import JournalModal from "./modals/JournalModal";
 import JournalDetailsDrawer from "./JournalDetailsDrawer";
 import PaymentDetailsDrawer from "./PaymentDetailsDrawer";
+import ReceiptPaymentView from "./ReceiptPaymentView";
 import ManufacturingDetailsDrawer from "./manufacturing/ManufacturingDetailsDrawer";
 
 dayjs.extend(customParseFormat);
@@ -182,6 +184,7 @@ const receiptColumns = [
   "Receipt Form",
   "Amount (₹)",
   "Narration",
+  "Status",
   "Actions",
 ];
 
@@ -1028,6 +1031,8 @@ export const voucherConfigs = {
     title: "Receipt Voucher",
     columns: receiptColumns,
     rowId: "Voucher No",
+    fetchDetail: fetchReceiptDetail,
+    detailsComponent: ReceiptPaymentView,
     modals: [{ key: "receipt-modal", component: ReceiptModal }],
     filterFields: [
       voucherAddButton({
@@ -1037,9 +1042,43 @@ export const voucherConfigs = {
       }),
     ],
     buildTableAction:
-      ({ openDetails, navigate }) =>
+      ({ openDetails, navigate, markReceiptVoucherPaid }) =>
       (row) =>
-        createActionButtons([{ type: "eye" }], { openDetails, navigate, row }),
+        createActionButtons(
+          [
+            { type: "eye" },
+            {
+              type: "payNow",
+              tooltip: "Mark as Received",
+              onClick: async (r) => {
+                const id = r?._id;
+                const voucherNo = r?.["Voucher No"] || "";
+                if (!id || typeof markReceiptVoucherPaid !== "function") {
+                  toast.error("Cannot update this voucher (missing id).");
+                  return;
+                }
+                if (
+                  !window.confirm(
+                    `Mark receipt voucher ${voucherNo} as Received?`
+                  )
+                ) {
+                  return;
+                }
+                try {
+                  await markReceiptVoucherPaid(id);
+                  toast.success(
+                    voucherNo
+                      ? `Voucher ${voucherNo} marked as Received.`
+                      : "Receipt voucher marked as Received."
+                  );
+                } catch (e) {
+                  toast.error(getApiErrorMessage(e, "Could not update status"));
+                }
+              },
+            },
+          ],
+          { openDetails, navigate, row }
+        ),
   },
   expenses: {
     title: "Expense Voucher",

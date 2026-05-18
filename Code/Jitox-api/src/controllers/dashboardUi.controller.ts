@@ -620,16 +620,9 @@ async function topStockItemsForDashboard(limit: number) {
 
 export const getDashboardOverview = async (_req: Request, res: Response) => {
   try {
-    const receivable = await Dyn.ordersReceivableFromQuotations();
     const recentOrders = await Dyn.recentOrdersFormatted(10);
     const payData = await Dyn.fetchPayablesList({});
     const payablesListedTotal = Number(payData.totalPayables) || 0;
-
-    const receivablesPayables = {
-      months: monthShort,
-      receivables: [42, 38, 55, 48, 62, 58, 70, 65, 72, 68, 75, 80],
-      payables: [30, 35, 40, 36, 45, 42, 50, 48, 52, 50, 55, 58],
-    };
 
     const quotations = await Quotation.find().lean();
     const salesFromOrders = quotations.reduce(
@@ -638,11 +631,15 @@ export const getDashboardOverview = async (_req: Request, res: Response) => {
     );
 
     const dbTotals = await aggregateDashboardTotalsFromDb();
+    const receivablesListedTotal =
+      Number(dbTotals.receiptTotal) ||
+      (await Dyn.totalReceiptVouchersAmount());
+    const receivablesPayables =
+      await Dyn.buildReceivablesPayablesMonthlyChart();
 
     const formatRsStat = (n: number) =>
-      `Rs : ${n.toLocaleString("en-IN", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+      `Rs : ${Math.round(n).toLocaleString("en-IN", {
+        maximumFractionDigits: 0,
       })}`;
 
     const purchaseAmt = Math.round(dbTotals.purchaseTotal);
@@ -728,7 +725,7 @@ export const getDashboardOverview = async (_req: Request, res: Response) => {
         {
           key: "receivable",
           label: "RECEIVABLE",
-          value: formatRsStat(Math.round(receivable)),
+          value: formatRsStat(Math.round(receivablesListedTotal)),
           accent: "blue",
         },
         {

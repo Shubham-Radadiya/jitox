@@ -110,8 +110,8 @@ const KPI_INFO = {
   receipt: "Receipt vouchers from customers.",
   expense: "Expense vouchers.",
   cashBank: "Day book — cash and bank movement.",
-  payable: "Amounts owed to suppliers.",
-  receivable: "Amounts due from customers.",
+  payable: "Total payment vouchers (Payable summary).",
+  receivable: "Total receipt vouchers (Receivable summary).",
   stock: "Inventory and stock levels.",
   order: "Order list and dispatch.",
   orders: "Opens order list & dispatch — track all customer orders.",
@@ -128,7 +128,7 @@ function mergeStatKpis(apiKpis) {
       key: def.key,
       label: fromApi?.label || def.label,
       variant: def.variant,
-      value: fromApi?.value ?? "Rs : 0.00",
+      value: fromApi?.value ?? "Rs : 0",
       trend: dir ? { direction: dir } : undefined,
     };
   });
@@ -281,7 +281,7 @@ const defaultOverview = {
   kpis: STAT_CARD_DEFS.map((d) => ({
     key: d.key,
     label: d.label,
-    value: "Rs : 0.00",
+    value: "Rs : 0",
   })),
   customers: {
     totalPct: 0,
@@ -757,10 +757,10 @@ function DashboardHome() {
                             {m}
                           </td>
                           <td className="py-2.5 pr-2 align-middle tabular-nums text-right whitespace-nowrap text-slate-800 dark:text-slate-200">
-                            {rp.receivables[i]}
+                            ₹{(rp.receivables[i] ?? 0).toLocaleString("en-IN")}
                           </td>
                           <td className="py-2.5 pr-3 align-middle tabular-nums text-right whitespace-nowrap text-slate-800 dark:text-slate-200">
-                            {rp.payables[i]}
+                            ₹{(rp.payables[i] ?? 0).toLocaleString("en-IN")}
                           </td>
                         </tr>
                       ))}

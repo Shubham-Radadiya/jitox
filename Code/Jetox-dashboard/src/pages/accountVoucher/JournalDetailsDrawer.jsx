@@ -14,7 +14,6 @@ const JournalDetailsDrawer = ({ open, onClose, data }) => {
     creditLabel,
     amountLabel,
     remarks,
-    status,
   } = data;
 
   return (
@@ -46,22 +45,12 @@ const JournalDetailsDrawer = ({ open, onClose, data }) => {
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           <section className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/40">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Date
-                </div>
-                <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {dateLabel}
-                </div>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Date
               </div>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Status
-                </div>
-                <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {status}
-                </div>
+              <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {dateLabel}
               </div>
             </div>
           </section>

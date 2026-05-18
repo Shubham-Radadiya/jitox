@@ -432,8 +432,12 @@ const CreateAccountModal = ({ open, onClose, onSaved, accountId }) => {
         );
 
         const pin = String(a.pincode ?? a.pinCode ?? "").replace(/\D/g, "");
+        const openingSource =
+          a.openingAmount != null && a.openingAmount !== ""
+            ? a.openingAmount
+            : a.amount;
         const rawAmt = Number.parseFloat(
-          String(a.amount ?? "").replace(/,/g, "")
+          String(openingSource ?? "").replace(/,/g, "")
         );
         const amt = Number.isFinite(rawAmt) ? String(rawAmt) : "";
         const bt =
@@ -765,7 +769,7 @@ const CreateAccountModal = ({ open, onClose, onSaved, accountId }) => {
           name: String(form.name).trim(),
           email: String(form.email).trim(),
           mobileNumber: String(form.mobile).trim(),
-          amount: amountNum,
+          openingAmount: amountNum,
           balenceType: form.balanceType,
           gstNumber: String(form.gst || "").trim(),
           category: String(form.category || "").trim(),

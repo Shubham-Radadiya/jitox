@@ -74,7 +74,8 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   },
   ref
 ) {
-  const [stockToggle, setStockToggle] = useState(false);
+  /** Default ON for purchase/sales/return so save updates Product Master qty (quotations skip stock). */
+  const [stockToggle, setStockToggle] = useState(() => formType !== "quotation");
   const [purchaseDate, setPurchaseDate] = useState(
     () => dayjs().format("YYYY-MM-DD")
   );
