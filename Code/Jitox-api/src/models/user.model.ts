@@ -30,6 +30,8 @@ const userSchema = new Schema<IUser>(
     region: { type: String, trim: true },
     /** Public URL path e.g. `/uploads/…` (served by API static). */
     profilePhoto: { type: String, trim: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+    parentUserId: { type: Schema.Types.ObjectId, ref: "User" },
   },
   {
     timestamps: true,

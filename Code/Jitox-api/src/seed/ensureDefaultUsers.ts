@@ -1,5 +1,10 @@
+import mongoose from "mongoose";
 import { User } from "../models";
 import { defaultUsers } from "../constants/defaultUsers";
+
+function toObjectId(id: unknown): mongoose.Types.ObjectId {
+  return new mongoose.Types.ObjectId(String(id));
+}
 
 const TASKS_KEY = "tasks";
 
@@ -41,6 +46,19 @@ export async function ensureDefaultUsers(): Promise<void> {
     testUser = new User(users.user);
     await testUser.save();
     console.log(`[seed] Created default user: ${users.user.email}`);
+  }
+
+  if (admin && manager && !manager.parentUserId) {
+    manager.parentUserId = toObjectId(admin._id);
+    if (!manager.createdBy) manager.createdBy = toObjectId(admin._id);
+    await manager.save();
+  }
+  if (manager && testUser && !testUser.parentUserId) {
+    testUser.parentUserId = toObjectId(manager._id);
+    if (!testUser.createdBy) {
+      testUser.createdBy = toObjectId(admin?._id ?? manager._id);
+    }
+    await testUser.save();
   }
 
   await ensureTasksModuleOnUsers();

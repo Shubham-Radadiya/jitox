@@ -7,6 +7,7 @@ import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
+import { buildPurchasePaymentFields } from "../utils/purchasePaymentStatus";
 
 /** Did the user opt into stock update for this voucher? */
 function shouldUpdateStock(stockDetails: unknown): boolean {
@@ -18,6 +19,11 @@ function shouldUpdateStock(stockDetails: unknown): boolean {
 const PURCHASE_VOUCHER_PATCH_KEYS = [
   "partyName",
   "invoiceNo",
+  "invoicePrefix",
+  "invoiceNumber",
+  "originalInvNo",
+  "ewayBill",
+  "termsOfPayment",
   "dueDate",
   "transportDetails",
   "deliveryAt",
@@ -34,6 +40,8 @@ const PURCHASE_VOUCHER_PATCH_KEYS = [
   "gstAmount",
   "totalAmount",
   "paymentMode",
+  "paymentStatus",
+  "paidAmount",
   "basePrice",
   "stockDetails",
 ] as const;
@@ -67,6 +75,11 @@ export const createPurchaseVoucher = async (
     const {
       partyName,
       invoiceNo,
+      invoicePrefix,
+      invoiceNumber,
+      originalInvNo,
+      ewayBill,
+      termsOfPayment,
       dueDate,
       transportDetails,
       deliveryAt,
@@ -83,6 +96,8 @@ export const createPurchaseVoucher = async (
       gstAmount,
       totalAmount,
       paymentMode,
+      paymentStatus,
+      paidAmount,
       basePrice,
       stockDetails,
     } = req.body;
@@ -107,9 +122,21 @@ export const createPurchaseVoucher = async (
       );
     }
 
+    const paymentFields = buildPurchasePaymentFields(
+      totalAmount,
+      paymentMode,
+      paymentStatus,
+      paidAmount
+    );
+
     const newVoucher = new PurchaseVoucher({
       partyName,
       invoiceNo,
+      invoicePrefix,
+      invoiceNumber,
+      originalInvNo,
+      ewayBill,
+      termsOfPayment,
       dueDate,
       transportDetails,
       deliveryAt,
@@ -126,6 +153,8 @@ export const createPurchaseVoucher = async (
       gstAmount,
       totalAmount,
       paymentMode,
+      paymentStatus: paymentFields.paymentStatus,
+      paidAmount: paymentFields.paidAmount,
       basePrice,
       stockDetails,
     });
@@ -202,10 +231,16 @@ export const getAllPurchaseVouchers = async (
           voucherDate: 1,
           totalAmount: 1,
           invoiceNo: 1,
+          invoicePrefix: 1,
+          invoiceNumber: 1,
+          termsOfPayment: 1,
           dueDate: 1,
           stockDetails: 1,
           gstAmount: 1,
           paymentMode: 1,
+          paymentStatus: 1,
+          paidAmount: 1,
+          paymentRequestId: 1,
           basePrice: 1,
           createdAt: 1,
           updatedAt: 1,
@@ -286,6 +321,22 @@ export const updatePurchaseVoucher = async (
     }
 
     voucher.set(patch);
+
+    if (
+      Object.prototype.hasOwnProperty.call(patch, "paymentStatus") ||
+      Object.prototype.hasOwnProperty.call(patch, "totalAmount") ||
+      Object.prototype.hasOwnProperty.call(patch, "paidAmount")
+    ) {
+      const paymentFields = buildPurchasePaymentFields(
+        voucher.totalAmount,
+        voucher.paymentMode,
+        voucher.paymentStatus,
+        voucher.paidAmount
+      );
+      voucher.paymentStatus = paymentFields.paymentStatus;
+      voucher.paidAmount = paymentFields.paidAmount;
+    }
+
     await voucher.save();
     await voucher.populate({
       path: "items.product",

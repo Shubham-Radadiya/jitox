@@ -4,6 +4,7 @@ import {
   registerUser,
   deleteUser,
   getAllUsers,
+  getSubordinateUsers,
   getUserByUserId,
   login,
   updateUser,
@@ -44,6 +45,11 @@ router.get("/get-users", (req, res) => {
   void createAdminAndUser(req, res);
 });
 router.get("/get-user/:id", adminAuthenticate, getUserByUserId);
+router.get(
+  "/subordinates/:id",
+  adminAuthenticate,
+  getSubordinateUsers
+);
 
 router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);

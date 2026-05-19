@@ -1,8 +1,24 @@
 import dayjs from "dayjs";
+import { resolvePurchasePaymentStatusDisplay } from "../../../utils/purchasePaymentStatus";
+
+export {
+  PURCHASE_PAYMENT_STATUS_OPTIONS,
+  resolvePurchasePaymentStatusDisplay,
+} from "../../../utils/purchasePaymentStatus";
 
 export function parseNum(v) {
   const n = Number(String(v ?? "").replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Line discount ₹ from qty × rate × Disc %. */
+export function calcLineDiscountAmtFromPct(qty, rate, discountPct) {
+  const base = parseNum(qty) * parseNum(rate);
+  const pct = parseNum(discountPct);
+  if (!base || !pct) return "";
+  const amt = (base * pct) / 100;
+  const rounded = Math.round(amt * 100) / 100;
+  return String(rounded);
 }
 
 export function fmtInr(n) {
@@ -101,18 +117,30 @@ export function mapPurchaseApiDocToPrefill(doc) {
             : "",
       qty: it.quantity != null ? String(it.quantity) : "",
       rate: it.rateParUnit != null ? String(it.rateParUnit) : "",
-      discountPct: "",
-      discountAmt: "",
+      discountPct:
+        it.discountPct != null && Number(it.discountPct) !== 0
+          ? String(it.discountPct)
+          : "",
+      discountAmt:
+        it.discountAmt != null && Number(it.discountAmt) !== 0
+          ? String(it.discountAmt)
+          : "",
     };
   });
 
-  const pm = String(doc.paymentMode || "");
-  const paymentLower = pm.toLowerCase();
-  let termsPayment = "credit";
-  if (paymentLower === "cash") termsPayment = "cash";
-  else if (paymentLower === "online") termsPayment = "online";
-  else if (paymentLower === "cheque") termsPayment = "cheque";
-  else if (paymentLower === "credit") termsPayment = "credit";
+  const termsFromPayment = String(doc.termsOfPayment || "").trim();
+  let termsPayment = termsFromPayment;
+  if (!termsPayment) {
+    const pm = String(doc.paymentMode || "");
+    const paymentLower = pm.toLowerCase();
+    termsPayment = "credit";
+    if (paymentLower === "cash") termsPayment = "cash";
+    else if (paymentLower === "online") termsPayment = "online";
+    else if (paymentLower === "cheque") termsPayment = "cheque";
+    else if (paymentLower === "credit") termsPayment = "credit";
+  }
+
+  const paymentStatus = resolvePurchasePaymentStatusDisplay(doc);
 
   let gstRate = "";
   const base = Number(doc.basePrice);
@@ -154,10 +182,24 @@ export function mapPurchaseApiDocToPrefill(doc) {
       ? String(narrationFromApi)
       : "";
 
+  const invoicePrefix = String(doc.invoicePrefix ?? "").trim();
+  const invoiceNumber = String(doc.invoiceNumber ?? "").trim();
+  const invoiceNo =
+    doc.invoiceNo != null && String(doc.invoiceNo).trim() !== ""
+      ? String(doc.invoiceNo).trim()
+      : `${invoicePrefix}${invoiceNumber}`.trim();
+
   return {
     partyName,
     purchaseDate,
     voucherNo,
+    invoiceNo,
+    invoicePrefix: invoicePrefix || undefined,
+    invoiceNumber:
+      invoiceNumber ||
+      (invoiceNo && !invoicePrefix ? invoiceNo : undefined),
+    originalInvNo: String(doc.originalInvNo ?? "").trim() || undefined,
+    ewayBill: String(doc.ewayBill ?? "").trim() || undefined,
     transporter: String(doc.transportDetails || "").trim(),
     deliveryAt: String(doc.deliveryAt || "").trim(),
     orderBy: String(doc.orderby || "").trim(),
@@ -167,6 +209,7 @@ export function mapPurchaseApiDocToPrefill(doc) {
     narration,
     termsText,
     termsPayment,
+    paymentStatus,
     gstRate,
     productRows,
     stockToggle: doc.stockDetails?.stockQuantity !== false,

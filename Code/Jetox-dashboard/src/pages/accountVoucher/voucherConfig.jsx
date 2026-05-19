@@ -5,6 +5,7 @@ import PurchaseDetails from "./purchase/PurchaseDetails";
 import SalesDetailsDrawer from "./sales/SalesDetailsDrawer";
 import {
   fetchPurchaseDetail,
+  fetchQuotationDetail,
   fetchPurchaseReturnDetail,
   fetchSalesOrderDetail,
   fetchJournalDetail,
@@ -26,6 +27,7 @@ import {
   shareOrCopyText,
 } from "../../utils/voucherShare";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { purchaseRowHasParty } from "../../utils/purchasePaymentStatus";
 import { buildUploadUrl } from "../../utils/uploadUrl";
 import { IoEyeOutline, IoDocumentTextOutline } from "react-icons/io5";
 import { TbEdit } from "react-icons/tb";
@@ -79,15 +81,12 @@ const withFooter = (columns, cells = []) => (
 
 const purchaseFooterRenderer = (columns, rows = []) => {
   let debit = 0;
-  let credit = 0;
   rows.forEach((r) => {
     debit += parseRupeeCell(r["Debit Amount"]);
-    credit += parseRupeeCell(r["Credit Amount"]);
   });
   return withFooter(columns, [
     { column: "Party Name", content: "Grand Total" },
     { column: "Debit Amount", content: fmtRupee(debit) },
-    { column: "Credit Amount", content: fmtRupee(credit) },
   ]);
 };
 
@@ -130,8 +129,6 @@ const purchaseColumns = [
   "Party Name",
   "Voucher No.",
   "Debit Amount",
-  "Credit Amount",
-  "Due Date",
   "Payment Status",
   "Actions",
 ];
@@ -287,6 +284,7 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
     mfgComplete: "Complete / add to stock",
     mfgPause: "Pause",
     mfgStop: "Mark failed",
+    purchaseMarkPaid: "Create payment voucher",
   };
 
   /** Named group so tooltips only react to this wrapper, not the `<tr class="group">` in TableContent */
@@ -554,6 +552,52 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
               index
             );
           }
+          if (action.type === "purchaseMarkPaid") {
+            const current = String(row["Payment Status"] || "").trim();
+            const isPaid = current === "Paid";
+            const noParty =
+              typeof action.hasParty === "function"
+                ? !action.hasParty(row)
+                : false;
+            const disabled =
+              isPaid ||
+              noParty ||
+              (typeof action.isDisabled === "function" &&
+                !!action.isDisabled(row));
+            let tooltip = action.tooltip || tooltipLabels.purchaseMarkPaid;
+            if (disabled) {
+              if (isPaid) {
+                tooltip = action.paidTooltip || "Already paid";
+              } else if (noParty) {
+                tooltip =
+                  action.noPartyTooltip ||
+                  "Select Party Name on purchase (Edit), then pay";
+              } else if (action.disabledTooltip) {
+                tooltip = action.disabledTooltip;
+              }
+            }
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => {
+                  if (disabled) return;
+                  action.onClick?.(row);
+                }}
+                disabled={disabled}
+                className={
+                  disabled
+                    ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                    : "hover:text-blue transition"
+                }
+                aria-label="Create payment voucher"
+                aria-disabled={disabled || undefined}
+              >
+                <CreditCard size={18} />
+              </button>,
+              tooltip,
+              index
+            );
+          }
           return null;
         })}
       </div>
@@ -713,6 +757,8 @@ export const voucherConfigs = {
     rowId: "Voucher No.",
     fetchDetail: fetchPurchaseDetail,
     detailsComponent: PurchaseDetails,
+    /** Credit-card pay action opens this modal from the purchase list. */
+    modals: [{ key: "payment-modal", component: PaymentModal }],
     enableColumnPicker: true,
     renderRowCell: purchasePaymentRenderer,
     filterFields: [
@@ -728,11 +774,23 @@ export const voucherConfigs = {
         navigate,
         openPurchaseModal,
         deletePurchaseVoucher,
+        createPaymentRequestForPurchase,
       }) =>
       (row) =>
         createActionButtons(
           [
             { type: "eye" },
+            {
+              type: "purchaseMarkPaid",
+              tooltip: "Add payment voucher — select payee, then Save",
+              paidTooltip: "Already paid",
+              hasParty: (r) => purchaseRowHasParty(r),
+              noPartyTooltip:
+                "Select Party Name (supplier) on purchase — use Edit first",
+              isDisabled: (r) => Boolean(r?._raw?.paymentRequestId),
+              disabledTooltip: "Payment voucher already created",
+              onClick: (r) => createPaymentRequestForPurchase?.(r),
+            },
             {
               type: "share",
               onClick: async (r) => {
@@ -957,16 +1015,27 @@ export const voucherConfigs = {
       }),
     ],
     buildTableAction:
-      ({ openDetails, navigate, markPaymentVoucherPaid }) =>
+      ({ openDetails, navigate, markPaymentVoucherPaid, openPaymentEdit }) =>
       (row) =>
         createActionButtons(
           [
             { type: "eye" },
             {
+              type: "edit",
+              onClick: (r) => openPaymentEdit?.(r),
+            },
+            {
               type: "payNow",
               onClick: async (r) => {
                 const id = r?._id;
                 const voucherNo = r?.["Voucher No"] || "";
+                const payTo = String(r.Party || "").trim();
+                if (!payTo || payTo === "—") {
+                  toast.error(
+                    "Please select Payment To on this voucher (use Edit)."
+                  );
+                  return;
+                }
                 if (!id || typeof markPaymentVoucherPaid !== "function") {
                   toast.error("Cannot update this voucher (missing id).");
                   return;
@@ -1290,6 +1359,8 @@ export const voucherConfigs = {
     title: "Quotation Voucher",
     columns: quotationColumns,
     rowId: "Quote No",
+    fetchDetail: fetchQuotationDetail,
+    detailsComponent: PurchaseDetails,
     emptyState: {
       title: "No quotations yet",
       description:
@@ -1302,6 +1373,51 @@ export const voucherConfigs = {
         path: "/dashboard/accounting-voucher/add-quotation",
       }),
     ],
+    buildTableAction:
+      ({ openDetails, navigate, deleteQuotationVoucher }) =>
+      (row) =>
+        createActionButtons(
+          [
+            { type: "eye" },
+            {
+              type: "edit",
+              onClick: (r) => {
+                const id = r?._id;
+                if (!id) {
+                  toast.error("Cannot edit this row (missing id).");
+                  return;
+                }
+                navigate(
+                  `/dashboard/accounting-voucher/add-quotation?editId=${encodeURIComponent(id)}`
+                );
+              },
+            },
+            {
+              type: "delete",
+              onClick: async (r) => {
+                if (
+                  !window.confirm(
+                    `Delete quotation ${r["Quote No"] || ""}?`
+                  )
+                ) {
+                  return;
+                }
+                const id = r?._id;
+                if (!id || typeof deleteQuotationVoucher !== "function") {
+                  toast.error("Cannot delete this row (missing id).");
+                  return;
+                }
+                try {
+                  await deleteQuotationVoucher(id);
+                  toast.success("Quotation deleted.");
+                } catch (e) {
+                  toast.error(getApiErrorMessage(e, "Delete failed"));
+                }
+              },
+            },
+          ],
+          { openDetails, navigate, row }
+        ),
   },
 };
 

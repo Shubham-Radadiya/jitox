@@ -112,7 +112,9 @@ export default function PurchaseVoucherModal({
       return;
     }
     if (!body.partyName) {
-      toast.error("Select a party (supplier account).");
+      toast.error(
+        "Please select Party Name (supplier) before saving."
+      );
       return;
     }
     const isEdit =

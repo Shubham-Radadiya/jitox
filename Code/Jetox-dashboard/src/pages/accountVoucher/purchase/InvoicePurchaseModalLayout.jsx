@@ -29,7 +29,7 @@ import { fmtInr, parseNum } from "./voucherFormConstants";
 import {
   buildPurchasePayloadShareText,
   downloadPurchasePayloadCsv,
-  printPurchasePayloadBill,
+  downloadPurchasePayloadTaxInvoicePdf,
   shareOrCopyText,
 } from "../../../utils/voucherShare";
 
@@ -367,7 +367,7 @@ export default function InvoicePurchaseModalLayout({
                             type="button"
                             role="menuitem"
                             className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] font-medium leading-snug text-slate-800 hover:bg-slate-50 active:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800 dark:active:bg-slate-800/90"
-                            onClick={() => {
+                            onClick={async () => {
                               setShareOpen(false);
                               const snap =
                                 typeof getShareSnapshot === "function"
@@ -377,15 +377,14 @@ export default function InvoicePurchaseModalLayout({
                                 toast.error("Nothing to print yet.");
                                 return;
                               }
-                              const ok = printPurchasePayloadBill(snap);
-                              if (ok) {
-                                toast.success(
-                                  "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
+                              try {
+                                await downloadPurchasePayloadTaxInvoicePdf(
+                                  snap
                                 );
-                              } else {
-                                toast.error(
-                                  "Allow downloads in your browser to save the bill."
-                                );
+                                toast.success("Tax invoice PDF downloaded.");
+                              } catch (e) {
+                                console.error(e);
+                                toast.error("Could not generate PDF.");
                               }
                             }}
                           >
@@ -393,7 +392,7 @@ export default function InvoicePurchaseModalLayout({
                               className="h-5 w-5 shrink-0 text-primary"
                               strokeWidth={2}
                             />
-                            Print bill (PDF)
+                            Download tax invoice (PDF)
                           </button>
                         </div>
                       </>,
@@ -461,7 +460,7 @@ export default function InvoicePurchaseModalLayout({
                       type="button"
                       role="menuitem"
                       className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
-                      onClick={() => {
+                      onClick={async () => {
                         setShareOpen(false);
                         const snap =
                           typeof getShareSnapshot === "function"
@@ -471,20 +470,17 @@ export default function InvoicePurchaseModalLayout({
                           toast.error("Nothing to print yet.");
                           return;
                         }
-                        const ok = printPurchasePayloadBill(snap);
-                        if (ok) {
-                          toast.success(
-                            "Downloaded (.html). Open it and use Print → Save as PDF for a PDF copy."
-                          );
-                        } else {
-                          toast.error(
-                            "Allow downloads in your browser to save the bill."
-                          );
+                        try {
+                          await downloadPurchasePayloadTaxInvoicePdf(snap);
+                          toast.success("Tax invoice PDF downloaded.");
+                        } catch (e) {
+                          console.error(e);
+                          toast.error("Could not generate PDF.");
                         }
                       }}
                     >
                       <Printer size={16} className="shrink-0 text-primary" />
-                      Print bill (PDF)
+                      Download tax invoice (PDF)
                     </button>
                   </div>
                 ) : null}
@@ -538,7 +534,7 @@ export default function InvoicePurchaseModalLayout({
                 options={dropdownOptions.parties}
                 value={partyName}
                 onChange={setPartyName}
-                placeholder="Search or select party"
+                placeholder="Select party (required)"
                 className="w-full"
               />
               <div className="mt-2 rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/35">
@@ -827,9 +823,18 @@ export default function InvoicePurchaseModalLayout({
                         </td>
                         <td className="px-1.5 py-1 align-middle sm:px-2 sm:py-2">
                           <input
-                            className={cellNum}
+                            className={`${cellNum}${
+                              parseNum(row.discountPct) > 0 &&
+                              !row.discountAmtManual
+                                ? " bg-slate-50 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
+                                : ""
+                            }`}
                             placeholder="₹"
-                            title="Discount amount (takes precedence over % if set)"
+                            title={
+                              parseNum(row.discountPct) > 0
+                                ? "Auto from Disc % — edit to use a fixed ₹ amount instead"
+                                : "Discount amount (or enter Disc % first)"
+                            }
                             value={row.discountAmt}
                             onChange={(e) =>
                               updateProductRow(row.id, "discountAmt", e.target.value)

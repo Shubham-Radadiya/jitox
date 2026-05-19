@@ -10,6 +10,8 @@ const PurchaseItemSchema = new Schema<IPurchaseItem>(
     category: { type: String, trim: true },
     unit: { type: String, trim: true },
     subtotal: { type: Number, required: true },
+    discountPct: { type: Number, default: 0 },
+    discountAmt: { type: Number, default: 0 },
     remarks: { type: String, trim: true },
     hsn: { type: String, trim: true },
     batch: { type: String, trim: true },
@@ -23,6 +25,13 @@ const PurchaseItemSchema = new Schema<IPurchaseItem>(
 const PurchaseVoucherSchema = new Schema<IPurchaseVoucher>(
   {
     partyName: { type: String, required: true, trim: true },
+    invoiceNo: { type: String, trim: true },
+    invoicePrefix: { type: String, trim: true },
+    invoiceNumber: { type: String, trim: true },
+    originalInvNo: { type: String, trim: true },
+    ewayBill: { type: String, trim: true },
+    termsOfPayment: { type: String, trim: true },
+    dueDate: { type: Date },
     transportDetails: { type: String, trim: true },
     deliveryAt: { type: String, trim: true },
     orderby: { type: String, trim: true },
@@ -41,6 +50,18 @@ const PurchaseVoucherSchema = new Schema<IPurchaseVoucher>(
       type: String,
       trim: true,
       enum: ["Cash", "Credit", "Cheque", "Online"],
+    },
+    paidAmount: { type: Number, default: 0 },
+    paymentStatus: {
+      type: String,
+      trim: true,
+      default: "Pending",
+      enum: ["Pending", "Paid", "Unpaid"],
+    },
+    /** Payment voucher created from this purchase — disables duplicate pay requests. */
+    paymentRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: "PaymentVoucher",
     },
 
     basePrice: { type: Number, trim: true },

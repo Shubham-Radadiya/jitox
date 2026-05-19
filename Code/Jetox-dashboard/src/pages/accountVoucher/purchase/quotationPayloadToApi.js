@@ -1,5 +1,8 @@
 import { parseNum } from "./voucherFormConstants";
-import { purchasePayloadToCreateBody } from "./purchasePayloadToApi";
+import {
+  composeInvoiceNo,
+  purchasePayloadToCreateBody,
+} from "./purchasePayloadToApi";
 
 function mapPaymentMode(termsPayment) {
   const s = String(termsPayment || "")
@@ -32,7 +35,7 @@ export function quotationPayloadToCreateBody(payload) {
   }));
 
   const voucherNo = String(payload.voucherNo || purchaseShape.voucherNo || "").trim();
-  const invoiceNo = String(payload.invoiceNo || "").trim();
+  const invoiceNo = composeInvoiceNo(payload);
 
   const body = {
     partyName: purchaseShape.partyName,

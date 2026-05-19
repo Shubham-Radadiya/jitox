@@ -8,6 +8,7 @@ import {
   downloadPurchaseDetailBillPdf,
   shareOrCopyText,
 } from "../../../utils/voucherShare";
+import { paymentStatusBadgeClasses } from "../../../utils/tableUi";
 
 const PurchaseDetails = ({ open, onClose, data }) => {
   if (!open || !data) return null;
@@ -17,6 +18,7 @@ const PurchaseDetails = ({ open, onClose, data }) => {
   const {
     voucherNo,
     status,
+    paymentTerms,
     purchaseDate,
     customer,
     party,
@@ -66,9 +68,9 @@ const PurchaseDetails = ({ open, onClose, data }) => {
               </div>
               <div className="flex flex-col gap-1">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Payment
+                  Payment Status
                 </div>
-                <span className="inline-flex items-center rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white shadow-sm dark:shadow-none">
+                <span className={paymentStatusBadgeClasses(status)}>
                   {status}
                 </span>
               </div>
@@ -180,10 +182,23 @@ const PurchaseDetails = ({ open, onClose, data }) => {
             </div>
 
             <div className="flex flex-col gap-2">
+              {paymentTerms && paymentTerms !== "—" ? (
+                <div className="flex items-center justify-between gap-4 border-b border-slate-200/70 pb-2 text-sm dark:border-slate-600/80">
+                  <span className="font-medium text-slate-600 dark:text-slate-400">
+                    Terms of Payment
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {paymentTerms}
+                  </span>
+                </div>
+              ) : null}
               {[
                 { label: "Total Amount", value: totals.totalAmount },
-                { label: "Tax (5%)", value: totals.tax },
-                { label: "Discount", value: totals.discount },
+                {
+                  label: totals.taxLabel || "Tax",
+                  value: totals.tax,
+                },
+                { label: "Discount", value: totals.discount ?? "₹0" },
                 { label: "Paid Amount", value: totals.paid },
                 { label: "Outstanding Due", value: totals.due },
                 { label: "Final Payable", value: totals.finalPayable },

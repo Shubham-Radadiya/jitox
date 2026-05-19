@@ -25,7 +25,12 @@ import {
   Settings,
   Trash2,
 } from "lucide-react";
-import { fmtInr, parseNum } from "./voucherFormConstants";
+import {
+  calcLineDiscountAmtFromPct,
+  fmtInr,
+  parseNum,
+} from "./voucherFormConstants";
+import { PURCHASE_PAYMENT_STATUS_OPTIONS } from "../../../utils/purchasePaymentStatus";
 import InvoicePurchaseModalLayout from "./InvoicePurchaseModalLayout";
 import {
   emptyMeta,
@@ -60,12 +65,27 @@ const emptyProductRow = () => ({
   rate: "",
   discountPct: "",
   discountAmt: "",
+  /** When true, Disc ₹ was typed manually and is not overwritten by Disc %. */
+  discountAmtManual: false,
 });
+
+function applyLineDiscountFromPct(row) {
+  if (row.discountAmtManual) return row;
+  const pct = parseNum(row.discountPct);
+  if (pct <= 0) {
+    return { ...row, discountAmt: "" };
+  }
+  return {
+    ...row,
+    discountAmt: calcLineDiscountAmtFromPct(row.qty, row.rate, row.discountPct),
+  };
+}
 
 const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   {
     formType = "purchase",
     prefill = null,
+    editMode = false,
     showPageHeader = true,
     layout = "default",
     onClose,
@@ -81,7 +101,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   );
   const [partyName, setPartyName] = useState("");
   const [voucherNo, setVoucherNo] = useState("V001");
-  const [invoiceNo] = useState("PUR-001");
+  const [invoiceNo, setInvoiceNo] = useState("PUR-001");
   const [transporter, setTransporter] = useState("");
   const [deliveryAt, setDeliveryAt] = useState("");
   const [orderBy, setOrderBy] = useState("");
@@ -89,6 +109,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   const [shipDifferent, setShipDifferent] = useState(false);
   const [shipTo, setShipTo] = useState("");
   const [termsPayment, setTermsPayment] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("Pending");
   const [gstRate, setGstRate] = useState("");
   const [productRows, setProductRows] = useState([emptyProductRow()]);
   const [invoicePrefix, setInvoicePrefix] = useState("RH-P-24-25/");
@@ -196,6 +217,9 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     if (prefill.partyName != null) setPartyName(prefill.partyName);
     if (prefill.purchaseDate) setPurchaseDate(prefill.purchaseDate);
     if (prefill.voucherNo) setVoucherNo(prefill.voucherNo);
+    if (prefill.invoiceNo != null && String(prefill.invoiceNo).trim() !== "") {
+      setInvoiceNo(String(prefill.invoiceNo).trim());
+    }
     if (prefill.narration != null) setNarration(prefill.narration);
     if (prefill.internalNotes != null) setInternalNotes(prefill.internalNotes);
     if (prefill.transporter != null) setTransporter(prefill.transporter);
@@ -211,6 +235,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       suppressShipToBillSyncRef.current = true;
     }
     if (prefill.termsPayment != null) setTermsPayment(prefill.termsPayment);
+    if (prefill.paymentStatus != null) setPaymentStatus(prefill.paymentStatus);
     if (prefill.gstRate != null && String(prefill.gstRate).trim() !== "") {
       setGstRate(prefill.gstRate);
     }
@@ -278,7 +303,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
               : p.defaultRate != null && p.defaultRate !== ""
                 ? String(p.defaultRate)
                 : "";
-          return {
+          return applyLineDiscountFromPct({
             ...row,
             product: value,
             hsn: p.hsn != null && String(p.hsn).trim() ? String(p.hsn) : "",
@@ -303,21 +328,47 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
               p.mfgDt != null && String(p.mfgDt).trim() !== "" ? String(p.mfgDt) : "",
             expDate:
               p.expDt != null && String(p.expDt).trim() !== "" ? String(p.expDt) : "",
-          };
+          });
         })
       );
       return;
     }
     setProductRows((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+      prev.map((row) => {
+        if (row.id !== id) return row;
+        if (field === "discountAmt") {
+          const trimmed = String(value).trim();
+          return {
+            ...row,
+            discountAmt: value,
+            discountAmtManual: Boolean(trimmed),
+          };
+        }
+        let next = { ...row, [field]: value };
+        if (field === "discountPct") {
+          next.discountAmtManual = false;
+          return applyLineDiscountFromPct(next);
+        }
+        if (
+          (field === "qty" || field === "rate") &&
+          parseNum(next.discountPct) > 0
+        ) {
+          return applyLineDiscountFromPct(next);
+        }
+        return next;
+      })
     );
   }, [productMetaById]);
 
   const isQuotation = formType === "quotation";
   const isPurchaseReturn = formType === "purchase-return";
   const isSales = formType === "sales";
+  const isPurchase = formType === "purchase";
+
   const pageTitle = isQuotation
-    ? "Add Quotation"
+    ? editMode
+      ? "Edit Quotation"
+      : "Add Quotation"
     : isPurchaseReturn
       ? "Purchase Return Voucher"
       : isSales
@@ -538,6 +589,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       shipTo,
       shipDifferent: shipDifferentLiveRef.current,
       termsPayment,
+      paymentStatus: isPurchase ? paymentStatus : undefined,
       gstRate,
       productRows,
       lineTotals,
@@ -562,6 +614,8 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     billTo,
     shipTo,
     termsPayment,
+    isPurchase,
+    paymentStatus,
     gstRate,
     productRows,
     lineTotals,
@@ -573,6 +627,12 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   const runInvoiceSave = useCallback(
     async (kind) => {
       const payload = gatherPayload();
+      if (!String(payload.partyName || "").trim()) {
+        toast.error(
+          "Please select Party Name (supplier) before saving this voucher."
+        );
+        return;
+      }
       const createdAt = new Date().toISOString();
       await onInvoiceAction?.({ ...payload, createdAt }, kind);
     },
@@ -669,7 +729,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
                 options={dropdownOptions.parties}
                 value={partyName}
                 onChange={setPartyName}
-                placeholder="Select party"
+                placeholder="Select party (required)"
                 addNavigateTo="/dashboard/account"
               />
               {partyHint ? (
@@ -928,12 +988,22 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
               onChange={setTermsPayment}
               placeholder="Select term"
             />
-            <InputField
-              label="Due Date"
-              placeholder="Auto-calculated from party terms"
-              readOnly
-              inputClassName={autoFieldInputClass}
-            />
+            {isPurchase ? (
+              <CommonDropdown
+                label="Payment Status"
+                options={PURCHASE_PAYMENT_STATUS_OPTIONS}
+                value={paymentStatus}
+                onChange={setPaymentStatus}
+                placeholder="Select status"
+              />
+            ) : (
+              <InputField
+                label="Due Date"
+                placeholder="Auto-calculated from party terms"
+                readOnly
+                inputClassName={autoFieldInputClass}
+              />
+            )}
           </div>
         </Card>
 

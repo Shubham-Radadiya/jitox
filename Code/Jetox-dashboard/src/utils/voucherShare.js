@@ -1,9 +1,15 @@
 import {
   escapeHtml,
-  printHtmlDocument,
   buildStandalonePrintableHtml,
   downloadHtmlDocumentAsPdf,
+  downloadHtmlFile,
 } from "./printAndExport";
+import {
+  buildPurchaseTaxInvoiceFullDocument,
+  buildPurchaseTaxInvoiceFullDocumentFromDetail,
+  purchasePayloadToTaxInvoiceDoc,
+  PURCHASE_TAX_INVOICE_PAGE_W_PX,
+} from "./purchaseTaxInvoicePdf";
 
 function csvEscape(value) {
   const s = String(value ?? "");
@@ -137,21 +143,46 @@ export function printPurchaseDetailBill(detail) {
 
 export async function downloadPurchaseDetailBillPdf(detail) {
   if (!detail) return;
-  const title = `Purchase — ${detail.voucherNo || "voucher"}`;
-  const body = buildPurchaseDetailBillBody(detail);
-  const fullHtml = buildStandalonePrintableHtml(title, body, {
-    bodyPaddingPx: 10,
-    bodyFontSizePx: 12,
-    h1FontSizePx: 16,
-    tableCellPaddingPx: 5,
+  const invNo =
+    detail._sourceDoc?.invoiceNo ||
+    detail.invoiceNo ||
+    detail.voucherNo ||
+    "voucher";
+  const title = `Tax-Invoice-${String(invNo).replace(/[/\\?%*:|"<>]/g, "-")}`;
+  const fullHtml =
+    buildPurchaseTaxInvoiceFullDocumentFromDetail(detail) ||
+    buildStandalonePrintableHtml(
+      title,
+      buildPurchaseDetailBillBody(detail),
+      { showTitle: false }
+    );
+  await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`, {
+    captureWidthPx: PURCHASE_TAX_INVOICE_PAGE_W_PX,
   });
-  await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
+}
+
+export async function downloadPurchasePayloadTaxInvoicePdf(payload) {
+  const doc = purchasePayloadToTaxInvoiceDoc(payload);
+  if (!doc) return;
+  const inv =
+    `${payload.invoicePrefix || ""}${payload.invoiceNumber || ""}`.trim() ||
+    payload.invoiceNo ||
+    payload.voucherNo ||
+    "draft";
+  const title = `Tax-Invoice-${String(inv).replace(/[/\\?%*:|"<>]/g, "-")}`;
+  const fullHtml = buildPurchaseTaxInvoiceFullDocument(doc, null);
+  await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`, {
+    captureWidthPx: PURCHASE_TAX_INVOICE_PAGE_W_PX,
+  });
 }
 
 export function buildPaymentDetailShareText(detail) {
   if (!detail) return "";
   let t = `Payment voucher\nVoucher: ${detail.voucherNo}\nDate: ${detail.date}\n`;
-  t += `Status: ${detail.status}\n`;
+  t += `Payment Status: ${detail.status}\n`;
+  if (detail.paymentTerms && detail.paymentTerms !== "—") {
+    t += `Terms of Payment: ${detail.paymentTerms}\n`;
+  }
   (detail.party || []).forEach((r) => {
     t += `${r.label}: ${r.value}\n`;
   });
@@ -169,7 +200,8 @@ export function downloadPaymentDetailCsv(detail) {
   const rows = [
     ["Voucher No", detail.voucherNo || ""],
     ["Date", detail.date || ""],
-    ["Status", detail.status || ""],
+    ["Payment Status", detail.status || ""],
+    ["Terms of Payment", detail.paymentTerms || ""],
     ...(detail.party || []).map((r) => [r.label, r.value]),
     ["Amount", detail.totals?.amount || ""],
     ["Remarks", detail.remarks || ""],
@@ -190,7 +222,8 @@ function buildPaymentDetailBillBody(detail) {
     : "";
   return `
 <p><strong>Date:</strong> ${escapeHtml(detail.date)}</p>
-<p><strong>Status:</strong> ${escapeHtml(detail.status || "—")}</p>
+<p><strong>Payment Status:</strong> ${escapeHtml(detail.status || "—")}</p>
+${detail.paymentTerms && detail.paymentTerms !== "—" ? `<p><strong>Terms of Payment:</strong> ${escapeHtml(detail.paymentTerms)}</p>` : ""}
 <table><tbody>${partyRows}</tbody></table>
 <p><strong>Amount:</strong> ${escapeHtml(detail.totals?.amount ?? "—")}</p>
 ${remarks}
@@ -280,40 +313,16 @@ export function downloadPurchasePayloadCsv(p) {
 
 export function printPurchasePayloadBill(p) {
   if (!p) return false;
+  const doc = purchasePayloadToTaxInvoiceDoc(p);
+  if (!doc) return false;
   const inv =
     `${p.invoicePrefix || ""}${p.invoiceNumber || ""}`.trim() ||
     p.invoiceNo ||
-    "—";
-  const lines = (p.productRows || [])
-    .map((row, i) => {
-      const amt = Math.round(rowMoneyForPayload(row, p.gstRate));
-      return `<tr><td>${i + 1}</td><td>${escapeHtml(row.product)}</td><td>${escapeHtml(
-        row.hsn
-      )}</td><td>${escapeHtml(row.qty)}</td><td>${escapeHtml(row.rate)}</td><td>${escapeHtml(
-        String(amt)
-      )}</td></tr>`;
-    })
-    .join("");
-  const narr = p.narration
-    ? `<p><strong>Narration</strong><br/>${escapeHtml(p.narration).replace(/\n/g, "<br/>")}</p>`
-    : "";
-  const notes = p.internalNotes
-    ? `<p><strong>Internal notes</strong><br/>${escapeHtml(p.internalNotes).replace(/\n/g, "<br/>")}</p>`
-    : "";
-  const body = `
-<p>Voucher: ${escapeHtml(p.voucherNo)} | Invoice: ${escapeHtml(inv)} | Date: ${escapeHtml(
-    p.purchaseDate
-  )}</p>
-${narr}
-${notes}
-<table>
-<thead><tr><th>#</th><th>Item</th><th>HSN</th><th>Qty</th><th>Rate</th><th>Amt (₹)</th></tr></thead>
-<tbody>${lines}</tbody>
-</table>
-<p><strong>Taxable:</strong> ₹${Math.round(p.lineTotals?.taxable || 0)} &nbsp;
-<strong>Tax:</strong> ₹${Math.round(p.lineTotals?.tax || 0)}</p>
-`;
-  return printHtmlDocument(`Purchase — ${p.voucherNo || "draft"}`, body);
+    p.voucherNo ||
+    "draft";
+  const fullHtml = buildPurchaseTaxInvoiceFullDocument(doc, null);
+  downloadHtmlFile(`${String(inv).replace(/[/\\?%*:|"<>]/g, "-")}-tax-invoice.html`, fullHtml);
+  return true;
 }
 
 /**

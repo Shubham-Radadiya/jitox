@@ -52,6 +52,8 @@ export const authApi = {
 export const usersApi = {
   getAll: () => http.get("/users/"),
   getById: (id) => http.get(`/users/get-user/${encodeURIComponent(id)}`),
+  getSubordinates: (id) =>
+    http.get(`/users/subordinates/${encodeURIComponent(id)}`),
   create: (body) => {
     const isFd = typeof FormData !== "undefined" && body instanceof FormData;
     return http.post("/users/create-user", body, isFd ? {} : undefined);

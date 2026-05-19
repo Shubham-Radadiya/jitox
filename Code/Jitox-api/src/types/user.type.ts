@@ -1,4 +1,4 @@
-import { Document } from "mongoose";
+import { Document, Types } from "mongoose";
 import type { AppRole } from "../constants/roles";
 
 export interface IUser extends Document {
@@ -25,4 +25,8 @@ export interface IUser extends Document {
   district?: string;
   region?: string;
   profilePhoto?: string;
+  /** User who created this account (admin/manager). */
+  createdBy?: Types.ObjectId;
+  /** Manager or admin this user reports to (team hierarchy). */
+  parentUserId?: Types.ObjectId;
 }

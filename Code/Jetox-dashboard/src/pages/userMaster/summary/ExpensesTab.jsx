@@ -2,8 +2,9 @@ import React, { useMemo, useState } from "react";
 import DataTable from "../../../components/ui/table/DataTable";
 import { Plus, Paperclip, Edit3, CalendarDays, CircleDot, Search } from "lucide-react";
 import { tableTdClasses } from "../../../utils/tableUi";
+import SummaryFilterBar from "./SummaryFilterBar";
 
-const ExpensesTab = () => {
+const ExpensesTab = ({ showFilterByLabel = false, filterLeading = null }) => {
   const [expenseTypeSearch, setExpenseTypeSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [modeFilter, setModeFilter] = useState("");
@@ -153,23 +154,7 @@ const ExpensesTab = () => {
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-0.5 rounded-lg bg-slate-100/90 p-0.5 whitespace-nowrap dark:bg-slate-800/80">
-          <button
-            type="button"
-            className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
-          >
-            My Data
-          </button>
-          <button
-            type="button"
-            className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
-          >
-            User (10)
-          </button>
-        </div>
-
-        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
+      <SummaryFilterBar showFilterLabel={showFilterByLabel} leading={filterLeading}>
           <div className="relative w-full sm:w-44">
             <CalendarDays
               size={14}
@@ -209,9 +194,7 @@ const ExpensesTab = () => {
               ))}
             </select>
           </div>
-
-        </div>
-      </div>
+      </SummaryFilterBar>
 
       <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-900/4 dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)] dark:ring-white/6">
         <div className="flex w-full min-w-0 flex-col gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2 dark:border-slate-600 dark:bg-slate-800/40 sm:flex-row sm:items-center sm:justify-between sm:px-4">

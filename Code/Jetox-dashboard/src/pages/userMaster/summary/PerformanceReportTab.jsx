@@ -7,12 +7,13 @@ import {
   objectToHtmlTable,
 } from "../../../utils/printAndExport";
 import { downloadCsv } from "../../../utils/voucherShare";
+import SummaryFilterBar from "./SummaryFilterBar";
 
 /**
  * PerformanceReportTab Component
  * Displays metrics, performance bars, and status cards.
  */
-const PerformanceReportTab = () => {
+const PerformanceReportTab = ({ filterLeading = null }) => {
   const [activeFilter, setActiveFilter] = useState("Month");
   const [isExportOpen, setIsExportOpen] = useState(false);
 
@@ -57,23 +58,8 @@ const PerformanceReportTab = () => {
 
   return (
     <div className="ds-stack-major min-w-0">
-      <div className="flex w-full min-w-0 flex-row items-center justify-between gap-2">
-        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-0.5 rounded-lg bg-slate-100/90 p-0.5 whitespace-nowrap dark:bg-slate-800/80">
-          <button
-            type="button"
-            className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
-          >
-            My Data
-          </button>
-          <button
-            type="button"
-            className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
-          >
-            User (10)
-          </button>
-        </div>
-
-        <div className="relative shrink-0 self-end lg:self-auto">
+      <SummaryFilterBar leading={filterLeading}>
+        <div className="relative shrink-0">
           <button
             type="button"
             onClick={() => setIsExportOpen(!isExportOpen)}
@@ -101,7 +87,7 @@ const PerformanceReportTab = () => {
             </div>
           )}
         </div>
-      </div>
+      </SummaryFilterBar>
 
       <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-4">
         {/* Left Performance Card */}

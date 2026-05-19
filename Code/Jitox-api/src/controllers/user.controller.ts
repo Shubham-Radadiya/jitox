@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { User } from "../models/index";
+import mongoose from "mongoose";
+import { User, Employee } from "../models/index";
+import type { AuthRequest } from "../middleware/authonticated.middleware";
 import { ensureDefaultUsers } from "../seed/ensureDefaultUsers";
 import { sendEmail } from "../helper/sendEmail";
 import { AppError } from "../common/errors/AppError";
@@ -242,6 +244,14 @@ export const createUser = async (
     const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
     const region = trimAddressPart(req.body.region);
 
+    const authReq = req as AuthRequest;
+    const creatorId = authReq.user?.id;
+    const parentRaw = req.body.parentUserId ?? req.body.parent_user_id;
+    let parentUserId: mongoose.Types.ObjectId | undefined;
+    if (parentRaw && mongoose.isValidObjectId(String(parentRaw))) {
+      parentUserId = new mongoose.Types.ObjectId(String(parentRaw));
+    }
+
     const user = new User({
       email: emailNormalized,
       password: hashedPassword,
@@ -264,6 +274,10 @@ export const createUser = async (
       ...(req.file
         ? { profilePhoto: `/uploads/${req.file.filename}` }
         : {}),
+      ...(creatorId && mongoose.isValidObjectId(String(creatorId))
+        ? { createdBy: new mongoose.Types.ObjectId(String(creatorId)) }
+        : {}),
+      ...(parentUserId ? { parentUserId } : {}),
     });
 
     await user.save();
@@ -424,6 +438,19 @@ export const updateUser = async (
       const r = trimAddressPart(req.body.region);
       user.region = r || undefined;
     }
+    const parentTouch =
+      req.body.parentUserId !== undefined ||
+      req.body.parent_user_id !== undefined;
+    if (parentTouch) {
+      const parentRaw = req.body.parentUserId ?? req.body.parent_user_id;
+      if (parentRaw === "" || parentRaw === null) {
+        user.parentUserId = undefined;
+      } else if (mongoose.isValidObjectId(String(parentRaw))) {
+        user.parentUserId = new mongoose.Types.ObjectId(String(parentRaw));
+      } else {
+        throw new AppError(HttpStatusCode.BAD_REQUEST, "Invalid parent user id.");
+      }
+    }
     if (req.file) {
       user.profilePhoto = `/uploads/${req.file.filename}`;
     }
@@ -509,20 +536,102 @@ export const deleteUser = async (
   }
 };
 
+/** HRM employees linked to a User Master account (`Employee.linkedUserId`). */
+async function linkedEmployeeCountByUserId(): Promise<Map<string, number>> {
+  const grouped = await Employee.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
+    { $match: { linkedUserId: { $exists: true, $ne: null } } },
+    { $group: { _id: "$linkedUserId", count: { $sum: 1 } } },
+  ]);
+  const map = new Map<string, number>();
+  for (const row of grouped) {
+    if (row._id) map.set(String(row._id), row.count);
+  }
+  return map;
+}
+
+function mapEmployeeForUserList(e: {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  phone?: string;
+  roleDesignation?: string;
+  department?: string;
+  status?: string;
+  linkedUserId?: mongoose.Types.ObjectId;
+}) {
+  const idStr = String(e._id);
+  return {
+    _id: idStr,
+    id: idStr,
+    isHrmEmployee: true,
+    name: e.name,
+    email: e.email,
+    phone: e.phone,
+    roleDesignation: e.roleDesignation,
+    department: e.department,
+    status: e.status,
+    linkedUserId: e.linkedUserId ? String(e.linkedUserId) : undefined,
+  };
+}
+
 export const getAllUsers = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const users = await User.find().select("-password");
+    const subordinateCounts = await linkedEmployeeCountByUserId();
 
     res.status(200).json({
       message: "Users fetched successfully",
       count: users.length,
-      users: users.map((u) => toPublicUser(u as IUser)),
+      users: users.map((u) => {
+        const pub = toPublicUser(u as IUser);
+        const id = String(u._id);
+        return {
+          ...pub,
+          subordinateCount: subordinateCounts.get(id) ?? 0,
+        };
+      }),
     });
   } catch (error) {
     console.error("Get All Users Error:", error);
+    throw error;
+  }
+};
+
+/** HRM employees linked to this User Master account (`Employee.linkedUserId`). */
+export const getSubordinateUsers = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(String(id))) {
+      throw new AppError(HttpStatusCode.BAD_REQUEST, "Invalid user id.");
+    }
+
+    const parent = await User.findById(id).select("_id role");
+    if (!parent) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "User not found.");
+    }
+
+    const employees = await Employee.find({ linkedUserId: id })
+      .select("name email phone roleDesignation department status linkedUserId")
+      .sort({ name: 1 })
+      .lean();
+
+    const mapped = employees.map((e) => mapEmployeeForUserList(e));
+
+    res.status(200).json({
+      message: "Linked employees fetched successfully",
+      source: "hrm",
+      count: mapped.length,
+      employees: mapped,
+      users: mapped,
+    });
+  } catch (error) {
+    console.error("Get Subordinate Users Error:", error);
     throw error;
   }
 };
@@ -540,9 +649,14 @@ export const getUserByUserId = async (
       throw new AppError(HttpStatusCode.NOT_FOUND, "User not found.");
     }
 
+    const subordinateCount = await Employee.countDocuments({ linkedUserId: id });
+
     res.status(200).json({
       message: "User fetched successfully",
-      user: toPublicUser(user as IUser),
+      user: {
+        ...toPublicUser(user as IUser),
+        subordinateCount,
+      },
     });
   } catch (error) {
     console.error("Get User By ID Error:", error);

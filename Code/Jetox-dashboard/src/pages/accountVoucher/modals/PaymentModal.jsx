@@ -10,6 +10,7 @@ import {
 } from "../../../components/ui/CommanUI";
 import { paymentVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
+import { usePurchaseFormMeta } from "../../../hooks/usePurchaseFormMeta";
 
 /** Backend enums (paymentVoucher.model.ts) — keep value casing identical to schema. */
 const PAYMENT_THROUGH_OPTIONS = [
@@ -29,51 +30,131 @@ const emptyForm = () => ({
   amount: "",
   remarks: "",
   status: "Pending",
+  voucherNo: "",
+  sourcePurchaseId: "",
+  sourceSalesId: "",
 });
 
-const PaymentModal = ({ open, onClose }) => {
+/** Prefill from purchase/sales row — Payment To is always left for manual pick. */
+function draftToForm(draft) {
+  if (!draft) return emptyForm();
+  const through = String(draft.paymentThrough || "Cash").trim();
+  const paymentThrough =
+    through.toLowerCase() === "bank" ? "Bank" : "Cash";
+  return {
+    ...emptyForm(),
+    date: draft.date
+      ? dayjs(draft.date).format("YYYY-MM-DD")
+      : dayjs().format("YYYY-MM-DD"),
+    paymentThrough,
+    paymentTo: "",
+    amount:
+      draft.amount != null && draft.amount !== ""
+        ? String(draft.amount).replace(/,/g, "")
+        : "",
+    remarks: String(draft.remarks || ""),
+    status: String(draft.status || "Pending") === "Paid" ? "Paid" : "Pending",
+    sourcePurchaseId: String(draft.sourcePurchaseId || "").trim(),
+    sourceSalesId: String(draft.sourceSalesId || "").trim(),
+  };
+}
+
+function paymentToForm(payment) {
+  if (!payment?._id) return emptyForm();
+  const through = String(payment.paymentThrough || "Cash").trim();
+  const paymentThrough =
+    through.toLowerCase() === "bank" ? "Bank" : "Cash";
+  return {
+    date: payment.date
+      ? dayjs(payment.date).format("YYYY-MM-DD")
+      : dayjs().format("YYYY-MM-DD"),
+    paymentThrough,
+    paymentTo: String(payment.paymentTo || "").trim(),
+    amount:
+      payment.amount != null && payment.amount !== ""
+        ? String(payment.amount).replace(/,/g, "")
+        : "",
+    remarks: String(payment.remarks || ""),
+    status: String(payment.status || "Pending") === "Paid" ? "Paid" : "Pending",
+    voucherNo: String(payment.voucherNo || "").trim(),
+    sourcePurchaseId: "",
+    sourceSalesId: "",
+  };
+}
+
+const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(payment?._id);
 
-  /** Parties + auto voucher no. — refetched on every modal open so the number stays current. */
-  const { data: metaRes, isLoading: metaLoading, isError: metaError } = useQuery({
+  /** Same party list as purchase / sales vouchers (Account Master). */
+  const {
+    data: purchaseMeta,
+    isLoading: partiesLoading,
+    isError: partiesError,
+  } = usePurchaseFormMeta({ enabled: open });
+
+  /** Next voucher no. only when creating. */
+  const { data: paymentMetaRes, isLoading: voucherNoLoading } = useQuery({
     queryKey: ["payment-voucher-form-meta"],
     queryFn: async () => {
       const { data } = await paymentVouchersApi.getFormMeta();
       return data;
     },
-    enabled: open,
+    enabled: open && !isEdit,
     staleTime: 0,
   });
 
   useEffect(() => {
-    if (!open) {
-      setForm(emptyForm());
+    if (open) {
+      if (payment?._id) {
+        setForm(paymentToForm(payment));
+      } else if (draft) {
+        setForm(draftToForm(draft));
+      } else {
+        setForm(emptyForm());
+      }
       setSaving(false);
+      return;
     }
-  }, [open]);
+    setForm(emptyForm());
+    setSaving(false);
+  }, [open, payment, draft]);
 
   useEffect(() => {
-    if (metaError) {
-      toast.error("Could not load parties or voucher number. Please retry.");
+    if (partiesError) {
+      toast.error(
+        "Could not load party list. Check Account Master or refresh."
+      );
     }
-  }, [metaError]);
+  }, [partiesError]);
 
   const nextVoucherNo = useMemo(() => {
-    const v = String(metaRes?.nextPaymentVoucherNo ?? "").trim();
+    if (isEdit) return form.voucherNo || "—";
+    const v = String(paymentMetaRes?.nextPaymentVoucherNo ?? "").trim();
     return v || "Auto";
-  }, [metaRes]);
+  }, [paymentMetaRes, isEdit, form.voucherNo]);
 
   const partyOptions = useMemo(() => {
-    const list = Array.isArray(metaRes?.parties) ? metaRes.parties : [];
-    return list
-      .filter((p) => p && String(p.value ?? "").trim())
-      .map((p) => ({
-        value: String(p.value),
-        label: String(p.label ?? p.value),
-      }));
-  }, [metaRes]);
+    const list = Array.isArray(purchaseMeta?.parties) ? purchaseMeta.parties : [];
+    const byValue = new Map();
+    for (const p of list) {
+      if (!p || !String(p.value ?? "").trim()) continue;
+      const value = String(p.value).trim();
+      byValue.set(value, {
+        value,
+        label: String(p.label ?? value).trim() || value,
+      });
+    }
+    const current = String(
+      form.paymentTo || payment?.paymentTo || ""
+    ).trim();
+    if (current && !byValue.has(current)) {
+      byValue.set(current, { value: current, label: current });
+    }
+    return Array.from(byValue.values());
+  }, [purchaseMeta, form.paymentTo, payment]);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -81,7 +162,7 @@ const PaymentModal = ({ open, onClose }) => {
 
   const validate = () => {
     if (!form.date) return "Pick a date.";
-    if (!form.paymentTo.trim()) return "Select whom you're paying.";
+    if (!form.paymentTo.trim()) return "Please select Payment To.";
     const n = Number(form.amount);
     if (!Number.isFinite(n) || n <= 0) return "Enter a valid amount.";
     return null;
@@ -101,26 +182,74 @@ const PaymentModal = ({ open, onClose }) => {
       remarks: form.remarks.trim(),
       status: form.status || "Pending",
     };
+    if (form.sourcePurchaseId) {
+      body.sourcePurchaseId = form.sourcePurchaseId;
+    }
+    if (form.sourceSalesId) {
+      body.sourceSalesId = form.sourceSalesId;
+    }
     try {
       setSaving(true);
-      const res = await paymentVouchersApi.create(body);
-      const savedNo =
-        res?.data?.voucher?.voucherNo ||
-        res?.data?.voucher?.voucherNumber ||
-        nextVoucherNo;
-      await queryClient.invalidateQueries({
-        queryKey: ["voucher-list", "payment"],
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["payment-voucher-form-meta"],
-      });
-      if (body.status === "Paid") {
-        await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      if (isEdit) {
+        await paymentVouchersApi.update(String(payment._id), body);
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "payment"],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "purchase"],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "sales"],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+        ]);
+        toast.success(
+          form.voucherNo
+            ? `Payment voucher ${form.voucherNo} updated.`
+            : "Payment voucher updated."
+        );
+      } else {
+        const res = await paymentVouchersApi.create(body);
+        const savedNo =
+          res?.data?.voucher?.voucherNo ||
+          res?.data?.voucher?.voucherNumber ||
+          nextVoucherNo;
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "payment"],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["payment-voucher-form-meta"],
+          }),
+          ...(body.sourcePurchaseId
+            ? [
+                queryClient.invalidateQueries({
+                  queryKey: ["voucher-list", "purchase"],
+                }),
+              ]
+            : []),
+          ...(body.sourceSalesId
+            ? [
+                queryClient.invalidateQueries({
+                  queryKey: ["voucher-list", "sales"],
+                }),
+              ]
+            : []),
+        ]);
+        if (body.status === "Paid") {
+          await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+        }
+        toast.success(`Payment voucher ${savedNo} saved.`);
       }
-      toast.success(`Payment voucher ${savedNo} saved.`);
       onClose();
     } catch (e) {
-      toast.error(getApiErrorMessage(e, "Could not save payment voucher"));
+      toast.error(
+        getApiErrorMessage(
+          e,
+          isEdit ? "Could not update payment voucher" : "Could not save payment voucher"
+        )
+      );
     } finally {
       setSaving(false);
     }
@@ -136,7 +265,7 @@ const PaymentModal = ({ open, onClose }) => {
         disabled={saving}
       />
       <Button
-        label={saving ? "Saving…" : "Save"}
+        label={saving ? "Saving…" : isEdit ? "Update" : "Save"}
         variant="primary"
         className="w-28"
         onClick={handleSave}
@@ -149,7 +278,7 @@ const PaymentModal = ({ open, onClose }) => {
     <CommonModal
       open={open}
       onClose={onClose}
-      title="Add Payment"
+      title={isEdit ? "Edit Payment" : "Add Payment"}
       width="720px"
       footer={footer}
     >
@@ -157,7 +286,9 @@ const PaymentModal = ({ open, onClose }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <InputField
             label="Voucher Number"
-            value={metaLoading ? "Generating…" : nextVoucherNo}
+            value={
+              !isEdit && voucherNoLoading ? "Generating…" : nextVoucherNo
+            }
             disabled
             placeholder="Auto"
           />
@@ -186,7 +317,11 @@ const PaymentModal = ({ open, onClose }) => {
             value={form.paymentTo}
             onChange={(value) => updateField("paymentTo", value)}
             placeholder={
-              metaLoading ? "Loading parties…" : "Select party"
+              partiesLoading
+                ? "Loading parties…"
+                : partyOptions.length
+                  ? "Select party"
+                  : "No parties — add in Account Master"
             }
             searchable
             searchPlaceholder="Search party…"

@@ -15,6 +15,10 @@ import { TableContent, tableColumnKey } from "../../hooks/TableCustomHook";
 import { useTableData } from "../../hooks/useTableData";
 import { useVoucherListData } from "../../hooks/useVoucherListData";
 import { getApiErrorMessage } from "../../utils/apiError";
+import {
+  purchaseRowHasParty,
+  purchaseRowPartyName,
+} from "../../utils/purchasePaymentStatus";
 import { invalidateProductAndStockQueries } from "../../utils/invalidateStockQueries";
 import {
   TABLE_ELEMENT_CLASS,
@@ -42,6 +46,7 @@ import {
   receiptVouchersApi,
   salesVouchersApi,
   manufacturingVouchersApi,
+  quotationsApi,
 } from "../../services/api";
 
 /** Matches `w-56` (14rem); clamp math must stay in sync with popover max-width below */
@@ -137,11 +142,16 @@ const VoucherPage = () => {
   // when the user clicks the pencil on a row.
   const [editingExpense, setEditingExpense] = useState(null);
   const [editingJournal, setEditingJournal] = useState(null);
+  const [editingPayment, setEditingPayment] = useState(null);
+  /** Prefill amount/link when paying a purchase — Payment To chosen in modal. */
+  const [paymentDraft, setPaymentDraft] = useState(null);
 
   useEffect(() => {
     setActiveModalKey(null);
     setEditingExpense(null);
     setEditingJournal(null);
+    setEditingPayment(null);
+    setPaymentDraft(null);
   }, [voucherSlug]);
 
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -345,6 +355,18 @@ const VoucherPage = () => {
     [queryClient]
   );
 
+  const deleteQuotationVoucher = useCallback(
+    async (id) => {
+      if (!id) return;
+      await quotationsApi.delete(String(id));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["voucher-list", "quotation"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] }),
+      ]);
+    },
+    [queryClient]
+  );
+
   /**
    * Mark a payment voucher's status to "Paid" via PUT /paymentVouchers/update/:id.
    * If the payment is linked to a sales voucher (via `sourceSalesId`), the
@@ -361,6 +383,9 @@ const VoucherPage = () => {
         }),
         queryClient.invalidateQueries({
           queryKey: ["voucher-list", "sales"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "purchase"],
         }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
       ]);
@@ -488,6 +513,53 @@ const VoucherPage = () => {
     [queryClient]
   );
 
+  /**
+   * Purchase-row credit card — opens Add Payment with amount/link prefilled.
+   * User must pick Payment To manually; marking Paid updates the purchase.
+   */
+  const createPaymentRequestForPurchase = useCallback((row) => {
+    const raw = row?._raw || {};
+    if (!raw._id) {
+      toast.error("This purchase row is missing an id — cannot create payment.");
+      return;
+    }
+    if (!purchaseRowHasParty(row)) {
+      toast.error(
+        "Please select Party Name (supplier) on this purchase voucher using Edit, then create payment."
+      );
+      return;
+    }
+
+    const totalAmount = Number(raw.totalAmount) || 0;
+    const paidAmount = Number(raw.paidAmount) || 0;
+    const outstanding = Math.max(0, totalAmount - paidAmount);
+    const amount = outstanding > 0 ? outstanding : totalAmount;
+    if (!amount) {
+      toast.error("Cannot create a payment voucher for ₹0.");
+      return;
+    }
+
+    const voucherNo = raw.voucherNo || row?.["Voucher No."] || "";
+    const today = new Date().toISOString().slice(0, 10);
+    const paymentThrough =
+      String(raw.paymentMode || "").trim().toLowerCase() === "cash"
+        ? "Cash"
+        : "Bank";
+
+    setEditingPayment(null);
+    setPaymentDraft({
+      date: today,
+      amount,
+      paymentThrough,
+      remarks: voucherNo
+        ? `Payment for purchase voucher ${voucherNo}`
+        : "Payment from purchase voucher",
+      status: "Pending",
+      sourcePurchaseId: raw._id,
+    });
+    setActiveModalKey("payment-modal");
+  }, []);
+
   // ---- Expense voucher: edit + quick-attach proof --------------------------
   // `editingExpense` is declared up near `activeModalKey` so both reset
   // together when the slug changes. Setting it alongside the modal key in
@@ -510,6 +582,23 @@ const VoucherPage = () => {
   const closeJournalModal = useCallback(() => {
     setActiveModalKey(null);
     setEditingJournal(null);
+  }, []);
+
+  const openPaymentEdit = useCallback((row) => {
+    const raw = row?._raw;
+    if (!raw?._id) {
+      toast.error("This payment row is missing an id — cannot edit.");
+      return;
+    }
+    setPaymentDraft(null);
+    setEditingPayment(raw);
+    setActiveModalKey("payment-modal");
+  }, []);
+
+  const closePaymentModal = useCallback(() => {
+    setActiveModalKey(null);
+    setEditingPayment(null);
+    setPaymentDraft(null);
   }, []);
 
   const openJournalEdit = useCallback((row) => {
@@ -787,12 +876,15 @@ const VoucherPage = () => {
       openPurchaseReturnModal,
       openSalesModal,
       deletePurchaseVoucher,
+      createPaymentRequestForPurchase,
+      deleteQuotationVoucher,
       deletePurchaseReturnVoucher,
       deleteSalesVoucher,
       createPaymentRequestForSale,
       markPaymentVoucherPaid,
       markReceiptVoucherPaid,
       openExpenseEdit,
+      openPaymentEdit,
       attachExpenseProof,
       openJournalEdit,
       onVoucherDocument: handleDocument,
@@ -836,6 +928,13 @@ const VoucherPage = () => {
         } else if (field.action === "open-modal" && field.modalKey) {
           if (field.modalKey === "journal-modal") {
             setEditingJournal(null);
+          }
+          if (field.modalKey === "payment-modal") {
+            setEditingPayment(null);
+            setPaymentDraft(null);
+          }
+          if (field.modalKey === "expense-modal") {
+            setEditingExpense(null);
           }
           setActiveModalKey(field.modalKey);
         } else if (field.onClick) {
@@ -1109,6 +1208,7 @@ const VoucherPage = () => {
           const { key, component: ModalComponent, props } = modalConfig;
           const isExpense = key === "expense-modal";
           const isJournal = key === "journal-modal";
+          const isPayment = key === "payment-modal";
           return (
             <ModalComponent
               key={key}
@@ -1118,7 +1218,9 @@ const VoucherPage = () => {
                   ? closeExpenseModal
                   : isJournal
                     ? closeJournalModal
-                    : () => setActiveModalKey(null)
+                    : isPayment
+                      ? closePaymentModal
+                      : () => setActiveModalKey(null)
               }
               {...(isExpense ? { expense: editingExpense } : {})}
               {...(isJournal
@@ -1126,6 +1228,9 @@ const VoucherPage = () => {
                     journal: editingJournal,
                     onSaved: handleJournalSaved,
                   }
+                : {})}
+              {...(isPayment
+                ? { payment: editingPayment, draft: paymentDraft }
                 : {})}
               {...(props || {})}
             />

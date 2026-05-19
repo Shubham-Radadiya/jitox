@@ -425,10 +425,14 @@ export const getPurchaseFormMeta = async (
       .sort({ businessName: 1 })
       .lean();
 
-    const parties = accounts.map((a) => ({
-      value: a.businessName,
-      label: a.businessName,
-    }));
+    const seenParty = new Set<string>();
+    const parties: { value: string; label: string }[] = [];
+    for (const a of accounts) {
+      const name = String(a.businessName ?? a.name ?? "").trim();
+      if (!name || seenParty.has(name)) continue;
+      seenParty.add(name);
+      parties.push({ value: name, label: name });
+    }
 
     const partyCreditHints: Record<string, string> = {};
     for (const a of accounts) {

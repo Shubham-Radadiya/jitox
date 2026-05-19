@@ -21,10 +21,9 @@ import { userService } from "../../services/user.services";
 import { getStoredUser, canAccessModule } from "../../utils/authSession";
 import { MODULE_ACCESS_OPTIONS } from "../../constants/accessModules";
 import { AddressTableCell } from "../../components/address/AddressDisplay";
-import { addressFromUser, buildTableSummary } from "../../utils/addressFormat";
 import { TABLE_ACTION_ICON_BTN, tableTdClasses } from "../../utils/tableUi";
 import { mergePageAddButton } from "../../utils/pageAddButton";
-import { buildUploadUrl } from "../../utils/uploadUrl";
+import { mapApiUserToRow } from "./mapUserRow";
 
 function pickFormField(payload, key) {
   if (payload instanceof FormData) {
@@ -46,47 +45,6 @@ function pickPayloadPermissions(payload) {
     }
   }
   return payload.permissions;
-}
-
-function mapApiUserToRow(u) {
-  const id = u._id || u.id;
-  const idStr = id ? String(id) : "";
-  const name =
-    u.name ||
-    [u.firstName, u.lastName].filter(Boolean).join(" ").trim() ||
-    "-";
-  const addr = addressFromUser(u);
-  return {
-    _id: idStr,
-    id: idStr,
-    "Employee ID": idStr ? idStr.slice(-8).toUpperCase() : "-",
-    "User Name": name,
-    Email: u.email,
-    "Phone No": u.phone || "-",
-    Role: u.role,
-    "Total Users": "-",
-    region: u.region || "",
-    Region: u.region || u.city || "-",
-    Area: u.district || u.taluka || "-",
-    Address: u.addressSummary || buildTableSummary(addr),
-    streetAddress: addr.streetAddress,
-    area: addr.area,
-    city: addr.city,
-    taluka: addr.taluka,
-    district: addr.district,
-    state: addr.state,
-    country: addr.country,
-    pincode: addr.pincode,
-    fullAddress: u.fullAddress,
-    "Joining Date": u.createdAt
-      ? new Date(u.createdAt).toISOString().slice(0, 10)
-      : "-",
-    isActive: true,
-    image: u.profilePhoto ? buildUploadUrl(u.profilePhoto) : null,
-    profilePhoto: u.profilePhoto,
-    permissions: u.permissions || [],
-    roleLower: (u.role || "").toLowerCase(),
-  };
 }
 
 const UserMasterIndex = () => {
@@ -576,7 +534,7 @@ const UserMasterIndex = () => {
           <>
             <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2 sm:gap-3">
               <h1 className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-semibold tracking-tight text-dark sm:text-lg sm:font-bold">
-                Total Users
+                Total Users ({users.length})
               </h1>
               <div className="jitox-header-pill shrink-0 gap-1.5 whitespace-nowrap px-2 py-1 text-[11px] leading-none sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm sm:leading-normal">
                 <span className="shrink-0">20 Jan, 2:30 PM</span>

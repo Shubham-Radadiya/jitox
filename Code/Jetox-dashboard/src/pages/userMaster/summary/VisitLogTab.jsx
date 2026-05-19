@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import DataTable from "../../../components/ui/table/DataTable";
 import { CalendarDays, MapPin, UserRoundSearch } from "lucide-react";
+import SummaryFilterBar from "./SummaryFilterBar";
 
-const VisitLogTab = () => {
+const VisitLogTab = ({ showFilterByLabel = false, filterLeading = null }) => {
   const [visitIdFilter, setVisitIdFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
@@ -91,23 +92,7 @@ const VisitLogTab = () => {
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="inline-flex w-fit max-w-full flex-nowrap items-center gap-0.5 rounded-lg bg-slate-100/90 p-0.5 whitespace-nowrap dark:bg-slate-800/80">
-          <button
-            type="button"
-            className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm ring-1 ring-primary/15 dark:bg-slate-900 dark:ring-primary/25 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
-          >
-            My Data
-          </button>
-          <button
-            type="button"
-            className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 sm:rounded-lg sm:px-4 sm:py-1 sm:text-[13px]"
-          >
-            User (10)
-          </button>
-        </div>
-
-        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
+      <SummaryFilterBar showFilterLabel={showFilterByLabel} leading={filterLeading}>
         <div className="relative w-full sm:w-40">
           <UserRoundSearch
             size={14}
@@ -167,8 +152,7 @@ const VisitLogTab = () => {
             ))}
           </select>
         </div>
-      </div>
-      </div>
+      </SummaryFilterBar>
 
       <DataTable columns={columns} data={filteredData} />
     </div>

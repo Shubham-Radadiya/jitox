@@ -130,7 +130,11 @@ function waitForImagesLoaded(root) {
   );
 }
 
-export async function downloadHtmlDocumentAsPdf(fullHtmlDocument, filename = "document.pdf") {
+export async function downloadHtmlDocumentAsPdf(
+  fullHtmlDocument,
+  filename = "document.pdf",
+  opts = {}
+) {
   const safeName = (filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`).replace(
     /[/\\?%*:|"<>]/g,
     "-"
@@ -153,8 +157,9 @@ export async function downloadHtmlDocumentAsPdf(fullHtmlDocument, filename = "do
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.title = "pdf-export";
+  const captureW = Number(opts.captureWidthPx) > 0 ? Number(opts.captureWidthPx) : 1040;
   iframe.style.cssText =
-    "position:absolute;left:-9999px;top:0;width:1040px;height:400px;border:0;margin:0;padding:0;opacity:1;pointer-events:none;overflow:hidden;";
+    `position:absolute;left:-9999px;top:0;width:${captureW}px;height:400px;border:0;margin:0;padding:0;opacity:1;pointer-events:none;overflow:hidden;`;
   document.body.appendChild(iframe);
 
   const frameDoc = iframe.contentDocument;

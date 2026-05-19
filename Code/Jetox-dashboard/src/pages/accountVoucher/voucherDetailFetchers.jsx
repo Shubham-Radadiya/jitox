@@ -7,23 +7,53 @@ import {
   receiptVouchersApi,
   accountsApi,
   manufacturingVouchersApi,
+  quotationsApi,
 } from "../../services/api";
 import { buildPaymentReceiptData } from "../../utils/paymentReceipt";
 import dayjs from "dayjs";
+import {
+  findAccountByBusinessName,
+} from "../../utils/accountMappers";
 import {
   purchaseDocToDetailShape,
   salesDocToOrderDetailShape,
   fmtRupee,
 } from "../../utils/voucherRowMappers";
 
+async function loadPartyAccountForVoucher(doc) {
+  const partyName = String(doc?.partyName || "").trim();
+  if (!partyName) return null;
+  try {
+    const { data } = await accountsApi.getAll({});
+    const list = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.accounts)
+        ? data.accounts
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+    return findAccountByBusinessName(list, partyName);
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchPurchaseDetail(id) {
   const { data } = await purchaseVouchersApi.getById(id);
-  return purchaseDocToDetailShape(data);
+  const partyAccount = await loadPartyAccountForVoucher(data);
+  return purchaseDocToDetailShape(data, partyAccount);
+}
+
+export async function fetchQuotationDetail(id) {
+  const { data } = await quotationsApi.getById(id);
+  const partyAccount = await loadPartyAccountForVoucher(data);
+  return purchaseDocToDetailShape(data, partyAccount);
 }
 
 export async function fetchPurchaseReturnDetail(id) {
   const { data } = await purchaseReturnVouchersApi.getById(id);
-  return purchaseDocToDetailShape(data);
+  const partyAccount = await loadPartyAccountForVoucher(data);
+  return purchaseDocToDetailShape(data, partyAccount);
 }
 
 export async function fetchSalesOrderDetail(id) {

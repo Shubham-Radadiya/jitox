@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { resolvePurchasePaymentStatusDisplay } from "./purchasePaymentStatus";
 
 export function fmtRupee(n) {
   const x = Number(n);
@@ -10,6 +11,25 @@ export function parseRupeeCell(s) {
   if (s == null || s === "—") return 0;
   const n = Number(String(s).replace(/[₹,\s]/g, ""));
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Line discount ₹ (matches purchase invoice: amt overrides %). */
+export function purchaseLineDiscount(it) {
+  const qty = Number(it?.quantity) || 0;
+  const rate = Number(it?.rateParUnit) || 0;
+  const base = qty * rate;
+  const dAmt = Number(it?.discountAmt);
+  const dPct = Number(it?.discountPct);
+  if (Number.isFinite(dAmt) && dAmt > 0) return dAmt;
+  if (Number.isFinite(dPct) && dPct > 0) return (base * dPct) / 100;
+  const sub = Number(it?.subtotal);
+  if (base > 0 && Number.isFinite(sub)) return Math.max(0, base - sub);
+  return 0;
+}
+
+export function sumPurchaseLineDiscounts(items) {
+  const list = Array.isArray(items) ? items : [];
+  return list.reduce((sum, it) => sum + purchaseLineDiscount(it), 0);
 }
 
 export function mapPurchaseAggregateRow(v) {
@@ -28,11 +48,7 @@ export function mapPurchaseAggregateRow(v) {
     "Party Name": v.partyName || "—",
     "Voucher No.": v.voucherNo || "—",
     "Debit Amount": debit,
-    "Credit Amount": "—",
-    "Due Date": v.dueDate
-      ? dayjs(v.dueDate).format("DD MMM YY")
-      : "—",
-    "Payment Status": v.paymentMode || "Pending",
+    "Payment Status": resolvePurchasePaymentStatusDisplay(v),
   };
 }
 
@@ -231,12 +247,6 @@ export function mapJournalRow(v) {
 }
 
 export function mapQuotationRow(q) {
-  const status =
-    q.dashboardOrderStatus ||
-    (q.dashboardTab
-      ? String(q.dashboardTab).replace(/([A-Z])/g, " $1").trim()
-      : "") ||
-    "Processing";
   return {
     _id: q._id,
     _raw: q,
@@ -246,7 +256,7 @@ export function mapQuotationRow(q) {
       : "—",
     Client: q.partyName || "—",
     Amount: q.totalAmount != null ? fmtRupee(q.totalAmount) : "—",
-    Status: status,
+    Status: "—",
   };
 }
 
@@ -258,7 +268,7 @@ function pushDetailRow(rows, label, value) {
 }
 
 /** Shape expected by PurchaseDetails drawer */
-export function purchaseDocToDetailShape(doc) {
+export function purchaseDocToDetailShape(doc, partyAccount = null) {
   const d = doc;
   if (!d) return null;
 
@@ -312,9 +322,33 @@ export function purchaseDocToDetailShape(doc) {
 
   const termsAndConditions = String(d.termsAndConditions || "").trim();
 
+  const paymentStatus = resolvePurchasePaymentStatusDisplay(d);
+  const totalNum = Number(d.totalAmount) || 0;
+  let paidNum = Number(d.paidAmount);
+  if (!Number.isFinite(paidNum)) {
+    if (paymentStatus === "Paid") paidNum = totalNum;
+    else if (paymentStatus === "Unpaid") paidNum = 0;
+    else paidNum = 0;
+  }
+  const dueNum = Math.max(0, totalNum - paidNum);
+
+  const discountNum = Math.round(sumPurchaseLineDiscounts(d.items));
+  const discountLabel = fmtRupee(discountNum);
+
+  const gstPctLabel =
+    hasSplitGst && basePriceNum > 0
+      ? Math.round((gstAmountNum / basePriceNum) * 100)
+      : null;
+
   return {
     voucherNo: d.voucherNo || "—",
-    status: d.paymentMode || "—",
+    status: paymentStatus,
+    paymentTerms: d.termsOfPayment
+      ? String(d.termsOfPayment)
+      : d.paymentMode
+        ? String(d.paymentMode)
+        : "—",
+    invoiceNo: d.invoiceNo ? String(d.invoiceNo) : "—",
     purchaseDate: d.voucherDate
       ? dayjs(d.voucherDate).format("DD MMM YYYY")
       : "—",
@@ -337,12 +371,15 @@ export function purchaseDocToDetailShape(doc) {
     totals: {
       totalAmount: totalLabel,
       tax: d.gstAmount != null ? fmtRupee(d.gstAmount) : "—",
-      discount: "—",
-      paid: "—",
-      due: "—",
+      taxLabel: gstPctLabel != null ? `Tax (${gstPctLabel}%)` : "Tax",
+      discount: discountLabel,
+      paid: fmtRupee(paidNum),
+      due: fmtRupee(dueNum),
       finalPayable: totalLabel,
       reference: d.transportDetails || "",
     },
+    _sourceDoc: d,
+    partyAccount: partyAccount || null,
   };
 }
 

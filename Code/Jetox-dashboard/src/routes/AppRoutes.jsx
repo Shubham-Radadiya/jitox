@@ -71,6 +71,9 @@ const UserMasterIndex = lazy(() => import("../pages/userMaster/UserMasterIndex")
 const UserSummaryIndex = lazy(() =>
   import("../pages/userMaster/summary/UserSummaryIndex")
 );
+const EmployeeSummaryIndex = lazy(() =>
+  import("../pages/userMaster/summary/EmployeeSummaryIndex")
+);
 const SchemeIndex = lazy(() => import("../pages/schemeMaster/SchemeIndex"));
 const DocumentsIndex = lazy(() => import("../pages/documents/DocumentsIndex"));
 const ReportsIndex = lazy(() => import("../pages/reports/ReportsIndex"));
@@ -165,6 +168,10 @@ function RouteTree() {
       <Route
         path="/dashboard/user-master/summary/:userId/:tab"
         element={<UserSummaryIndex />}
+      />
+      <Route
+        path="/dashboard/user-master/employee-summary/:employeeId/:tab"
+        element={<EmployeeSummaryIndex />}
       />
       <Route path="/dashboard/scheme-master" element={<SchemeIndex />} />
       <Route path="/dashboard/documents" element={<DocumentsIndex />} />

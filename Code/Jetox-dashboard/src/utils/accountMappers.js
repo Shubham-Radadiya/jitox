@@ -10,6 +10,46 @@ export function getCustomerInactiveMonths() {
   return Number.isFinite(n) && n > 0 ? n : 3;
 }
 
+const REGION_LABELS = {
+  north: "North Region",
+  south: "South Region",
+  east: "East Region",
+  west: "West Region",
+};
+
+/** Account Master “Area Assignment” → display label (Region). */
+export function formatAreaAssignmentLabel(value) {
+  const s = String(value || "").trim();
+  if (!s) return "";
+  const key = s.toLowerCase();
+  if (REGION_LABELS[key]) return REGION_LABELS[key];
+  return s
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function accountRegionAndArea(account) {
+  if (!account || typeof account !== "object") {
+    return { region: "", area: "" };
+  }
+  return {
+    region: formatAreaAssignmentLabel(account.areaAssigment),
+    area: String(account.area || account.businessArea || "").trim(),
+  };
+}
+
+/** Match purchase/sales party dropdown value to an Account Master row. */
+export function findAccountByBusinessName(accounts, businessName) {
+  const target = String(businessName || "").trim().toLowerCase();
+  if (!target) return null;
+  const list = Array.isArray(accounts) ? accounts : [];
+  return (
+    list.find(
+      (a) => String(a?.businessName || "").trim().toLowerCase() === target
+    ) || null
+  );
+}
+
 export function mapAccountToRow(a) {
   const isCredit = String(a.balenceType || "").toLowerCase() === "credit";
   const amt = Number(a.amount);

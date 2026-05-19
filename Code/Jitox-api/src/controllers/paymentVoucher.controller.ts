@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import { Account, PaymentVoucher, SalesVoucher } from "../models/index";
+import {
+  Account,
+  PaymentVoucher,
+  PurchaseVoucher,
+  SalesVoucher,
+} from "../models/index";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
@@ -24,6 +29,33 @@ const PAYMENT_VOUCHER_PATCH_KEYS = [
 
 function parseAmountToNumber(value: unknown): number {
   return parsePaymentAmount(value);
+}
+
+/** Keep purchase voucher payment status in sync with its linked payment voucher. */
+async function syncLinkedPurchaseFromPaymentChange(
+  paymentDoc: {
+    sourcePurchaseId?: unknown;
+    amount?: unknown;
+  },
+  previousStatus: string,
+  nextStatus: string
+): Promise<void> {
+  const purchaseId = paymentDoc.sourcePurchaseId;
+  if (!purchaseId || !mongoose.isValidObjectId(purchaseId)) return;
+  if (previousStatus === nextStatus) return;
+
+  const purchase = await PurchaseVoucher.findById(purchaseId);
+  if (!purchase) return;
+
+  if (nextStatus === "Paid") {
+    const total = Number(purchase.totalAmount) || 0;
+    purchase.paidAmount = total;
+    purchase.paymentStatus = "Paid";
+  } else if (previousStatus === "Paid") {
+    purchase.paidAmount = 0;
+    purchase.paymentStatus = "Pending";
+  }
+  await purchase.save();
 }
 
 async function reconcileAccountFromPaymentChange(
@@ -108,11 +140,24 @@ export const createPaymentVoucher = async (
       remarks,
       status,
       sourceSalesId,
+      sourcePurchaseId,
     } = req.body;
 
     /** voucherNo is generated server-side, so it's not in the required list. */
     const requiredFields = ["date", "paymentTo", "amount"] as const;
     validateAndRespond(req.body, requiredFields, res);
+
+    if (
+      sourceSalesId &&
+      sourcePurchaseId &&
+      mongoose.isValidObjectId(sourceSalesId) &&
+      mongoose.isValidObjectId(sourcePurchaseId)
+    ) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Link payment to either a sales or a purchase voucher, not both."
+      );
+    }
 
     /**
      * If a `sourceSalesId` is passed, refuse to create a second request for the
@@ -139,6 +184,32 @@ export const createPaymentVoucher = async (
       linkedSalesId = sale._id as mongoose.Types.ObjectId;
     }
 
+    let linkedPurchaseId: mongoose.Types.ObjectId | null = null;
+    if (sourcePurchaseId && mongoose.isValidObjectId(sourcePurchaseId)) {
+      const purchase = await PurchaseVoucher.findById(sourcePurchaseId).select(
+        "paymentRequestId paymentStatus"
+      );
+      if (!purchase) {
+        throw new AppError(
+          HttpStatusCode.NOT_FOUND,
+          "Linked purchase voucher not found."
+        );
+      }
+      if (purchase.paymentRequestId) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "A payment voucher already exists for this purchase."
+        );
+      }
+      if (String(purchase.paymentStatus || "") === "Paid") {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "This purchase voucher is already marked as paid."
+        );
+      }
+      linkedPurchaseId = purchase._id as mongoose.Types.ObjectId;
+    }
+
     const resolvedVoucherNo = await resolveUniquePaymentVoucherNo(voucherNo);
 
     const newVoucher = new PaymentVoucher({
@@ -148,8 +219,9 @@ export const createPaymentVoucher = async (
       paymentTo,
       amount,
       remarks,
-      status,
+      status: status || "Pending",
       sourceSalesId: linkedSalesId,
+      sourcePurchaseId: linkedPurchaseId,
     });
 
     const savedVoucher = await newVoucher.save();
@@ -157,6 +229,11 @@ export const createPaymentVoucher = async (
     /** Back-link so the sales row button gates itself on the next fetch. */
     if (linkedSalesId) {
       await SalesVoucher.findByIdAndUpdate(linkedSalesId, {
+        $set: { paymentRequestId: savedVoucher._id },
+      });
+    }
+    if (linkedPurchaseId) {
+      await PurchaseVoucher.findByIdAndUpdate(linkedPurchaseId, {
         $set: { paymentRequestId: savedVoucher._id },
       });
     }
@@ -333,6 +410,12 @@ export const updatePaymentVoucher = async (
       }
     }
 
+    await syncLinkedPurchaseFromPaymentChange(
+      voucher,
+      previousStatus,
+      nextStatus
+    );
+
     await logDayBookEntry({
       voucherNumber: voucher.voucherNo as unknown as string,
       voucherType: "Payment",
@@ -391,6 +474,20 @@ export const deletePaymentVoucher = async (
         }
         sale.paymentRequestId = undefined;
         await sale.save();
+      }
+    }
+
+    if ((deleted as any).sourcePurchaseId) {
+      const purchase = await PurchaseVoucher.findById(
+        (deleted as any).sourcePurchaseId
+      );
+      if (purchase) {
+        if (String((deleted as any).status || "") === "Paid") {
+          purchase.paidAmount = 0;
+          purchase.paymentStatus = "Pending";
+        }
+        purchase.paymentRequestId = undefined;
+        await purchase.save();
       }
     }
 
@@ -457,14 +554,14 @@ export const getPaymentFormMeta = async (
     const accounts = await Account.find({
       customerStatus: { $ne: "Inactive" },
     })
-      .select("businessName")
+      .select("businessName name")
       .sort({ businessName: 1 })
       .lean();
 
     const seen = new Set<string>();
     const parties: { value: string; label: string }[] = [];
     for (const a of accounts) {
-      const name = String(a?.businessName ?? "").trim();
+      const name = String(a?.businessName ?? a?.name ?? "").trim();
       if (!name || seen.has(name)) continue;
       seen.add(name);
       parties.push({ value: name, label: name });

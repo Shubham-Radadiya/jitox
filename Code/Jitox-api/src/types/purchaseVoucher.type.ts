@@ -9,6 +9,8 @@ export interface IPurchaseItem {
   unit: string;
   category: string;
   subtotal: Number;
+  discountPct?: number;
+  discountAmt?: number;
   remarks?: string;
   hsn?: string;
   batch?: string;
@@ -19,6 +21,13 @@ export interface IPurchaseItem {
 
 export interface IPurchaseVoucher extends Document {
   partyName: string;
+  invoiceNo?: string;
+  invoicePrefix?: string;
+  invoiceNumber?: string;
+  originalInvNo?: string;
+  ewayBill?: string;
+  termsOfPayment?: string;
+  dueDate?: Date;
   transportDetails?: string;
   deliveryAt?: string;
   orderby?: string;
@@ -38,6 +47,9 @@ export interface IPurchaseVoucher extends Document {
   gstAmount: number;
   totalAmount: number;
   paymentMode?: string;
+  paidAmount?: number;
+  paymentStatus?: string;
+  paymentRequestId?: mongoose.Schema.Types.ObjectId;
   basePrice?: number;
   stockDetails: {
     stockQuantity: boolean;

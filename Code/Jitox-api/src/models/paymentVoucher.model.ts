@@ -25,6 +25,11 @@ const paymentVoucherSchema = new Schema<IPaymentVoucher>(
       type: Schema.Types.ObjectId,
       ref: "SalesVoucher",
     },
+    /** Back-link when this payment was requested from a purchase voucher row. */
+    sourcePurchaseId: {
+      type: Schema.Types.ObjectId,
+      ref: "PurchaseVoucher",
+    },
   },
   {
     timestamps: true,

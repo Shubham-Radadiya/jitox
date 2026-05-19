@@ -1,5 +1,13 @@
 import { parseNum } from "./voucherFormConstants";
 
+/** Invoice layout uses prefix + number; legacy forms may only send `invoiceNo`. */
+export function composeInvoiceNo(payload) {
+  const prefix = String(payload?.invoicePrefix ?? "").trim();
+  const number = String(payload?.invoiceNumber ?? "").trim();
+  if (prefix || number) return `${prefix}${number}`.trim();
+  return String(payload?.invoiceNo ?? "").trim();
+}
+
 function mapPaymentMode(termsPayment) {
   const s = String(termsPayment || "")
     .trim()
@@ -37,6 +45,8 @@ export function purchasePayloadToCreateBody(payload) {
     .map((row) => {
       const { taxable, tax } = lineTaxableAndTax(row, gstRate);
       const subtotal = taxable;
+      const discountPct = parseNum(row.discountPct);
+      const discountAmt = parseNum(row.discountAmt);
       return {
         product: row.product,
         quantity: parseNum(row.qty) || 0,
@@ -45,6 +55,8 @@ export function purchasePayloadToCreateBody(payload) {
         category: row.category || "",
         unit: row.unit || "Nos",
         subtotal,
+        discountPct,
+        discountAmt,
         hsn: String(row.hsn ?? "").trim(),
         batch: String(row.batch ?? "").trim(),
         expDate: String(row.expDate ?? "").trim(),
@@ -76,8 +88,27 @@ export function purchasePayloadToCreateBody(payload) {
   /** Persist full billing + shipping lines; legacy single field follows ship when different else bill. */
   const shipStored = sd ? shipRaw : billTo;
 
+  const paymentStatusRaw = String(payload.paymentStatus || "Pending").trim();
+  const normalizedStatus = ["Pending", "Paid", "Unpaid"].includes(
+    paymentStatusRaw
+  )
+    ? paymentStatusRaw
+    : "Pending";
+  const paidAmount = normalizedStatus === "Paid" ? totalAmount : 0;
+
+  const invoicePrefix = String(payload.invoicePrefix ?? "").trim();
+  const invoiceNumber = String(payload.invoiceNumber ?? "").trim();
+  const invoiceNo = composeInvoiceNo(payload);
+  const termsPaymentRaw = String(payload.termsPayment ?? "").trim();
+
   return {
     partyName: String(payload.partyName || "").trim(),
+    invoiceNo,
+    invoicePrefix,
+    invoiceNumber,
+    originalInvNo: String(payload.originalInvNo ?? "").trim(),
+    ewayBill: String(payload.ewayBill ?? "").trim(),
+    termsOfPayment: termsPaymentRaw,
     voucherNo: String(payload.voucherNo || "").trim(),
     voucherDate: payload.purchaseDate,
     transportDetails: String(payload.transporter || "").trim(),
@@ -92,7 +123,9 @@ export function purchasePayloadToCreateBody(payload) {
     items,
     gstAmount,
     totalAmount,
-    paymentMode: mapPaymentMode(payload.termsPayment),
+    paymentMode: mapPaymentMode(termsPaymentRaw),
+    paymentStatus: normalizedStatus,
+    paidAmount,
     basePrice: lineTaxableTotal,
     stockDetails: {
       stockQuantity: payload.stockToggle !== false,
