@@ -48,7 +48,7 @@ export default function NotificationsPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">Notifications</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-            Task assignments and updates in real time.
+            Task updates, territory mapping alerts, and more.
           </p>
         </div>
         <button

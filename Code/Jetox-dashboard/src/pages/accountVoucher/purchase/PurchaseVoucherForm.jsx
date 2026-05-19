@@ -43,6 +43,7 @@ import {
   readStoredExtras,
 } from "../../../utils/dropdownExtrasStorage";
 import { PURCHASE_INVOICE_EXTRA_KEYS } from "../../../utils/purchaseInvoiceDropdownKeys";
+import { getStoredUser, isAdminUser } from "../../../utils/authSession";
 
 const autoFieldInputClass =
   "bg-slate-100 text-slate-600 cursor-not-allowed border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-600";
@@ -153,6 +154,20 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       );
     }
   }, [metaError]);
+
+  /** Field users: default “Order by” to logged-in name when creating a sales bill. */
+  useEffect(() => {
+    if (formType !== "sales") return;
+    if (prefill?.orderBy) return;
+    const u = getStoredUser();
+    if (!u || isAdminUser(u)) return;
+    const name =
+      u.name ||
+      [u.firstName, u.lastName].filter(Boolean).join(" ").trim() ||
+      u.email ||
+      "";
+    if (name) setOrderBy(name);
+  }, [formType, prefill?.orderBy]);
 
   /** Apply next free voucher no. from API once (avoids duplicate `V001` on every new voucher). */
   useEffect(() => {

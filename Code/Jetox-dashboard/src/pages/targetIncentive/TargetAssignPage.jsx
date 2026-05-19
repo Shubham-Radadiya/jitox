@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import TargetIncentiveSubNav from "./TargetIncentiveSubNav";
 import { CommonDropdown, Button } from "../../components/ui/CommanUI";
+import { dashboardUiApi } from "../../services/api";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const unitOpts = [
   { value: "Bags", label: "Bags" },
@@ -48,7 +50,36 @@ const initialRows = [
 export default function TargetAssignPage() {
   const navigate = useNavigate();
   const [rows, setRows] = useState(initialRows);
+  const [saving, setSaving] = useState(false);
   const [applicable, setApplicable] = useState("all");
+
+  useEffect(() => {
+    let cancelled = false;
+    dashboardUiApi
+      .listTargetIncentiveAssignments()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        const latest = list[0];
+        if (!latest?.rows?.length) return;
+        setRows(
+          latest.rows.map((r, i) => ({
+            id: String(i + 1),
+            group: r.group || "",
+            category: r.category || "",
+            product: r.product || "",
+            unit: r.unit || "",
+            qty: r.qty || "",
+            selling: r.selling || "",
+            incentive: r.incentive || "",
+          }))
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const update = (id, field, value) => {
     setRows((prev) =>
@@ -200,7 +231,23 @@ export default function TargetAssignPage() {
             label="Save incentive"
             size="sm"
             className="text-xs min-h-8 px-2.5 py-1 sm:text-sm sm:min-h-9 sm:px-3 sm:py-1"
-            onClick={() => toast.success("Incentive rules saved (demo). Connect API to persist.")}
+            disabled={saving}
+            onClick={async () => {
+              const valid = rows.filter((r) => String(r.product || "").trim());
+              if (!valid.length) {
+                toast.error("Add at least one product row.");
+                return;
+              }
+              setSaving(true);
+              try {
+                await dashboardUiApi.saveTargetIncentiveAssign({ rows: valid });
+                toast.success("Incentive rules saved.");
+              } catch (err) {
+                toast.error(getApiErrorMessage(err, "Save failed"));
+              } finally {
+                setSaving(false);
+              }
+            }}
           />
         </div>
       </div>

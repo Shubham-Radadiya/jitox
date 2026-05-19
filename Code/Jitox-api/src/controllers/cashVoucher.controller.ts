@@ -175,3 +175,47 @@ export const getCashVoucherById = async (
     throw error;
   }
 };
+
+export const updateCashVoucher = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const updateData = { ...req.body };
+    if (req.file) {
+      updateData.attachmentsFile = req.file.path;
+    }
+    const updated = await CashVoucher.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+    if (!updated) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "Cash voucher not found.");
+    }
+    res.status(200).json({
+      message: "Cash voucher updated successfully.",
+      voucher: updated,
+    });
+  } catch (error) {
+    console.error("Update Cash Voucher Error:", error);
+    throw error;
+  }
+};
+
+export const deleteCashVoucher = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const deleted = await CashVoucher.findByIdAndDelete(id);
+    if (!deleted) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "Cash voucher not found.");
+    }
+    res.status(200).json({ message: "Cash voucher deleted successfully." });
+  } catch (error) {
+    console.error("Delete Cash Voucher Error:", error);
+    throw error;
+  }
+};

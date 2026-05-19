@@ -24,6 +24,8 @@ import ManufacturingVoucher from "./manufacturingVoucher.model";
 import MarketingScheme from "./marketingScheme.model";
 import DocumentCategory from "./documentCategory.model";
 import DocumentEntry from "./documentEntry.model";
+import TargetIncentiveAssignment from "./targetIncentiveAssignment.model";
+import Territory from "./territory.model";
 
 export {
   User,
@@ -51,4 +53,6 @@ export {
   MarketingScheme,
   DocumentCategory,
   DocumentEntry,
+  TargetIncentiveAssignment,
+  Territory,
 };

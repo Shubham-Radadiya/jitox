@@ -4,7 +4,11 @@ import { Plus, Paperclip, Edit3, CalendarDays, CircleDot, Search } from "lucide-
 import { tableTdClasses } from "../../../utils/tableUi";
 import SummaryFilterBar from "./SummaryFilterBar";
 
+<<<<<<< HEAD
 const ExpensesTab = ({ showFilterByLabel = false, filterLeading = null }) => {
+=======
+const ExpensesTab = ({ expenses: expensesProp, liveData = false }) => {
+>>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
   const [expenseTypeSearch, setExpenseTypeSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [modeFilter, setModeFilter] = useState("");
@@ -21,7 +25,10 @@ const ExpensesTab = ({ showFilterByLabel = false, filterLeading = null }) => {
   ];
 
   const data = useMemo(
-    () => [
+    () => {
+      if (liveData) return Array.isArray(expensesProp) ? expensesProp : [];
+      if (expensesProp?.length) return expensesProp;
+      return [
       {
         Date: "02 Jan 2025",
         "Expense Type": "Logistics",
@@ -62,8 +69,9 @@ const ExpensesTab = ({ showFilterByLabel = false, filterLeading = null }) => {
         Proof: "-",
         Action: true,
       },
-    ],
-    []
+    ];
+    },
+    [expensesProp, liveData]
   );
 
   const dateOptions = useMemo(() => {

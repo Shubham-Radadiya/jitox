@@ -68,6 +68,7 @@ const ReceivableIndex = lazy(() => import("../pages/receivable/ReceivableIndex")
 const PayableIndex = lazy(() => import("../pages/payable/PayableIndex"));
 const StockIndex = lazy(() => import("../pages/stock/StockIndex"));
 const UserMasterIndex = lazy(() => import("../pages/userMaster/UserMasterIndex"));
+const TerritoryIndex = lazy(() => import("../pages/territories/TerritoryIndex"));
 const UserSummaryIndex = lazy(() =>
   import("../pages/userMaster/summary/UserSummaryIndex")
 );
@@ -165,6 +166,7 @@ function RouteTree() {
       <Route path="/dashboard/payable" element={<PayableIndex />} />
       <Route path="/dashboard/stock" element={<StockIndex />} />
       <Route path="/dashboard/user-master" element={<UserMasterIndex />} />
+      <Route path="/dashboard/territories" element={<TerritoryIndex />} />
       <Route
         path="/dashboard/user-master/summary/:userId/:tab"
         element={<UserSummaryIndex />}

@@ -50,6 +50,9 @@ export interface ISalesVoucher extends Document {
     openingStock?: number;
     minimumReOrderLevel?: number;
   };
+  createdByUserId?: mongoose.Types.ObjectId;
+  territoryId?: mongoose.Types.ObjectId;
+  managerUserId?: mongoose.Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
 }

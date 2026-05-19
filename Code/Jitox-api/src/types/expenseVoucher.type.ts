@@ -8,4 +8,6 @@ export interface IExpenseVoucher extends Document {
   paymentMode: String;
   amount: Number;
   uploadProof: String;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

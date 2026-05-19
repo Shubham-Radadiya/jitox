@@ -7,7 +7,11 @@ import { Clock, Edit3, Eye, FileText, CalendarDays, Plus, X } from "lucide-react
 import { tableTdClasses } from "../../../utils/tableUi";
 import SummaryFilterBar from "./SummaryFilterBar";
 
+<<<<<<< HEAD
 const AttendanceTab = ({ showFilterByLabel = false, filterLeading = null }) => {
+=======
+const AttendanceTab = ({ attendance, liveData = false }) => {
+>>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
   const [activeMenu, setActiveMenu] = useState(null);
   const [isTimesheetOpen, setIsTimesheetOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState("");
@@ -29,14 +33,19 @@ const AttendanceTab = ({ showFilterByLabel = false, filterLeading = null }) => {
   const columnPopupRef = useRef(null);
   const columnTriggerRef = useRef(null);
 
-  const stats = [
-    { label: "Total Hours Worked", value: "170 H : 19 M : 57 S", color: "blue" },
-    { label: "Total Present Days", value: "21", color: "green" },
-    { label: "Total Absent Days", value: "5", color: "red" },
-    { label: "Total Half Days", value: "1", color: "orange" },
-    { label: "On Leave", value: "2.5", color: "gray" },
-    { label: "Early Out", value: "1", color: "black" },
-  ];
+  const stats =
+    liveData && attendance?.stats
+      ? attendance.stats
+      : attendance?.stats?.length
+    ? attendance.stats
+    : [
+        { label: "Total Hours Worked", value: "170 H : 19 M : 57 S", color: "blue" },
+        { label: "Total Present Days", value: "21", color: "green" },
+        { label: "Total Absent Days", value: "5", color: "red" },
+        { label: "Total Half Days", value: "1", color: "orange" },
+        { label: "On Leave", value: "2.5", color: "gray" },
+        { label: "Early Out", value: "1", color: "black" },
+      ];
 
   const baseColumns = [
     "Date",
@@ -49,7 +58,10 @@ const AttendanceTab = ({ showFilterByLabel = false, filterLeading = null }) => {
   ];
 
   const data = useMemo(
-    () => [
+    () => {
+      if (liveData) return Array.isArray(attendance?.rows) ? attendance.rows : [];
+      if (attendance?.rows?.length) return attendance.rows;
+      return [
       {
         Date: "Thu 29 May, 2025",
         "Attendance Status": "P",
@@ -78,8 +90,9 @@ const AttendanceTab = ({ showFilterByLabel = false, filterLeading = null }) => {
         "Break Time": "-",
         "Productive Hour": "-",
       },
-    ],
-    []
+    ];
+    },
+    [attendance, liveData]
   );
 
   const dateOptions = useMemo(() => {

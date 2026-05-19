@@ -122,3 +122,55 @@ export const getDayBookById = async (
     throw error;
   }
 };
+
+export const updateDayBook = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { voucherType, debitAmount, creditAmount, particulars } = req.body;
+    const existing = await DayBook.findById(id);
+    if (!existing) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "Day book entry not found.");
+    }
+    const sides = resolveDayBookAmounts(
+      voucherType ?? existing.voucherType,
+      debitAmount ?? existing.debitAmount,
+      creditAmount ?? existing.creditAmount
+    );
+    const updated = await DayBook.findByIdAndUpdate(
+      id,
+      {
+        ...req.body,
+        debitAmount: sides.debitAmount,
+        creditAmount: sides.creditAmount,
+      },
+      { new: true, runValidators: true }
+    );
+    res.status(200).json({
+      message: "Day book updated successfully.",
+      dayBook: serializeDayBookRow(updated!),
+    });
+  } catch (error) {
+    console.error("Update DayBook Error:", error);
+    throw error;
+  }
+};
+
+export const deleteDayBook = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const deleted = await DayBook.findByIdAndDelete(id);
+    if (!deleted) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "Day book entry not found.");
+    }
+    res.status(200).json({ message: "Day book deleted successfully." });
+  } catch (error) {
+    console.error("Delete DayBook Error:", error);
+    throw error;
+  }
+};

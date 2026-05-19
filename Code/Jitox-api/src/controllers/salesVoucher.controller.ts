@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
-import { Account, Product } from "../models/index";
+import { Types } from "mongoose";
+import { Account, Product, User } from "../models/index";
 import SalesVoucher from "../models/salesVoucher.model";
+import type { AuthRequest } from "../middleware/authonticated.middleware";
+import { buildSalesScopeFilter, isTerritoryScopedRole } from "../services/territory.service";
+import { Role } from "../constants/roles";
 import { ISalesItem } from "../types/salesVoucher.type";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
@@ -79,7 +83,7 @@ function shouldUpdateStock(stockDetails: unknown): boolean {
 }
 
 export const createSalesVoucher = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
@@ -122,13 +126,37 @@ export const createSalesVoucher = async (
 
     const resolvedVoucherNo = await resolveUniqueSalesVoucherNo(voucherNo);
 
+    let orderbyFinal = String(orderby || "").trim();
+    let createdByUserId: Types.ObjectId | undefined;
+    let territoryId: Types.ObjectId | undefined;
+    let managerUserId: Types.ObjectId | undefined;
+
+    const authId = req.user?.id ? String(req.user.id) : "";
+    const authRole = req.user?.role ? String(req.user.role) : "";
+    if (authId && isTerritoryScopedRole(authRole)) {
+      const creator = await User.findById(authId).select(
+        "name firstName lastName email territoryId managerId role"
+      );
+      if (creator) {
+        createdByUserId = creator._id as Types.ObjectId;
+        if (creator.territoryId) territoryId = creator.territoryId;
+        if (creator.managerId) managerUserId = creator.managerId;
+        if (!orderbyFinal) {
+          orderbyFinal =
+            creator.name ||
+            [creator.firstName, creator.lastName].filter(Boolean).join(" ").trim() ||
+            creator.email;
+        }
+      }
+    }
+
     const newVoucher = new SalesVoucher({
       partyName,
       invoiceNo,
       dueDate,
       transportDetails,
       deliveryAt,
-      orderby,
+      orderby: orderbyFinal,
       shipToAndBillTo,
       billTo,
       shipTo,
@@ -145,6 +173,9 @@ export const createSalesVoucher = async (
       paymentStatus,
       orderStatus,
       stockDetails,
+      ...(createdByUserId ? { createdByUserId } : {}),
+      ...(territoryId ? { territoryId } : {}),
+      ...(managerUserId ? { managerUserId } : {}),
     });
 
     const savedVoucher = await newVoucher.save();
@@ -172,13 +203,24 @@ export const createSalesVoucher = async (
 };
 
 export const getAllSalesVouchers = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
     const { partyName, dueDate, dateFrom, dateTo } = req.query;
 
-    const matchStage: any = {};
+    const matchStage: Record<string, unknown> = {};
+    const scope = await buildSalesScopeFilter({
+      id: req.user?.id ? String(req.user.id) : undefined,
+      role: req.user?.role ? String(req.user.role) : undefined,
+    });
+    if (scope && Object.keys(scope).length) {
+      Object.assign(matchStage, scope);
+    }
+
+    if (req.user?.role === Role.admin && req.query.territoryId) {
+      matchStage.territoryId = new Types.ObjectId(String(req.query.territoryId));
+    }
 
     if (partyName) {
       matchStage.partyName = { $regex: partyName as string, $options: "i" };

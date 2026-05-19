@@ -26,7 +26,11 @@ function DetailRow({ label, children }) {
   );
 }
 
+<<<<<<< HEAD
 const OrdersPlacedTab = ({ showFilterByLabel = false, filterLeading = null }) => {
+=======
+const OrdersPlacedTab = ({ orders: ordersProp, liveData = false }) => {
+>>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
   const [expandedRow, setExpandedRow] = useState(0);
   const [orderNumberFilter, setOrderNumberFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
@@ -42,7 +46,10 @@ const OrdersPlacedTab = ({ showFilterByLabel = false, filterLeading = null }) =>
   ];
 
   const data = useMemo(
-    () => [
+    () => {
+      if (liveData) return Array.isArray(ordersProp) ? ordersProp : [];
+      if (ordersProp?.length) return ordersProp;
+      return [
       {
         id: 0,
         "Order Number": "ORD-0035",
@@ -88,8 +95,9 @@ const OrdersPlacedTab = ({ showFilterByLabel = false, filterLeading = null }) =>
         "Order Status": "In Process",
         "Payment Status": "In Process",
       },
-    ],
-    []
+    ];
+    },
+    [ordersProp, liveData]
   );
 
   const orderNumberOptions = useMemo(() => {

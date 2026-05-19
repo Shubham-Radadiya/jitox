@@ -17,6 +17,7 @@ export const ALL_MODULE_PERMISSIONS = [
   "target-incentive",
   "reports",
   "tasks",
+  "territories",
 ] as const;
 
 export type ModulePermission = (typeof ALL_MODULE_PERMISSIONS)[number];
@@ -46,4 +47,8 @@ export function effectivePermissions(
   return list;
 }
 
-export const DEFAULT_SELF_REGISTER_PERMISSIONS: string[] = ["dashboard"];
+export const DEFAULT_SELF_REGISTER_PERMISSIONS: string[] = [
+  "dashboard",
+  "vouchers",
+  "orders",
+];

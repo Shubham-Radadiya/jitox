@@ -49,11 +49,27 @@ export const authApi = {
   resetPassword: (body) => http.post("/users/change-password", body),
 };
 
+export const territoriesApi = {
+  list: () => http.get("/territories/"),
+  create: (body) => http.post("/territories/", body),
+  update: (id, body) => http.put(`/territories/${encodeURIComponent(id)}`, body),
+  listPendingDistricts: () => http.get("/territories/pending-districts"),
+  getSalesReport: (params) =>
+    http.get("/territories/report/sales", { params }),
+  listManagers: (params) =>
+    http.get("/territories/managers", { params }),
+};
+
 export const usersApi = {
   getAll: () => http.get("/users/"),
   getById: (id) => http.get(`/users/get-user/${encodeURIComponent(id)}`),
+<<<<<<< HEAD
   getSubordinates: (id) =>
     http.get(`/users/subordinates/${encodeURIComponent(id)}`),
+=======
+  getSummary: (id) =>
+    http.get(`/users/get-user/${encodeURIComponent(id)}/summary`),
+>>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
   create: (body) => {
     const isFd = typeof FormData !== "undefined" && body instanceof FormData;
     return http.post("/users/create-user", body, isFd ? {} : undefined);
@@ -128,6 +144,10 @@ export const dayBooksApi = {
   getAll: (params) => http.get("/dayBooks/", { params }),
   getById: (id) => http.get(`/dayBooks/${encodeURIComponent(id)}`),
   create: (body) => http.post("/dayBooks/create", body),
+  update: (id, body) =>
+    http.put(`/dayBooks/update/${encodeURIComponent(id)}`, body),
+  delete: (id) =>
+    http.delete(`/dayBooks/delete/${encodeURIComponent(id)}`),
 };
 
 export const tasksApi = {
@@ -256,6 +276,7 @@ export const paymentVouchersApi = {
 };
 
 export const expenseVouchersApi = {
+  getExpenseTypes: () => http.get("/expenseVouchers/expense-types"),
   getAll: (params) => http.get("/expenseVouchers/", { params }),
   getById: (id) => http.get(`/expenseVouchers/${encodeURIComponent(id)}`),
   create: (formData) =>
@@ -277,6 +298,12 @@ export const cashVouchersApi = {
     http.post("/cashVouchers/create", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+  update: (id, formData) =>
+    http.put(`/cashVouchers/update/${encodeURIComponent(id)}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  delete: (id) =>
+    http.delete(`/cashVouchers/delete/${encodeURIComponent(id)}`),
 };
 
 export const journalVouchersApi = {
@@ -340,6 +367,10 @@ export const dashboardUiApi = {
 
   getOverview: () => http.get(`${DU}/overview`),
   getTargetIncentive: () => http.get(`${DU}/target-incentive`),
+  saveTargetIncentiveAssign: (body) =>
+    http.post(`${DU}/target-incentive/assign`, body),
+  listTargetIncentiveAssignments: () =>
+    http.get(`${DU}/target-incentive/assignments`),
   getReports: (params) => http.get(`${DU}/reports`, { params }),
   getEmployees: () => http.get(`${DU}/employees`),
   getEmployeeTracking: (id, params) =>

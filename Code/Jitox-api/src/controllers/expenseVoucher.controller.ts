@@ -90,6 +90,23 @@ export const createExpenseVoucher = async (
   }
 };
 
+export const getExpenseTypeOptions = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
+  res.status(200).json({
+    types: [
+      "Fuel",
+      "Travel",
+      "Supplies",
+      "Rent",
+      "Electricity",
+      "Salaries",
+      "Other",
+    ],
+  });
+};
+
 export const getAllExpenseVouchers = async (
   req: Request,
   res: Response

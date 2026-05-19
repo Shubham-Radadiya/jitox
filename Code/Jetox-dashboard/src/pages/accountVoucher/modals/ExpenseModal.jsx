@@ -17,8 +17,7 @@ import { expenseVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { buildUploadUrl } from "../../../utils/uploadUrl";
 
-/** Hardcoded for now — categories master can replace this later. */
-const EXPENSE_TYPE_OPTIONS = [
+const DEFAULT_EXPENSE_TYPE_OPTIONS = [
   { value: "Fuel", label: "Fuel" },
   { value: "Travel", label: "Travel" },
   { value: "Supplies", label: "Supplies" },
@@ -86,6 +85,24 @@ function isProofTypeAllowed(file) {
 const ExpenseModal = ({ open, onClose, expense = null }) => {
   const queryClient = useQueryClient();
   const { data: meta } = usePurchaseFormMeta();
+  const [expenseTypeOptions, setExpenseTypeOptions] = useState(
+    DEFAULT_EXPENSE_TYPE_OPTIONS
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    expenseVouchersApi
+      .getExpenseTypes()
+      .then(({ data }) => {
+        const types = data?.types || [];
+        if (types.length) {
+          setExpenseTypeOptions(
+            types.map((t) => ({ value: t, label: t }))
+          );
+        }
+      })
+      .catch(() => setExpenseTypeOptions(DEFAULT_EXPENSE_TYPE_OPTIONS));
+  }, [open]);
   const partyOptions = useMemo(() => {
     if (!meta?.parties?.length) return emptyMeta.parties;
     return meta.parties;
@@ -263,7 +280,7 @@ const ExpenseModal = ({ open, onClose, expense = null }) => {
           />
           <CommonDropdown
             label="Expense Type"
-            options={EXPENSE_TYPE_OPTIONS}
+            options={expenseTypeOptions}
             value={form.expenseType}
             onChange={(value) => updateField("expenseType", value)}
             placeholder="Fuel, Travel, Supplies…"
