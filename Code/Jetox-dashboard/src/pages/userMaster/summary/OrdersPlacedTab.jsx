@@ -26,11 +26,12 @@ function DetailRow({ label, children }) {
   );
 }
 
-<<<<<<< HEAD
-const OrdersPlacedTab = ({ showFilterByLabel = false, filterLeading = null }) => {
-=======
-const OrdersPlacedTab = ({ orders: ordersProp, liveData = false }) => {
->>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
+const OrdersPlacedTab = ({
+  orders: ordersProp,
+  liveData = false,
+  showFilterByLabel = false,
+  filterLeading = null,
+}) => {
   const [expandedRow, setExpandedRow] = useState(0);
   const [orderNumberFilter, setOrderNumberFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");

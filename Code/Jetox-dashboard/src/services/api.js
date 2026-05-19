@@ -63,13 +63,10 @@ export const territoriesApi = {
 export const usersApi = {
   getAll: () => http.get("/users/"),
   getById: (id) => http.get(`/users/get-user/${encodeURIComponent(id)}`),
-<<<<<<< HEAD
   getSubordinates: (id) =>
     http.get(`/users/subordinates/${encodeURIComponent(id)}`),
-=======
   getSummary: (id) =>
     http.get(`/users/get-user/${encodeURIComponent(id)}/summary`),
->>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
   create: (body) => {
     const isFd = typeof FormData !== "undefined" && body instanceof FormData;
     return http.post("/users/create-user", body, isFd ? {} : undefined);

@@ -13,9 +13,6 @@ import SummaryFilterBar from "./SummaryFilterBar";
  * PerformanceReportTab Component
  * Displays metrics, performance bars, and status cards.
  */
-<<<<<<< HEAD
-const PerformanceReportTab = ({ filterLeading = null }) => {
-=======
 const STAT_ICONS = [
   CheckCircle2,
   ShoppingBag,
@@ -25,8 +22,11 @@ const STAT_ICONS = [
   Clock,
 ];
 
-const PerformanceReportTab = ({ performance, liveData = false }) => {
->>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
+const PerformanceReportTab = ({
+  performance,
+  liveData = false,
+  filterLeading = null,
+}) => {
   const [activeFilter, setActiveFilter] = useState("Month");
   const [isExportOpen, setIsExportOpen] = useState(false);
 

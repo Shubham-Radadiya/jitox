@@ -3,11 +3,12 @@ import DataTable from "../../../components/ui/table/DataTable";
 import { CalendarDays, MapPin, UserRoundSearch } from "lucide-react";
 import SummaryFilterBar from "./SummaryFilterBar";
 
-<<<<<<< HEAD
-const VisitLogTab = ({ showFilterByLabel = false, filterLeading = null }) => {
-=======
-const VisitLogTab = ({ rows: rowsProp = [], liveData = false }) => {
->>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
+const VisitLogTab = ({
+  rows: rowsProp = [],
+  liveData = false,
+  showFilterByLabel = false,
+  filterLeading = null,
+}) => {
   const [visitIdFilter, setVisitIdFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");

@@ -7,11 +7,12 @@ import { Clock, Edit3, Eye, FileText, CalendarDays, Plus, X } from "lucide-react
 import { tableTdClasses } from "../../../utils/tableUi";
 import SummaryFilterBar from "./SummaryFilterBar";
 
-<<<<<<< HEAD
-const AttendanceTab = ({ showFilterByLabel = false, filterLeading = null }) => {
-=======
-const AttendanceTab = ({ attendance, liveData = false }) => {
->>>>>>> 69ebfdc813757a7929aefd9c8580f91e4dc9f950
+const AttendanceTab = ({
+  attendance,
+  liveData = false,
+  showFilterByLabel = false,
+  filterLeading = null,
+}) => {
   const [activeMenu, setActiveMenu] = useState(null);
   const [isTimesheetOpen, setIsTimesheetOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState("");
