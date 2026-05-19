@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import Territory from "../models/territory.model";
 import User from "../models/user.model";
 
@@ -38,11 +39,11 @@ export async function ensureDefaultTerritories(): Promise<void> {
   const north = await Territory.findOne({ name: "North Gujarat" });
   if (manager && north) {
     if (!north.managerId) {
-      north.managerId = manager._id;
+      north.managerId = manager._id as Types.ObjectId;
       await north.save();
     }
     if (!manager.territoryId) {
-      manager.territoryId = north._id;
+      manager.territoryId = north._id as Types.ObjectId;
       manager.region = north.name;
       await manager.save();
     }

@@ -24,4 +24,6 @@ export interface ITask extends Document {
   priority: TaskPriority;
   dueDate?: Date;
   attachments: TaskAttachment[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }

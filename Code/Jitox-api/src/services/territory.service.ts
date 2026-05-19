@@ -65,7 +65,7 @@ export async function checkAndNotifyUnmappedDistrict(
   if (!isTerritoryScopedRole(user.role)) return;
 
   const addr = normalizeStructuredAddress(
-    user.toObject() as Record<string, unknown>
+    user.toObject() as unknown as Record<string, unknown>
   );
   const district = trimAddressPart(addr.district);
   if (!district) return;
@@ -134,10 +134,12 @@ export async function applyTerritoryAssignmentToUser(
     : user.territoryId;
 
   if (opts?.reResolveFromAddress && role === Role.user) {
-    const addr = normalizeStructuredAddress(user);
+    const addr = normalizeStructuredAddress(
+      user.toObject() as unknown as Record<string, unknown>
+    );
     const matched = await resolveTerritoryFromAddress(addr);
-    if (matched) {
-      territoryId = matched._id;
+    if (matched?._id) {
+      territoryId = new Types.ObjectId(String(matched._id));
     }
   }
 
