@@ -3,6 +3,7 @@ import {
   createExpenseVoucher,
   deleteExpenseVoucher,
   getAllExpenseVouchers,
+  getExpenseTypeOptions,
   getExpenseVoucherById,
   updateExpenseVoucher,
 } from "../controllers/expenseVoucher.controller";
@@ -15,6 +16,7 @@ router.post(
   singleProofUpload("uploadProof"),
   createExpenseVoucher
 );
+router.get("/expense-types", getExpenseTypeOptions);
 router.get("/", getAllExpenseVouchers);
 router.get("/:id", getExpenseVoucherById);
 router.put(

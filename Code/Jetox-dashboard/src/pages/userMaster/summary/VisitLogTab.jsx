@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import DataTable from "../../../components/ui/table/DataTable";
 import { CalendarDays, MapPin, UserRoundSearch } from "lucide-react";
 
-const VisitLogTab = () => {
+const VisitLogTab = ({ rows: rowsProp = [], liveData = false }) => {
   const [visitIdFilter, setVisitIdFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
@@ -17,7 +17,10 @@ const VisitLogTab = () => {
     "Notes",
   ];
 
-  const data = useMemo(() => [
+  const data = useMemo(() => {
+    if (liveData) return Array.isArray(rowsProp) ? rowsProp : [];
+    if (rowsProp?.length) return rowsProp;
+    return [
     {
       "Visit ID": "VS1001",
       "Client Name": "Alpha Traders",
@@ -63,7 +66,8 @@ const VisitLogTab = () => {
       "Outcomes": "Interested",
       "Notes": "Discussed Bulk Pricing",
     }
-  ], []);
+  ];
+  }, [rowsProp, liveData]);
 
   const visitIdOptions = useMemo(() => {
     const seen = new Set(data.map((d) => String(d["Visit ID"] || "").trim()).filter(Boolean));

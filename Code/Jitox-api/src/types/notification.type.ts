@@ -4,7 +4,8 @@ export type NotificationType =
   | "task_assigned"
   | "task_updated"
   | "task_completed"
-  | "task_overdue";
+  | "task_overdue"
+  | "territory_unmapped_district";
 
 export interface INotification extends Document {
   userId: string;

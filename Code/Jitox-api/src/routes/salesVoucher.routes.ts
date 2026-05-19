@@ -7,8 +7,11 @@ import {
   getSalesVoucherById,
   updateSalesVoucher,
 } from "../controllers/salesVoucher.controller";
+import { attachUserOptional } from "../middleware/attachUserOptional";
 
 const router = express.Router();
+
+router.use(attachUserOptional);
 
 router.post("/create-sales-voucher", createSalesVoucher);
 router.get("/form-meta", getSalesFormMeta);

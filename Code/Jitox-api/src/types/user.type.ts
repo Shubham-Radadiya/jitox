@@ -1,4 +1,4 @@
-import { Document } from "mongoose";
+import { Document, Types } from "mongoose";
 import type { AppRole } from "../constants/roles";
 
 export interface IUser extends Document {
@@ -25,4 +25,7 @@ export interface IUser extends Document {
   district?: string;
   region?: string;
   profilePhoto?: string;
+  territoryId?: Types.ObjectId;
+  /** Reporting manager (field User role). */
+  managerId?: Types.ObjectId;
 }

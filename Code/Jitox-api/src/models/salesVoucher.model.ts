@@ -74,6 +74,9 @@ const SalesVoucherSchema = new Schema<ISalesVoucher>(
       openingStock: { type: Number, trim: true },
       minimumReOrderLevel: { type: Number, trim: true },
     },
+    createdByUserId: { type: Schema.Types.ObjectId, ref: "User" },
+    territoryId: { type: Schema.Types.ObjectId, ref: "Territory" },
+    managerUserId: { type: Schema.Types.ObjectId, ref: "User" },
   },
   {
     timestamps: true,

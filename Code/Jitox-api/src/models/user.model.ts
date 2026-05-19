@@ -28,6 +28,8 @@ const userSchema = new Schema<IUser>(
     district: { type: String, trim: true },
     /** Sales / territory region (separate from address city). */
     region: { type: String, trim: true },
+    territoryId: { type: Schema.Types.ObjectId, ref: "Territory" },
+    managerId: { type: Schema.Types.ObjectId, ref: "User" },
     /** Public URL path e.g. `/uploads/…` (served by API static). */
     profilePhoto: { type: String, trim: true },
   },

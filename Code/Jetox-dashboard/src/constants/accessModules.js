@@ -12,6 +12,7 @@ export const MODULE_ACCESS_OPTIONS = [
   { key: "payable", label: "Payable" },
   { key: "stock", label: "Stock" },
   { key: "users", label: "User Master" },
+  { key: "territories", label: "Territory Master" },
   { key: "schemes", label: "Scheme" },
   { key: "documents", label: "Documents" },
   { key: "target-incentive", label: "Target & Incentive" },
@@ -41,6 +42,7 @@ export const MENU_ITEMS = [
   { name: "Payable", permissionKey: "payable", path: "/dashboard/payable" },
   { name: "Stock", permissionKey: "stock", path: "/dashboard/stock" },
   { name: "User Master", permissionKey: "users", path: "/dashboard/user-master" },
+  { name: "Territory Master", permissionKey: "territories", path: "/dashboard/territories" },
   { name: "Scheme", permissionKey: "schemes", path: "/dashboard/scheme-master" },
   { name: "Documents", permissionKey: "documents", path: "/dashboard/documents" },
   {
@@ -81,6 +83,12 @@ export const NAV_ENTRIES = [
   { kind: "link", name: "Payable", permissionKey: "payable", path: "/dashboard/payable" },
   { kind: "link", name: "Stock", permissionKey: "stock", path: "/dashboard/stock" },
   { kind: "link", name: "User Master", permissionKey: "users", path: "/dashboard/user-master" },
+  {
+    kind: "link",
+    name: "Territory Master",
+    permissionKey: "territories",
+    path: "/dashboard/territories",
+  },
   { kind: "link", name: "Scheme", permissionKey: "schemes", path: "/dashboard/scheme-master" },
   { kind: "link", name: "Documents", permissionKey: "documents", path: "/dashboard/documents" },
   {

@@ -3,7 +3,7 @@ import DataTable from "../../../components/ui/table/DataTable";
 import { Plus, Paperclip, Edit3, CalendarDays, CircleDot, Search } from "lucide-react";
 import { tableTdClasses } from "../../../utils/tableUi";
 
-const ExpensesTab = () => {
+const ExpensesTab = ({ expenses: expensesProp, liveData = false }) => {
   const [expenseTypeSearch, setExpenseTypeSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [modeFilter, setModeFilter] = useState("");
@@ -20,7 +20,10 @@ const ExpensesTab = () => {
   ];
 
   const data = useMemo(
-    () => [
+    () => {
+      if (liveData) return Array.isArray(expensesProp) ? expensesProp : [];
+      if (expensesProp?.length) return expensesProp;
+      return [
       {
         Date: "02 Jan 2025",
         "Expense Type": "Logistics",
@@ -61,8 +64,9 @@ const ExpensesTab = () => {
         Proof: "-",
         Action: true,
       },
-    ],
-    []
+    ];
+    },
+    [expensesProp, liveData]
   );
 
   const dateOptions = useMemo(() => {

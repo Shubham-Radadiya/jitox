@@ -12,7 +12,7 @@ import toast from "react-hot-toast";
 import { MODULE_ACCESS_OPTIONS } from "../../constants/accessModules";
 import AddressForm from "../../components/address/AddressForm";
 import { EMPTY_ADDRESS, addressFromUser } from "../../utils/addressFormat";
-import { buildUserMultipartFormData } from "../../services/api";
+import { buildUserMultipartFormData, territoriesApi } from "../../services/api";
 
 const ROLE_OPTIONS = [
   { label: "Admin", value: "admin" },
@@ -43,6 +43,8 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
     role: "user",
     joiningDate: null,
     region: "",
+    territoryId: "",
+    managerId: "",
     assignedAreas: "",
     password: "",
     confirmPassword: "",
@@ -58,6 +60,38 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
   const [addrErrors, setAddrErrors] = useState({});
   const [address, setAddress] = useState(() => ({ ...EMPTY_ADDRESS }));
   const [saving, setSaving] = useState(false);
+  const [territoryOptions, setTerritoryOptions] = useState([]);
+  const [managerOptions, setManagerOptions] = useState([]);
+
+  useEffect(() => {
+    if (!open) return;
+    territoriesApi
+      .list()
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : [];
+        setTerritoryOptions(
+          list.map((t) => ({ label: t.name, value: String(t._id) }))
+        );
+      })
+      .catch(() => setTerritoryOptions([]));
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || mapRoleToApi(form.role) !== "User") return;
+    const params = form.territoryId ? { territoryId: form.territoryId } : {};
+    territoriesApi
+      .listManagers(params)
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : [];
+        setManagerOptions(
+          list.map((m) => ({
+            label: m.name || m.email,
+            value: String(m._id),
+          }))
+        );
+      })
+      .catch(() => setManagerOptions([]));
+  }, [open, form.role, form.territoryId]);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -83,6 +117,8 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
         ? dayjs(user["Joining Date"])
         : null,
       region: user.region || user.Region || "",
+      territoryId: user.territoryId ? String(user.territoryId) : "",
+      managerId: user.managerId ? String(user.managerId) : "",
       assignedAreas: user.Area || user.assignedAreas || nextAddr.district || "",
       password: "",
       confirmPassword: "",
@@ -186,7 +222,12 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
       streetAddress: address.streetAddress.trim(),
       area: address.area.trim(),
       city: String(address.city || "").trim(),
-      region: String(form.region || "").trim(),
+      region: isAdminRole ? String(form.region || "").trim() : undefined,
+      territoryId: !isAdminRole ? form.territoryId || undefined : undefined,
+      managerId:
+        !isAdminRole && apiRole === "User"
+          ? form.managerId || undefined
+          : undefined,
       taluka: address.taluka.trim(),
       district: (address.district || form.assignedAreas || "").trim(),
       state: address.state.trim(),
@@ -329,18 +370,45 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
                 onChange={(d) => setForm({ ...form, joiningDate: d })}
               />
             </div>
-            <CommonDropdown
-              label="Region"
-              addNavigateTo="/dashboard/user-master"
-              value={form.region}
-              onChange={(v) => setForm({ ...form, region: v })}
-              options={[
-                { label: "North", value: "North" },
-                { label: "South", value: "South" },
-                { label: "Surat", value: "Surat" },
-              ]}
-            />
+            {isAdminRole ? (
+              <CommonDropdown
+                label="Region (optional)"
+                hideAdd
+                placeholder="—"
+                value={form.region}
+                onChange={(v) => setForm({ ...form, region: v })}
+                options={[
+                  { label: "—", value: "" },
+                  { label: "North", value: "North" },
+                  { label: "South", value: "South" },
+                ]}
+              />
+            ) : (
+              <CommonDropdown
+                label="Territory"
+                hideAdd
+                placeholder="Select territory"
+                value={form.territoryId}
+                onChange={(v) =>
+                  setForm({ ...form, territoryId: v, managerId: "" })
+                }
+                options={territoryOptions}
+              />
+            )}
           </div>
+
+          {!isAdminRole && apiRole === "User" && (
+            <div className="mt-3">
+              <CommonDropdown
+                label="Reporting manager"
+                hideAdd
+                placeholder="Select manager"
+                value={form.managerId}
+                onChange={(v) => setForm({ ...form, managerId: v })}
+                options={managerOptions}
+              />
+            </div>
+          )}
 
           <div className="mt-4">
             <InputField

@@ -20,6 +20,8 @@ import {
   trimAddressPart,
 } from "../utils/address.util";
 import { toPublicUser } from "../utils/userAddress.dto";
+import { buildUserSummary } from "../services/userSummary.service";
+import { applyTerritoryAssignmentToUser } from "../services/territory.service";
 import type { IUser } from "../types/user.type";
 
 /** FormData sends JSON arrays as strings — normalize before `sanitizePermissionList`. */
@@ -94,6 +96,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         email: user.email,
         role: user.role,
         permissions,
+        territoryId: user.territoryId,
+        managerId: user.managerId,
+        region: user.region,
       },
     });
   } catch (error) {
@@ -157,6 +162,7 @@ export const registerUser = async (
       pincode: addr.pincode,
     });
 
+    await applyTerritoryAssignmentToUser(user, { reResolveFromAddress: true });
     await user.save();
 
     const permissions = effectivePermissions(user.role, user.permissions);
@@ -178,6 +184,9 @@ export const registerUser = async (
         city: pub.city,
         state: pub.state,
         pincode: pub.pincode,
+        territoryId: user.territoryId,
+        managerId: user.managerId,
+        region: user.region,
       },
     });
   } catch (error) {
@@ -260,12 +269,17 @@ export const createUser = async (
       state: addr.state,
       country: addr.country,
       pincode: addr.pincode,
-      ...(region ? { region } : {}),
+      ...(region && parsedRole !== Role.admin ? { region } : {}),
       ...(req.file
         ? { profilePhoto: `/uploads/${req.file.filename}` }
         : {}),
     });
 
+    await applyTerritoryAssignmentToUser(user, {
+      territoryId: req.body.territoryId,
+      managerId: req.body.managerId,
+      reResolveFromAddress: parsedRole === Role.user,
+    });
     await user.save();
 
     const permissions = effectivePermissions(user.role, user.permissions);
@@ -443,6 +457,12 @@ export const updateUser = async (
       user.permissions = [];
     }
 
+    await applyTerritoryAssignmentToUser(user, {
+      territoryId: req.body.territoryId,
+      managerId: req.body.managerId,
+      reResolveFromAddress: touchingAddr && user.role === Role.user,
+    });
+
     const updatedUser = await user.save();
     const permissions = effectivePermissions(
       updatedUser.role,
@@ -472,6 +492,8 @@ export const updateUser = async (
         country: pub.country,
         pincode: pub.pincode,
         region: updatedUser.region,
+        territoryId: updatedUser.territoryId,
+        managerId: updatedUser.managerId,
         profilePhoto: updatedUser.profilePhoto,
       },
     });
@@ -546,6 +568,26 @@ export const getUserByUserId = async (
     });
   } catch (error) {
     console.error("Get User By ID Error:", error);
+    throw error;
+  }
+};
+
+export const getUserSummaryById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const summary = await buildUserSummary(id);
+    if (!summary) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "User not found.");
+    }
+    res.status(200).json({
+      message: "User summary loaded",
+      summary,
+    });
+  } catch (error) {
+    console.error("Get User Summary Error:", error);
     throw error;
   }
 };

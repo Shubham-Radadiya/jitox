@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/asset_paths.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
 import 'package:jitox_agro_app/View/Screens/Account/account_screen.dart';
-import 'package:jitox_agro_app/View/Screens/Home/home_screen.dart';
+import 'package:jitox_agro_app/View/Screens/Field/field_home_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Order/all_orders_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Order/order_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Reports/report_screen.dart';
@@ -46,7 +46,7 @@ class _TabScreenState extends State<TabScreen> {
         "id": 0,
         "icon": AppIcons.homeIcon,
         "label": "Home",
-        "page": const HomeScreen(),
+        "page": const FieldHomeScreen(),
       },
       {
         "id": 1,

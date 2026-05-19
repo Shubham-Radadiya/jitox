@@ -12,18 +12,38 @@ import { downloadCsv } from "../../../utils/voucherShare";
  * PerformanceReportTab Component
  * Displays metrics, performance bars, and status cards.
  */
-const PerformanceReportTab = () => {
+const STAT_ICONS = [
+  CheckCircle2,
+  ShoppingBag,
+  Landmark,
+  Wallet,
+  CalendarDays,
+  Clock,
+];
+
+const PerformanceReportTab = ({ performance, liveData = false }) => {
   const [activeFilter, setActiveFilter] = useState("Month");
   const [isExportOpen, setIsExportOpen] = useState(false);
 
-  const stats = [
-    { label: "Total Visits", value: "05", icon: CheckCircle2, color: "text-green-500", bgColor: "bg-green-50 dark:bg-green-950/50" },
-    { label: "Total Orders", value: "08", icon: ShoppingBag, color: "text-green-600", bgColor: "bg-green-50 dark:bg-green-950/50" },
-    { label: "Total Sales Amount", value: "₹3,20,000", icon: Landmark, color: "text-green-600", bgColor: "bg-green-50 dark:bg-green-950/50" },
-    { label: "Total Expenses", value: "₹12,500", icon: Wallet, color: "text-green-600", bgColor: "bg-green-50 dark:bg-green-950/50" },
-    { label: "Attendance Summary", value: "24 Present / 2 Absent", icon: CalendarDays, color: "text-green-600", bgColor: "bg-green-50 dark:bg-green-950/50" },
-    { label: "Pending Follow-ups", value: "05", icon: Clock, color: "text-green-600", bgColor: "bg-green-50 dark:bg-green-950/50" },
-  ];
+  const stats = (
+    liveData && performance?.stats
+      ? performance.stats
+      : performance?.stats?.length
+    ? performance.stats
+    : [
+        { label: "Total Visits", value: "05" },
+        { label: "Total Orders", value: "08" },
+        { label: "Total Sales Amount", value: "₹3,20,000" },
+        { label: "Total Expenses", value: "₹12,500" },
+        { label: "Attendance Summary", value: "24 Present / 2 Absent" },
+        { label: "Pending Follow-ups", value: "05" },
+      ]
+  ).map((s, i) => ({
+    ...s,
+    icon: STAT_ICONS[i] || CheckCircle2,
+    color: "text-green-600",
+    bgColor: "bg-green-50 dark:bg-green-950/50",
+  }));
 
   const exportPerformancePdf = async () => {
     const flat = Object.fromEntries(stats.map((s) => [s.label, s.value]));

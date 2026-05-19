@@ -27,6 +27,10 @@ import {
   getEmployeeTracking,
   getPurchaseFormMeta,
 } from "../controllers/dashboardUi.controller";
+import {
+  listTargetIncentiveAssignments,
+  saveTargetIncentiveAssignment,
+} from "../controllers/targetIncentive.controller";
 import { uploadDocumentFile } from "../middleware/multerDocuments.middleware";
 
 const router = Router();
@@ -72,6 +76,8 @@ router.delete("/documents/entries/:id", deleteDocumentEntry);
 router.get("/overview", getDashboardOverview);
 router.get("/reports", getReportsPage);
 router.get("/target-incentive", getTargetIncentive);
+router.get("/target-incentive/assignments", listTargetIncentiveAssignments);
+router.post("/target-incentive/assign", saveTargetIncentiveAssignment);
 router.get("/employees", getEmployees);
 router.get("/employees/:id/tracking", getEmployeeTracking);
 

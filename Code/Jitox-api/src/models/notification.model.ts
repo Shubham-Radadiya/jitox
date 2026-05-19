@@ -12,6 +12,7 @@ const notificationSchema = new Schema<INotification>(
         "task_updated",
         "task_completed",
         "task_overdue",
+        "territory_unmapped_district",
       ],
     },
     title: { type: String, required: true, trim: true },

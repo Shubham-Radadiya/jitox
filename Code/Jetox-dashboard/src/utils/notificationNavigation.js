@@ -20,6 +20,14 @@ export function getNotificationTargetPath(raw) {
     "task_overdue",
   ]);
 
+  if (type === "territory_unmapped_district") {
+    const district = raw.meta?.district;
+    const q = district
+      ? `?highlightDistrict=${encodeURIComponent(String(district))}`
+      : "";
+    return `/dashboard/territories${q}`;
+  }
+
   const user = getStoredUser();
   const tasksHome = isAdminUser(user)
     ? "/dashboard/tasks/all"

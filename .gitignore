@@ -1,0 +1,4 @@
+.video-frames/
+Code/Jetox-dashboard/.env
+Code/Jetox-dashboard/.env.local*
+Code/Jitox-api/dist/

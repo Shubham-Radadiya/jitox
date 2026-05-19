@@ -5,6 +5,7 @@ import path from "path";
 import cors from "cors";
 import connectDB from "./config/db.config";
 import { ensureDefaultUsers } from "./seed/ensureDefaultUsers";
+import { ensureDefaultTerritories } from "./seed/ensureDefaultTerritories";
 import { seedDemoData } from "./seed/seedDemoData";
 import { setupRoutes } from "./routes";
 import { globalErrorHandler } from "./common/errors/globalError";
@@ -46,6 +47,7 @@ const start = async () => {
   const allowBootstrap = process.env.ALLOW_BOOTSTRAP_USERS === "true";
 
   if (isDev || allowBootstrap) {
+    await ensureDefaultTerritories();
     await ensureDefaultUsers();
     if (isDev && process.env.SEED_DEMO_DATA !== "false") {
       try {

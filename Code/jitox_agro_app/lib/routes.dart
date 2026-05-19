@@ -19,6 +19,11 @@ import 'package:jitox_agro_app/View/Screens/Tab/tab_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Tasks/add_task_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Tasks/task_details_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Tasks/task_screen.dart';
+import 'package:jitox_agro_app/View/Screens/Field/add_dealer_payment_screen.dart';
+import 'package:jitox_agro_app/View/Screens/Field/dealer_list_screen.dart';
+import 'package:jitox_agro_app/View/Screens/Field/language_screen.dart';
+import 'package:jitox_agro_app/View/Screens/Field/live_feed_screen.dart';
+import 'package:jitox_agro_app/View/Screens/Field/product_demo_screen.dart';
 
 class AppRoutes {
   static Route? routes(RouteSettings settings) {
@@ -122,6 +127,27 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) {
           return LeaveRequestScreen();
         });
+
+      case dealerListScreen:
+        return MaterialPageRoute(builder: (_) => const DealerListScreen());
+
+      case liveFeedScreen:
+        return MaterialPageRoute(builder: (_) => const LiveFeedScreen());
+
+      case addDealerPaymentScreen:
+        final dealerName = settings.arguments as String?;
+        return MaterialPageRoute(
+          builder: (_) => AddDealerPaymentScreen(
+            dealerName: dealerName ?? 'DEALER NAME 382',
+          ),
+        );
+
+      case productDemoScreen:
+        return MaterialPageRoute(builder: (_) => const ProductDemoScreen());
+
+      case languageScreen:
+        return MaterialPageRoute(builder: (_) => const LanguageScreen());
+
       default:
         return MaterialPageRoute(builder: (_) => SplashScreen());
     }

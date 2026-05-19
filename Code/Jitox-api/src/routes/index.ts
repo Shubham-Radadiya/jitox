@@ -17,9 +17,11 @@ import dashboardUiRouter from "./dashboardUi.routes";
 import notificationRouter from "./notification.routes";
 import customerRouter from "./customer.routes";
 import hrmApiRouter from "./hrm.api.routes";
+import territoryRouter from "./territory.routes";
 import { Express } from "express";
 
 export const setupRoutes = (app: Express) => {
+  app.use("/territories", territoryRouter);
   app.use("/dashboard-ui", dashboardUiRouter);
   app.use("/api", hrmApiRouter);
   app.use("/users", userRouter);

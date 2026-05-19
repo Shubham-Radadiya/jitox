@@ -1,6 +1,13 @@
 import Notification from "../models/notification.model";
+import User from "../models/user.model";
 import { NotificationType } from "../types/notification.type";
+import { Role } from "../constants/roles";
 import { emitToUser, emitToAdmins } from "../socket/io";
+
+export async function getAdminUserIds(): Promise<string[]> {
+  const admins = await User.find({ role: Role.admin }).select("_id").lean();
+  return admins.map((a) => String(a._id));
+}
 
 function statusLabel(status: string): string {
   const m: Record<string, string> = {
@@ -124,5 +131,81 @@ export async function notifyAdminsTaskStatusFromAssignee(
         },
       })
     )
+  );
+}
+
+/** Alert admins when a user's district is not listed on any territory. */
+export async function notifyAdminsUnmappedDistrict(input: {
+  userId: string;
+  userName: string;
+  district: string;
+  state?: string;
+}): Promise<void> {
+  const district = String(input.district || "").trim();
+  if (!district) return;
+
+  const adminIds = await getAdminUserIds();
+  if (!adminIds.length) return;
+
+  const districtKey = district.toLowerCase();
+  const existing = await Notification.findOne({
+    userId: { $in: adminIds },
+    type: "territory_unmapped_district",
+    read: false,
+    "meta.districtKey": districtKey,
+    "meta.userId": input.userId,
+  }).lean();
+  if (existing) return;
+
+  const statePart = input.state ? ` (${input.state})` : "";
+  const body = `User "${input.userName}" is in district "${district}"${statePart}, which is not assigned to any territory. Add this district to a territory in Territory Master.`;
+
+  await Promise.all(
+    adminIds.map((uid) =>
+      createAndPushNotification({
+        userId: uid,
+        type: "territory_unmapped_district",
+        title: "District not mapped to territory",
+        body,
+        meta: {
+          userId: input.userId,
+          userName: input.userName,
+          district,
+          districtKey,
+          state: input.state || "",
+        },
+      })
+    )
+  );
+  emitToAdmins("territory:unmapped_district", {
+    district,
+    userId: input.userId,
+  });
+}
+
+/** Mark unmapped-district alerts resolved when the district is added to a territory. */
+export async function resolveUnmappedDistrictNotifications(
+  district: string,
+  territoryId: string,
+  territoryName: string
+): Promise<void> {
+  const districtKey = String(district || "")
+    .trim()
+    .toLowerCase();
+  if (!districtKey) return;
+
+  await Notification.updateMany(
+    {
+      type: "territory_unmapped_district",
+      read: false,
+      "meta.districtKey": districtKey,
+    },
+    {
+      $set: {
+        read: true,
+        "meta.resolvedTerritoryId": territoryId,
+        "meta.resolvedTerritoryName": territoryName,
+      },
+    }
   );
 }
