@@ -62,3 +62,34 @@ export interface IPurchaseVoucher extends Document {
   createdAt?: Date;
   updatedAt?: Date;
 }
+
+/** Purchase return voucher — shared item shape; fewer fields than full purchase. */
+export interface IPurchaseReturnVoucher extends Document {
+  partyName: string;
+  invoiceNo?: string;
+  dueDate?: Date;
+  transportDetails?: string;
+  deliveryAt?: string;
+  orderby?: string;
+  shipToAndBillTo?: string;
+  voucherNo: string;
+  voucherDate: Date;
+  items: IPurchaseItem[];
+  gstAmount: number;
+  totalAmount: number;
+  paymentMode?: string;
+  basePrice?: number;
+  refundRequestId?: mongoose.Schema.Types.ObjectId;
+  refundedAmount?: number;
+  refundStatus?: string;
+  stockDetails: {
+    stockQuantity: boolean;
+    productStatus?: boolean;
+    generetePurchaseBill?: boolean;
+    updateStockAfterOrderPlaced?: boolean;
+    openingStock?: number;
+    minimumReOrderLevel?: number;
+  };
+  createdAt?: Date;
+  updatedAt?: Date;
+}

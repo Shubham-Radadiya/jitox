@@ -4,6 +4,7 @@ export interface IPaymentVoucher extends Document {
   voucherNo: String;
   date: Date;
   paymentThrough: String;
+  paymentFrom?: String;
   paymentTo: String;
   amount: String;
   remarks: String;

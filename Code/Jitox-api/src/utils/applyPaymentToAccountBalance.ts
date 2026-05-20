@@ -12,11 +12,12 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export async function findAccountByPartyName(paymentTo: string) {
-  const name = String(paymentTo || "").trim();
+export async function findAccountByPartyName(partyName: string) {
+  const name = String(partyName || "").trim();
   if (!name) return null;
+  const rx = new RegExp(`^${escapeRegex(name)}$`, "i");
   return Account.findOne({
-    businessName: { $regex: new RegExp(`^${escapeRegex(name)}$`, "i") },
+    $or: [{ businessName: { $regex: rx } }, { name: { $regex: rx } }],
   });
 }
 
@@ -152,5 +153,79 @@ export async function applyCashBankTransferToAccounts(
   }
   if (credit && !isCashLedgerName(credit)) {
     await applyReceiptToAccountBalance(credit, amount, direction);
+  }
+}
+
+/**
+ * Party ledger credit (purchase, sales) — outstanding increases (`Account.amount` up).
+ * Mirrors receipt-side money in.
+ */
+export async function applyPartyLedgerCreditToAccountBalance(
+  partyName: string,
+  amount: unknown,
+  direction: "apply" | "reverse"
+): Promise<void> {
+  return applyReceiptToAccountBalance(partyName, amount, direction);
+}
+
+/**
+ * Party ledger debit (purchase return, sales return) — outstanding decreases.
+ * Mirrors payment-side money out.
+ */
+export async function applyPartyLedgerDebitToAccountBalance(
+  partyName: string,
+  amount: unknown,
+  direction: "apply" | "reverse"
+): Promise<void> {
+  return applyPaymentToAccountBalance(partyName, amount, direction);
+}
+
+export async function reconcilePartyLedgerCreditOnVoucherChange(
+  prevParty: string,
+  prevAmount: unknown,
+  nextParty: string,
+  nextAmount: unknown
+): Promise<void> {
+  const partyChanged =
+    String(prevParty || "").trim().toLowerCase() !==
+    String(nextParty || "").trim().toLowerCase();
+  const amtChanged =
+    parsePaymentAmount(prevAmount) !== parsePaymentAmount(nextAmount);
+  if (partyChanged || amtChanged) {
+    await applyPartyLedgerCreditToAccountBalance(
+      prevParty,
+      prevAmount,
+      "reverse"
+    );
+    await applyPartyLedgerCreditToAccountBalance(
+      nextParty,
+      nextAmount,
+      "apply"
+    );
+  }
+}
+
+export async function reconcilePartyLedgerDebitOnVoucherChange(
+  prevParty: string,
+  prevAmount: unknown,
+  nextParty: string,
+  nextAmount: unknown
+): Promise<void> {
+  const partyChanged =
+    String(prevParty || "").trim().toLowerCase() !==
+    String(nextParty || "").trim().toLowerCase();
+  const amtChanged =
+    parsePaymentAmount(prevAmount) !== parsePaymentAmount(nextAmount);
+  if (partyChanged || amtChanged) {
+    await applyPartyLedgerDebitToAccountBalance(
+      prevParty,
+      prevAmount,
+      "reverse"
+    );
+    await applyPartyLedgerDebitToAccountBalance(
+      nextParty,
+      nextAmount,
+      "apply"
+    );
   }
 }

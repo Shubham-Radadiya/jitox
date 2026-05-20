@@ -1,5 +1,8 @@
 import mongoose, { Document, Schema } from "mongoose";
-import { IPurchaseItem, IPurchaseVoucher } from "../types/purchaseVoucher.type";
+import {
+  IPurchaseItem,
+  IPurchaseReturnVoucher,
+} from "../types/purchaseVoucher.type";
 
 const PurchaseReturnItemSchema = new Schema<IPurchaseItem>(
   {
@@ -20,7 +23,7 @@ const PurchaseReturnItemSchema = new Schema<IPurchaseItem>(
   { _id: false }
 );
 
-const PurchaseReturnVoucherSchema = new Schema<IPurchaseVoucher>(
+const PurchaseReturnVoucherSchema = new Schema<IPurchaseReturnVoucher>(
   {
     partyName: { type: String, required: true, trim: true },
     transportDetails: { type: String, trim: true },
@@ -38,6 +41,18 @@ const PurchaseReturnVoucherSchema = new Schema<IPurchaseVoucher>(
       enum: ["Cash", "Credit", "Cheque", "Online"],
     },
     basePrice: { type: Number, trim: true },
+    /** Receipt voucher created for supplier refund — gates duplicate refund button. */
+    refundRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: "ReceiptVoucher",
+    },
+    refundedAmount: { type: Number, default: 0 },
+    refundStatus: {
+      type: String,
+      trim: true,
+      default: "Pending",
+      enum: ["Pending", "Partial", "Received"],
+    },
     stockDetails: {
       stockQuantity: { type: Boolean, default: true },
       productStatus: { type: Boolean, trim: true },
@@ -52,7 +67,7 @@ const PurchaseReturnVoucherSchema = new Schema<IPurchaseVoucher>(
   }
 );
 
-const PurchaseReturnVoucher = mongoose.model<IPurchaseVoucher>(
+const PurchaseReturnVoucher = mongoose.model<IPurchaseReturnVoucher>(
   "PurchaseReturnVoucher",
   PurchaseReturnVoucherSchema
 );

@@ -43,6 +43,14 @@ export function getReceiptReceivedByName() {
   );
 }
 
+/** Contact person on Account Master for the party on the receipt (Received By). */
+export function receiptReceivedByFromParty(account, partyName = "") {
+  const person = String(account?.name || "").trim();
+  if (person) return person;
+  const business = String(account?.businessName || partyName || "").trim();
+  return business || "—";
+}
+
 export function formatReceiptDate(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
@@ -71,7 +79,12 @@ export function buildPaymentReceiptData(source = {}) {
     paymentMode: isCash ? "Cash" : through,
     chequeNo: "—",
     remarks: String(source.remarks || "").trim() || "—",
-    receivedBy: getReceiptReceivedByName(),
+    receivedBy:
+      String(source.receivedBy || "").trim() ||
+      receiptReceivedByFromParty(
+        source.partyAccount,
+        source.receiptFrom
+      ),
   };
 }
 

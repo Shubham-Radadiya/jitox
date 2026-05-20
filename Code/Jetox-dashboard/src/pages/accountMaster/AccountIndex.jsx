@@ -14,6 +14,7 @@ import {
   journalVouchersApi,
   purchaseVouchersApi,
   purchaseReturnVouchersApi,
+  salesVouchersApi,
   expenseVouchersApi,
   cashVouchersApi,
 } from "../../services/api";
@@ -37,6 +38,7 @@ import { mergePageAddButton } from "../../utils/pageAddButton";
 import {
   accountOpeningMeta,
   buildPartyTransactionEntries,
+  computePartyLedgerClosingBalance,
   normalizeList,
 } from "../../utils/partyLedgerTx";
 
@@ -228,14 +230,53 @@ const AccountIndex = () => {
     queryKey: ["accounts", "table"],
     queryFn: async () => {
       try {
-        const res = await accountsApi.getAll({});
-        const raw = res?.data;
+        const [
+          accountsRes,
+          paymentRes,
+          receiptRes,
+          journalRes,
+          expenseRes,
+          cashRes,
+          purchaseRes,
+          purchaseReturnRes,
+          salesRes,
+        ] = await Promise.all([
+          accountsApi.getAll({}),
+          paymentVouchersApi.getAll({}),
+          receiptVouchersApi.getAll({}),
+          journalVouchersApi.getAll({}),
+          expenseVouchersApi.getAll({}),
+          cashVouchersApi.getAll({}),
+          purchaseVouchersApi.getAll({}),
+          purchaseReturnVouchersApi.getAll({}),
+          salesVouchersApi.getAll({}),
+        ]);
+        const raw = accountsRes?.data;
         const list = Array.isArray(raw)
           ? raw
           : raw && typeof raw === "object" && Array.isArray(raw.data)
             ? raw.data
             : [];
-        return list.map(mapAccountToRow);
+        const ledgerSource = {
+          payments: normalizeList(paymentRes),
+          receipts: normalizeList(receiptRes),
+          journals: normalizeList(journalRes),
+          expenses: normalizeList(expenseRes),
+          cashVouchers: normalizeList(cashRes),
+          purchases: normalizeList(purchaseRes),
+          purchaseReturns: normalizeList(purchaseReturnRes),
+          sales: normalizeList(salesRes),
+          salesReturns: [],
+        };
+        return list.map((a) => {
+          const id = a._id || a.id;
+          const closing = computePartyLedgerClosingBalance(
+            a,
+            id,
+            ledgerSource
+          );
+          return mapAccountToRow(a, { closingRunning: closing });
+        });
       } catch (e) {
         if (isEmptyListNotFound(e)) return [];
         throw e;
@@ -349,6 +390,7 @@ const AccountIndex = () => {
         { data: journalsRes },
         { data: purchaseRes },
         { data: purchaseReturnRes },
+        { data: salesRes },
         { data: expenseRes },
         { data: cashRes },
       ] = await Promise.all([
@@ -358,6 +400,7 @@ const AccountIndex = () => {
         journalVouchersApi.getAll({}),
         purchaseVouchersApi.getAll({}),
         purchaseReturnVouchersApi.getAll({}),
+        salesVouchersApi.getAll({}),
         expenseVouchersApi.getAll({}),
         cashVouchersApi.getAll({}),
       ]);
@@ -368,6 +411,8 @@ const AccountIndex = () => {
         journals: normalizeList(journalsRes),
         purchases: normalizeList(purchaseRes),
         purchaseReturns: normalizeList(purchaseReturnRes),
+        sales: normalizeList(salesRes),
+        salesReturns: [],
         expenses: normalizeList(expenseRes),
         cashVouchers: normalizeList(cashRes),
       };

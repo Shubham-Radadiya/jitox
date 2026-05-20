@@ -111,6 +111,8 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   const [shipTo, setShipTo] = useState("");
   const [termsPayment, setTermsPayment] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("Pending");
+  const [returnTotalAmount, setReturnTotalAmount] = useState(0);
+  const [returnPaidAmount, setReturnPaidAmount] = useState(0);
   const [gstRate, setGstRate] = useState("");
   const [productRows, setProductRows] = useState([emptyProductRow()]);
   const [invoicePrefix, setInvoicePrefix] = useState("RH-P-24-25/");
@@ -251,6 +253,12 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     }
     if (prefill.termsPayment != null) setTermsPayment(prefill.termsPayment);
     if (prefill.paymentStatus != null) setPaymentStatus(prefill.paymentStatus);
+    if (prefill.totalAmount != null) {
+      setReturnTotalAmount(Number(prefill.totalAmount) || 0);
+    }
+    if (prefill.paidAmount != null) {
+      setReturnPaidAmount(Number(prefill.paidAmount) || 0);
+    }
     if (prefill.gstRate != null && String(prefill.gstRate).trim() !== "") {
       setGstRate(prefill.gstRate);
     }
@@ -1011,6 +1019,45 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
                 onChange={setPaymentStatus}
                 placeholder="Select status"
               />
+            ) : isPurchaseReturn ? (
+              <>
+                <InputField
+                  label="Total Amount"
+                  readOnly
+                  value={fmtInr(
+                    returnTotalAmount > 0
+                      ? returnTotalAmount
+                      : lineTotals.taxable + lineTotals.tax
+                  )}
+                  inputClassName={autoFieldInputClass}
+                />
+                <InputField
+                  label="Paid Amount"
+                  readOnly
+                  value={fmtInr(returnPaidAmount)}
+                  inputClassName={autoFieldInputClass}
+                />
+                <InputField
+                  label="Payment Status"
+                  readOnly
+                  value={paymentStatus || "Pending"}
+                  inputClassName={autoFieldInputClass}
+                />
+                <InputField
+                  label="Refund Due"
+                  readOnly
+                  value={fmtInr(
+                    Math.max(
+                      0,
+                      (returnTotalAmount > 0
+                        ? returnTotalAmount
+                        : lineTotals.taxable + lineTotals.tax) -
+                        returnPaidAmount
+                    )
+                  )}
+                  inputClassName={autoFieldInputClass}
+                />
+              </>
             ) : (
               <InputField
                 label="Due Date"

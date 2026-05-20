@@ -1,21 +1,30 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import { Account, ReceiptVoucher, SalesVoucher } from "../models/index";
+import {
+  Account,
+  PurchaseReturnVoucher,
+  ReceiptVoucher,
+  SalesVoucher,
+} from "../models/index";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+import { parsePaymentAmount } from "../utils/applyPaymentToAccountBalance";
 import {
-  applyReceiptToAccountBalance,
-  parsePaymentAmount,
-} from "../utils/applyPaymentToAccountBalance";
+  receiptLedgerSnapshot,
+  reconcileReceiptVoucherLedgers,
+  resolveReceiptThroughFields,
+} from "../utils/receiptVoucherLedger";
+import { recomputeLinkedPurchaseReturnRefund } from "../utils/purchaseReturnRefundStatus";
 
 const RECEIPT_VOUCHER_PATCH_KEYS = [
   "voucherNo",
   "date",
   "receiptThrough",
   "receiptFrom",
+  "receivedIn",
   "amount",
   "remarks",
   "status",
@@ -23,38 +32,6 @@ const RECEIPT_VOUCHER_PATCH_KEYS = [
 
 function parseAmountToNumber(value: unknown): number {
   return parsePaymentAmount(value);
-}
-
-async function reconcileAccountFromReceiptChange(
-  previousStatus: string,
-  nextStatus: string,
-  prevReceiptFrom: string,
-  prevAmount: unknown,
-  nextReceiptFrom: string,
-  nextAmount: unknown
-): Promise<void> {
-  const wasPaid = previousStatus === "Paid";
-  const isPaid = nextStatus === "Paid";
-
-  if (wasPaid && !isPaid) {
-    await applyReceiptToAccountBalance(prevReceiptFrom, prevAmount, "reverse");
-    return;
-  }
-  if (!wasPaid && isPaid) {
-    await applyReceiptToAccountBalance(nextReceiptFrom, nextAmount, "apply");
-    return;
-  }
-  if (wasPaid && isPaid) {
-    const toChanged =
-      String(prevReceiptFrom || "").trim().toLowerCase() !==
-      String(nextReceiptFrom || "").trim().toLowerCase();
-    const amtChanged =
-      parsePaymentAmount(prevAmount) !== parsePaymentAmount(nextAmount);
-    if (toChanged || amtChanged) {
-      await applyReceiptToAccountBalance(prevReceiptFrom, prevAmount, "reverse");
-      await applyReceiptToAccountBalance(nextReceiptFrom, nextAmount, "apply");
-    }
-  }
 }
 
 async function computeNextReceiptVoucherNo(): Promise<string> {
@@ -138,14 +115,41 @@ export const createReceiptVoucher = async (
       date,
       receiptThrough,
       receiptFrom,
+      receivedIn,
       amount,
       remarks,
       status,
       sourceSalesId,
+      sourcePurchaseReturnId,
     } = req.body;
 
     const requiredFields = ["date", "receiptFrom", "amount"] as const;
     validateAndRespond(req.body, requiredFields, res);
+
+    const nextStatus = String(status || "Pending");
+    if (nextStatus === "Paid" && !String(receivedIn || "").trim()) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Please select Received in (bank or cash account) when status is Received."
+      );
+    }
+
+    const throughFields = await resolveReceiptThroughFields(
+      String(receivedIn || ""),
+      receiptThrough
+    );
+
+    if (
+      sourceSalesId &&
+      sourcePurchaseReturnId &&
+      mongoose.isValidObjectId(sourceSalesId) &&
+      mongoose.isValidObjectId(sourcePurchaseReturnId)
+    ) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Link receipt to either a sales or a purchase return voucher, not both."
+      );
+    }
 
     let linkedSalesId: mongoose.Types.ObjectId | null = null;
     if (sourceSalesId && mongoose.isValidObjectId(sourceSalesId)) {
@@ -159,27 +163,57 @@ export const createReceiptVoucher = async (
       linkedSalesId = sale._id as mongoose.Types.ObjectId;
     }
 
+    let linkedPurchaseReturnId: mongoose.Types.ObjectId | null = null;
+    if (
+      sourcePurchaseReturnId &&
+      mongoose.isValidObjectId(sourcePurchaseReturnId)
+    ) {
+      const pr = await PurchaseReturnVoucher.findById(
+        sourcePurchaseReturnId
+      ).select("refundRequestId partyName");
+      if (!pr) {
+        throw new AppError(
+          HttpStatusCode.NOT_FOUND,
+          "Linked purchase return voucher not found."
+        );
+      }
+      if (pr.refundRequestId) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "A receipt voucher already exists for this purchase return."
+        );
+      }
+      linkedPurchaseReturnId = pr._id as mongoose.Types.ObjectId;
+    }
+
     const resolvedVoucherNo = await resolveUniqueReceiptVoucherNo(voucherNo);
-    const nextStatus = String(status || "Pending");
 
     const newVoucher = new ReceiptVoucher({
       voucherNo: resolvedVoucherNo,
       date,
-      receiptThrough: receiptThrough || "Cash",
+      receiptThrough: throughFields.receiptThrough,
       receiptFrom,
+      receivedIn: throughFields.receivedIn,
       amount,
       remarks,
       status: nextStatus,
       sourceSalesId: linkedSalesId,
+      sourcePurchaseReturnId: linkedPurchaseReturnId,
     });
 
     const savedVoucher = await newVoucher.save();
 
+    if (linkedPurchaseReturnId) {
+      await PurchaseReturnVoucher.findByIdAndUpdate(linkedPurchaseReturnId, {
+        $set: { refundRequestId: savedVoucher._id },
+      });
+      await recomputeLinkedPurchaseReturnRefund(linkedPurchaseReturnId);
+    }
+
     if (nextStatus === "Paid") {
-      await applyReceiptToAccountBalance(
-        String(savedVoucher.receiptFrom || ""),
-        savedVoucher.amount,
-        "apply"
+      await reconcileReceiptVoucherLedgers(
+        receiptLedgerSnapshot({ status: "Pending" }),
+        receiptLedgerSnapshot(savedVoucher)
       );
     }
 
@@ -187,11 +221,16 @@ export const createReceiptVoucher = async (
       await applyReceiptToLinkedSale(savedVoucher, "apply");
     }
 
+    const intoLabel = throughFields.receivedIn
+      ? ` into ${throughFields.receivedIn}`
+      : "";
     await logDayBookEntry({
       voucherNumber: savedVoucher.voucherNo as unknown as string,
       voucherType: "Receipt",
-      particulars: `${receiptFrom} — receipt${
-        receiptThrough ? ` (${receiptThrough})` : ""
+      particulars: `${receiptFrom} — receipt${intoLabel}${
+        throughFields.receiptThrough
+          ? ` (${throughFields.receiptThrough})`
+          : ""
       }`,
       debitAmount: amount,
       creditAmount: amount,
@@ -311,9 +350,7 @@ export const updateReceiptVoucher = async (
       }
     }
 
-    const previousStatus = String(voucher.status || "");
-    const prevReceiptFrom = String(voucher.receiptFrom || "");
-    const prevAmount = voucher.amount;
+    const previousSnap = receiptLedgerSnapshot(voucher);
     const patch: Record<string, unknown> = {};
     for (const key of RECEIPT_VOUCHER_PATCH_KEYS) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -321,32 +358,64 @@ export const updateReceiptVoucher = async (
       }
     }
 
+    const mergedReceivedIn = Object.prototype.hasOwnProperty.call(
+      patch,
+      "receivedIn"
+    )
+      ? String(patch.receivedIn || "")
+      : String(voucher.receivedIn || "");
+    const mergedThrough = Object.prototype.hasOwnProperty.call(
+      patch,
+      "receiptThrough"
+    )
+      ? patch.receiptThrough
+      : voucher.receiptThrough;
+    const throughFields = await resolveReceiptThroughFields(
+      mergedReceivedIn,
+      mergedThrough
+    );
+    patch.receivedIn = throughFields.receivedIn;
+    patch.receiptThrough = throughFields.receiptThrough;
+
+    const nextStatus = Object.prototype.hasOwnProperty.call(patch, "status")
+      ? String(patch.status || "")
+      : String(voucher.status || "");
+    if (nextStatus === "Paid" && !throughFields.receivedIn) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Please select Received in (bank or cash account) when status is Received."
+      );
+    }
+
     voucher.set(patch);
     await voucher.save();
 
-    const nextStatus = String(voucher.status || "");
-
-    await reconcileAccountFromReceiptChange(
-      previousStatus,
-      nextStatus,
-      prevReceiptFrom,
-      prevAmount,
-      String(voucher.receiptFrom || ""),
-      voucher.amount
+    await reconcileReceiptVoucherLedgers(
+      previousSnap,
+      receiptLedgerSnapshot(voucher)
     );
 
-    if (voucher.sourceSalesId && previousStatus !== nextStatus) {
-      if (nextStatus === "Paid" && previousStatus !== "Paid") {
+    const previousStatus = previousSnap.status;
+    const nextStatusAfter = String(voucher.status || "");
+    if (voucher.sourceSalesId && previousStatus !== nextStatusAfter) {
+      if (nextStatusAfter === "Paid" && previousStatus !== "Paid") {
         await applyReceiptToLinkedSale(voucher, "apply");
-      } else if (previousStatus === "Paid" && nextStatus !== "Paid") {
+      } else if (previousStatus === "Paid" && nextStatusAfter !== "Paid") {
         await applyReceiptToLinkedSale(voucher, "reverse");
       }
     }
 
+    if (voucher.sourcePurchaseReturnId) {
+      await recomputeLinkedPurchaseReturnRefund(voucher.sourcePurchaseReturnId);
+    }
+
+    const intoLabel = String(voucher.receivedIn || "").trim()
+      ? ` into ${voucher.receivedIn}`
+      : "";
     await logDayBookEntry({
       voucherNumber: voucher.voucherNo as unknown as string,
       voucherType: "Receipt",
-      particulars: `${voucher.receiptFrom} — receipt${
+      particulars: `${voucher.receiptFrom} — receipt${intoLabel}${
         voucher.receiptThrough ? ` (${voucher.receiptThrough})` : ""
       }`,
       debitAmount: voucher.amount as unknown as string,
@@ -379,10 +448,9 @@ export const deleteReceiptVoucher = async (
       String((deleted as InstanceType<typeof ReceiptVoucher>).status || "") ===
       "Paid"
     ) {
-      await applyReceiptToAccountBalance(
-        String((deleted as InstanceType<typeof ReceiptVoucher>).receiptFrom || ""),
-        (deleted as InstanceType<typeof ReceiptVoucher>).amount,
-        "reverse"
+      await reconcileReceiptVoucherLedgers(
+        receiptLedgerSnapshot(deleted as InstanceType<typeof ReceiptVoucher>),
+        receiptLedgerSnapshot({ status: "Pending" })
       );
     }
 
@@ -395,6 +463,23 @@ export const deleteReceiptVoucher = async (
         deleted as InstanceType<typeof ReceiptVoucher>,
         "reverse"
       );
+    }
+
+    if ((deleted as InstanceType<typeof ReceiptVoucher>).sourcePurchaseReturnId) {
+      const prId = (deleted as InstanceType<typeof ReceiptVoucher>)
+        .sourcePurchaseReturnId;
+      const pr = await PurchaseReturnVoucher.findById(prId).select(
+        "refundRequestId"
+      );
+      if (
+        pr &&
+        pr.refundRequestId &&
+        String(pr.refundRequestId) === String((deleted as any)._id)
+      ) {
+        pr.refundRequestId = undefined;
+        await pr.save();
+      }
+      await recomputeLinkedPurchaseReturnRefund(prId);
     }
 
     await removeDayBookEntry((deleted as InstanceType<typeof ReceiptVoucher>).voucherNo as unknown as string);
@@ -414,17 +499,32 @@ export const getReceiptFormMeta = async (
     const accounts = await Account.find({
       customerStatus: { $ne: "Inactive" },
     })
-      .select("businessName")
+      .select("businessName name accountType")
       .sort({ businessName: 1 })
       .lean();
 
-    const seen = new Set<string>();
+    const seenParty = new Set<string>();
     const parties: { value: string; label: string }[] = [];
+    const seenReceivedIn = new Set<string>();
+    const receivedInAccounts: { value: string; label: string }[] = [];
+    const RECEIVED_IN_TYPES = new Set(["BankAccounts", "CashInHand"]);
+
     for (const a of accounts) {
-      const name = String(a?.businessName ?? "").trim();
-      if (!name || seen.has(name)) continue;
-      seen.add(name);
-      parties.push({ value: name, label: name });
+      const name = String(a?.businessName ?? a?.name ?? "").trim();
+      if (!name) continue;
+      if (!seenParty.has(name)) {
+        seenParty.add(name);
+        parties.push({ value: name, label: name });
+      }
+      const acctType = String(a?.accountType ?? "").trim();
+      if (RECEIVED_IN_TYPES.has(acctType) && !seenReceivedIn.has(name)) {
+        seenReceivedIn.add(name);
+        receivedInAccounts.push({ value: name, label: name });
+      }
+    }
+
+    if (!seenReceivedIn.has("Cash")) {
+      receivedInAccounts.unshift({ value: "Cash", label: "Cash" });
     }
 
     let nextReceiptVoucherNo = "JITOX-DEMO-REC-001";
@@ -434,7 +534,7 @@ export const getReceiptFormMeta = async (
       console.error("computeNextReceiptVoucherNo", e);
     }
 
-    sendSuccess(res, { nextReceiptVoucherNo, parties });
+    sendSuccess(res, { nextReceiptVoucherNo, parties, receivedInAccounts });
   } catch (error) {
     console.error("getReceiptFormMeta", error);
     res

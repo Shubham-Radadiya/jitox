@@ -297,8 +297,10 @@ function pickBadgeBase(dense) {
 export function paymentStatusBadgeClasses(value, options = {}) {
   const B = pickBadgeBase(options.dense);
   const s = String(value ?? "").toLowerCase();
-  if (s === "paid")
+  if (s === "paid" || s === "received")
     return `${B} border-green-200/90 bg-green-100 text-green-800 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50`;
+  if (s === "partial")
+    return `${B} border-sky-200/90 bg-sky-100 text-sky-900 dark:border-sky-400/45 dark:bg-sky-500/16 dark:text-sky-50`;
   if (s === "pending")
     return `${B} border-amber-200/90 bg-amber-100 text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50`;
   if (s === "unpaid")

@@ -2,6 +2,25 @@ import dayjs from "dayjs";
 import { fmtRupee, parseRupeeCell } from "./voucherRowMappers";
 
 /**
+ * Running balance side for party / account ledgers (debit − credit).
+ * Positive → Dr, negative → Cr (e.g. supplier payable).
+ */
+export function formatLedgerRunningBalance(running) {
+  const n = Number(running);
+  if (!Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  const side = n >= 0 ? "Dr" : "Cr";
+  return `${fmtRupee(abs)} ${side}`;
+}
+
+/** e.g. "Closing balance: ₹5,155.00 Cr" */
+export function formatClosingBalanceLabel(running) {
+  const cell = formatLedgerRunningBalance(running);
+  if (cell === "—") return "Closing balance: —";
+  return `Closing balance: ${cell}`;
+}
+
+/**
  * Map DayBook API documents → ledger table rows with a simple running balance.
  */
 export function mapDayBooksToLedgerRows(docs) {
@@ -11,8 +30,6 @@ export function mapDayBooksToLedgerRows(docs) {
     const dr = parseRupeeCell(d.debitAmount);
     const cr = parseRupeeCell(d.creditAmount);
     running += dr - cr;
-    const abs = Math.abs(running);
-    const side = running >= 0 ? "Dr" : "Cr";
     return {
       _id: d._id,
       Date: d.createdAt ? dayjs(d.createdAt).format("DD-MMM-YY") : "—",
@@ -21,7 +38,8 @@ export function mapDayBooksToLedgerRows(docs) {
       Particulars: d.particulars || "—",
       "Debit ₹": dr ? fmtRupee(dr) : "—",
       "Credit ₹": cr ? fmtRupee(cr) : "—",
-      "Balance ₹": `${fmtRupee(abs)} ${side}`,
+      "Balance ₹": formatLedgerRunningBalance(running),
+      _runningBalance: running,
     };
   });
 }

@@ -1,4 +1,5 @@
 import { buildTableSummary } from "./addressFormat";
+import { formatAccountCreditDebitFromRunning } from "./partyLedgerTx";
 
 /** Admin-configurable inactivity threshold (months without billing). */
 export function getCustomerInactiveMonths() {
@@ -50,11 +51,25 @@ export function findAccountByBusinessName(accounts, businessName) {
   );
 }
 
-export function mapAccountToRow(a) {
-  const isCredit = String(a.balenceType || "").toLowerCase() === "credit";
-  const amt = Number(a.amount);
+export function mapAccountToRow(a, options = {}) {
   const fmt = (n) =>
     Number.isFinite(n) ? n.toLocaleString("en-IN") : "—";
+
+  let creditCell;
+  let debitCell;
+  if (
+    options.closingRunning != null &&
+    Number.isFinite(Number(options.closingRunning))
+  ) {
+    const cells = formatAccountCreditDebitFromRunning(options.closingRunning);
+    creditCell = cells.credit;
+    debitCell = cells.debit;
+  } else {
+    const isCredit = String(a.balenceType || "").toLowerCase() === "credit";
+    const amt = Number(a.amount);
+    creditCell = isCredit ? fmt(amt) : "—";
+    debitCell = !isCredit ? fmt(amt) : "—";
+  }
   const cat = a.category
     ? String(a.category).replace(/_/g, " ")
     : a.accountType || "—";
@@ -85,8 +100,8 @@ export function mapAccountToRow(a) {
     "Contact Person": a.name || "—",
     Territory: a.areaAssigment || "—",
     "Account Type": cat,
-    "Credit (₹)": isCredit ? fmt(amt) : "—",
-    "Debit (₹)": !isCredit ? fmt(amt) : "—",
+    "Credit (₹)": creditCell,
+    "Debit (₹)": debitCell,
     Status: status,
     Street:
       a.addressSummary ||

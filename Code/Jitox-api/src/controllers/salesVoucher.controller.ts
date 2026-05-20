@@ -11,6 +11,10 @@ import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+import {
+  applyPartyLedgerCreditToAccountBalance,
+  reconcilePartyLedgerCreditOnVoucherChange,
+} from "../utils/applyPaymentToAccountBalance";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
 
 /** Fields accepted from PUT body when updating a sales voucher. */
@@ -195,6 +199,12 @@ export const createSalesVoucher = async (
       creditAmount: totalAmount,
     });
 
+    await applyPartyLedgerCreditToAccountBalance(
+      String(partyName || ""),
+      totalAmount,
+      "apply"
+    );
+
     sendCreated(res, savedVoucher, "Sales voucher created successfully.");
   } catch (error) {
     console.error("Create Sales Voucher Error:", error);
@@ -323,6 +333,9 @@ export const updateSalesVoucher = async (
       throw new AppError(HttpStatusCode.NOT_FOUND, "No sales voucher found.");
     }
 
+    const prevPartyName = String(voucher.partyName || "");
+    const prevTotalAmount = voucher.totalAmount;
+
     /** Snapshot prior stock state so we can rollback before applying new lines. */
     const prevStockOn = shouldUpdateStock(voucher.stockDetails);
     const prevItems = Array.isArray(voucher.items)
@@ -393,6 +406,13 @@ export const updateSalesVoucher = async (
       creditAmount: voucher.totalAmount as unknown as string,
     });
 
+    await reconcilePartyLedgerCreditOnVoucherChange(
+      prevPartyName,
+      prevTotalAmount,
+      String(voucher.partyName || ""),
+      voucher.totalAmount
+    );
+
     sendSuccess(res, voucher, "Sales voucher updated successfully.");
   } catch (error) {
     console.error("Update Sales Voucher Error:", error);
@@ -424,6 +444,12 @@ export const deleteSalesVoucher = async (
     }
 
     await removeDayBookEntry((deletedVoucher as any).voucherNo);
+
+    await applyPartyLedgerCreditToAccountBalance(
+      String((deletedVoucher as any).partyName || ""),
+      (deletedVoucher as any).totalAmount,
+      "reverse"
+    );
 
     res.status(200).json({ message: "Sales voucher deleted successfully." });
   } catch (error) {

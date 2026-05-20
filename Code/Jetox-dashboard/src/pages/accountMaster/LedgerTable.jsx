@@ -22,14 +22,22 @@ import {
   journalVouchersApi,
   expenseVouchersApi,
   cashVouchersApi,
+  purchaseVouchersApi,
+  purchaseReturnVouchersApi,
+  salesVouchersApi,
 } from "../../services/api";
 import { getApiErrorMessage, isEmptyListNotFound } from "../../utils/apiError";
 import {
   accountOpeningMeta,
   buildPartyMoneyLedgerEntries,
+  compareLedgerEntries,
   normalizeList,
 } from "../../utils/partyLedgerTx";
 import { fmtRupee } from "../../utils/voucherRowMappers";
+import {
+  formatClosingBalanceLabel,
+  formatLedgerRunningBalance,
+} from "../../utils/ledgerRowMapper";
 
 const LEDGER_TITLE = "Day book ledger";
 
@@ -79,6 +87,9 @@ const LedgerTable = () => {
           { data: journalRes },
           { data: expenseRes },
           { data: cashRes },
+          { data: purchaseRes },
+          { data: purchaseReturnRes },
+          { data: salesRes },
         ] = await Promise.all([
           accountsApi.getById(accountId),
           paymentVouchersApi.getAll({}),
@@ -86,6 +97,9 @@ const LedgerTable = () => {
           journalVouchersApi.getAll({}),
           expenseVouchersApi.getAll({}),
           cashVouchersApi.getAll({}),
+          purchaseVouchersApi.getAll({}),
+          purchaseReturnVouchersApi.getAll({}),
+          salesVouchersApi.getAll({}),
         ]);
         return {
           account: account || {},
@@ -94,6 +108,10 @@ const LedgerTable = () => {
           journals: normalizeList(journalRes),
           expenses: normalizeList(expenseRes),
           cashVouchers: normalizeList(cashRes),
+          purchases: normalizeList(purchaseRes),
+          purchaseReturns: normalizeList(purchaseReturnRes),
+          sales: normalizeList(salesRes),
+          salesReturns: [],
         };
       } catch (e) {
         if (isEmptyListNotFound(e)) return [];
@@ -122,6 +140,7 @@ const LedgerTable = () => {
       .map((r) => ({
         _id: r._id,
         dateIso: r.dateIso,
+        sortAt: r.sortAt,
         voucherType: r.voucherType,
         voucherNo: r.voucherNo,
         particulars: r.particulars,
@@ -129,10 +148,7 @@ const LedgerTable = () => {
         credit: r.credit,
       }))
       .filter((r) => inDateRange(r.dateIso, dateRange))
-      .sort(
-        (a, b) =>
-          new Date(a.dateIso || 0).getTime() - new Date(b.dateIso || 0).getTime()
-      );
+      .sort(compareLedgerEntries);
 
     const openingRow =
       openingAmount > 0
@@ -158,7 +174,6 @@ const LedgerTable = () => {
     let running = openingAmount > 0 ? (openingIsDebit ? openingAmount : -openingAmount) : 0;
     const txRows = merged.map((r) => {
       running += r.debit - r.credit;
-      const abs = Math.abs(running);
       return {
         _id: r._id,
         Date: r.dateIso
@@ -175,13 +190,21 @@ const LedgerTable = () => {
         Particulars: r.particulars || "—",
         "Debit ₹": r.debit ? fmtRupee(r.debit) : "—",
         "Credit ₹": r.credit ? fmtRupee(r.credit) : "—",
-        "Balance ₹": fmtRupee(abs),
+        "Balance ₹": formatLedgerRunningBalance(running),
+        _runningBalance: running,
       };
     });
 
     if (!openingRow) return txRows;
-    const abs = Math.abs(openingIsDebit ? openingAmount : -openingAmount);
-    return [{ ...openingRow, "Balance ₹": fmtRupee(abs) }, ...txRows];
+    const openingRunning = openingIsDebit ? openingAmount : -openingAmount;
+    return [
+      {
+        ...openingRow,
+        "Balance ₹": formatLedgerRunningBalance(openingRunning),
+        _runningBalance: openingRunning,
+      },
+      ...txRows,
+    ];
   }, [ledgerSource, dateRange, accountId]);
 
   useEffect(() => {
@@ -218,7 +241,12 @@ const LedgerTable = () => {
 
   const closingLine = useMemo(() => {
     if (!data.length) return "No entries in range.";
-    return `Closing balance: ${data[data.length - 1]["Balance ₹"]}`;
+    const last = data[data.length - 1];
+    const running =
+      typeof last._runningBalance === "number"
+        ? last._runningBalance
+        : 0;
+    return formatClosingBalanceLabel(running);
   }, [data]);
 
   const ledgerTitle = useMemo(() => {

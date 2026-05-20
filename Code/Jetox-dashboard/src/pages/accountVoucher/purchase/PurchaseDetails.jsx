@@ -1,7 +1,7 @@
 import React from "react";
 import toast from "react-hot-toast";
 import { X, FileSpreadsheet, Printer, Share2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   buildPurchaseDetailShareText,
   downloadPurchaseDetailCsv,
@@ -11,9 +11,11 @@ import {
 import { paymentStatusBadgeClasses } from "../../../utils/tableUi";
 
 const PurchaseDetails = ({ open, onClose, data }) => {
+  const { pathname = "" } = useLocation();
   if (!open || !data) return null;
-  const navigation = useNavigate();
-  const path = navigation.pathname;
+  const isPurchaseReturn =
+    data.isPurchaseReturn === true ||
+    String(pathname).includes("purchase-return");
 
   const {
     voucherNo,
@@ -38,7 +40,7 @@ const PurchaseDetails = ({ open, onClose, data }) => {
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-white px-4 py-3.5 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary dark:text-emerald-400">
-              Purchase Details
+              {isPurchaseReturn ? "Purchase Return Details" : "Purchase Details"}
             </p>
             <div className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">
               {voucherNo}
@@ -68,14 +70,14 @@ const PurchaseDetails = ({ open, onClose, data }) => {
               </div>
               <div className="flex flex-col gap-1">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Payment Status
+                  {isPurchaseReturn ? "Refund / Received Status" : "Payment Status"}
                 </div>
                 <span className={paymentStatusBadgeClasses(status)}>
                   {status}
                 </span>
               </div>
-              {(path === "/dashboard/accounting-voucher/sales" ||
-                path === "/sales-return") && (
+              {(pathname === "/dashboard/accounting-voucher/sales" ||
+                pathname === "/sales-return") && (
                 <div className="flex flex-col gap-1">
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Status
@@ -199,8 +201,14 @@ const PurchaseDetails = ({ open, onClose, data }) => {
                   value: totals.tax,
                 },
                 { label: "Discount", value: totals.discount ?? "₹0" },
-                { label: "Paid Amount", value: totals.paid },
-                { label: "Outstanding Due", value: totals.due },
+                {
+                  label: isPurchaseReturn ? "Received Amount" : "Paid Amount",
+                  value: totals.paid,
+                },
+                {
+                  label: isPurchaseReturn ? "Refund Due" : "Outstanding Due",
+                  value: totals.due,
+                },
                 { label: "Final Payable", value: totals.finalPayable },
               ].map((item) => (
                 <div

@@ -12,6 +12,7 @@ const PaymentDetailsDrawer = ({ open, onClose, data }) => {
     voucherNo,
     dateLabel,
     partyLabel,
+    paidFromLabel,
     modeLabel,
     amountLabel,
     remarks,
@@ -80,6 +81,14 @@ const PaymentDetailsDrawer = ({ open, onClose, data }) => {
                 </dt>
                 <dd className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">
                   {partyLabel}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  Paid from
+                </dt>
+                <dd className="mt-0.5 font-medium text-slate-900 dark:text-slate-100">
+                  {paidFromLabel}
                 </dd>
               </div>
               <div>

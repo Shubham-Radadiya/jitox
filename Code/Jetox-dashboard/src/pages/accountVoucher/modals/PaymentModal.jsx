@@ -12,12 +12,6 @@ import { paymentVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { usePurchaseFormMeta } from "../../../hooks/usePurchaseFormMeta";
 
-/** Backend enums (paymentVoucher.model.ts) — keep value casing identical to schema. */
-const PAYMENT_THROUGH_OPTIONS = [
-  { value: "Cash", label: "Cash" },
-  { value: "Bank", label: "Bank" },
-];
-
 const PAYMENT_STATUS_OPTIONS = [
   { value: "Pending", label: "Pending" },
   { value: "Paid", label: "Paid" },
@@ -25,7 +19,7 @@ const PAYMENT_STATUS_OPTIONS = [
 
 const emptyForm = () => ({
   date: dayjs().format("YYYY-MM-DD"),
-  paymentThrough: "Cash",
+  paymentFrom: "",
   paymentTo: "",
   amount: "",
   remarks: "",
@@ -38,15 +32,12 @@ const emptyForm = () => ({
 /** Prefill from purchase/sales row — Payment To is always left for manual pick. */
 function draftToForm(draft) {
   if (!draft) return emptyForm();
-  const through = String(draft.paymentThrough || "Cash").trim();
-  const paymentThrough =
-    through.toLowerCase() === "bank" ? "Bank" : "Cash";
   return {
     ...emptyForm(),
     date: draft.date
       ? dayjs(draft.date).format("YYYY-MM-DD")
       : dayjs().format("YYYY-MM-DD"),
-    paymentThrough,
+    paymentFrom: String(draft.paymentFrom || "").trim(),
     paymentTo: "",
     amount:
       draft.amount != null && draft.amount !== ""
@@ -61,14 +52,11 @@ function draftToForm(draft) {
 
 function paymentToForm(payment) {
   if (!payment?._id) return emptyForm();
-  const through = String(payment.paymentThrough || "Cash").trim();
-  const paymentThrough =
-    through.toLowerCase() === "bank" ? "Bank" : "Cash";
   return {
     date: payment.date
       ? dayjs(payment.date).format("YYYY-MM-DD")
       : dayjs().format("YYYY-MM-DD"),
-    paymentThrough,
+    paymentFrom: String(payment.paymentFrom || "").trim(),
     paymentTo: String(payment.paymentTo || "").trim(),
     amount:
       payment.amount != null && payment.amount !== ""
@@ -88,21 +76,19 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
   const [saving, setSaving] = useState(false);
   const isEdit = Boolean(payment?._id);
 
-  /** Same party list as purchase / sales vouchers (Account Master). */
   const {
     data: purchaseMeta,
     isLoading: partiesLoading,
     isError: partiesError,
   } = usePurchaseFormMeta({ enabled: open });
 
-  /** Next voucher no. only when creating. */
   const { data: paymentMetaRes, isLoading: voucherNoLoading } = useQuery({
     queryKey: ["payment-voucher-form-meta"],
     queryFn: async () => {
       const { data } = await paymentVouchersApi.getFormMeta();
       return data;
     },
-    enabled: open && !isEdit,
+    enabled: open,
     staleTime: 0,
   });
 
@@ -156,6 +142,28 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
     return Array.from(byValue.values());
   }, [purchaseMeta, form.paymentTo, payment]);
 
+  const paidFromOptions = useMemo(() => {
+    const list = Array.isArray(paymentMetaRes?.paidFromAccounts)
+      ? paymentMetaRes.paidFromAccounts
+      : [];
+    const byValue = new Map();
+    for (const p of list) {
+      if (!p || !String(p.value ?? "").trim()) continue;
+      const value = String(p.value).trim();
+      byValue.set(value, {
+        value,
+        label: String(p.label ?? value).trim() || value,
+      });
+    }
+    const current = String(
+      form.paymentFrom || payment?.paymentFrom || ""
+    ).trim();
+    if (current && !byValue.has(current)) {
+      byValue.set(current, { value: current, label: current });
+    }
+    return Array.from(byValue.values());
+  }, [paymentMetaRes, form.paymentFrom, payment]);
+
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -163,6 +171,9 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
   const validate = () => {
     if (!form.date) return "Pick a date.";
     if (!form.paymentTo.trim()) return "Please select Payment To.";
+    if (form.status === "Paid" && !form.paymentFrom.trim()) {
+      return "Please select Paid from (bank or cash account).";
+    }
     const n = Number(form.amount);
     if (!Number.isFinite(n) || n <= 0) return "Enter a valid amount.";
     return null;
@@ -176,7 +187,7 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
     }
     const body = {
       date: form.date,
-      paymentThrough: form.paymentThrough || "Cash",
+      paymentFrom: form.paymentFrom.trim(),
       paymentTo: form.paymentTo.trim(),
       amount: String(form.amount).trim(),
       remarks: form.remarks.trim(),
@@ -203,6 +214,7 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
             queryKey: ["voucher-list", "sales"],
           }),
           queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+          queryClient.invalidateQueries({ queryKey: ["account-ledger"] }),
         ]);
         toast.success(
           form.voucherNo
@@ -239,6 +251,7 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
         ]);
         if (body.status === "Paid") {
           await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+          await queryClient.invalidateQueries({ queryKey: ["account-ledger"] });
         }
         toast.success(`Payment voucher ${savedNo} saved.`);
       }
@@ -303,16 +316,7 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <CommonDropdown
-            label="Payment Through"
-            options={PAYMENT_THROUGH_OPTIONS}
-            value={form.paymentThrough}
-            onChange={(value) => updateField("paymentThrough", value)}
-            placeholder="Cash or Bank"
-            hideAdd
-            menuPortal
-          />
-          <CommonDropdown
-            label="Payment To"
+            label="Payment To (party)"
             options={partyOptions}
             value={form.paymentTo}
             onChange={(value) => updateField("paymentTo", value)}
@@ -320,11 +324,28 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
               partiesLoading
                 ? "Loading parties…"
                 : partyOptions.length
-                  ? "Select party"
+                  ? "Select supplier / party"
                   : "No parties — add in Account Master"
             }
             searchable
             searchPlaceholder="Search party…"
+            addNavigateTo="/dashboard/account"
+            menuPortal
+          />
+          <CommonDropdown
+            label="Paid from (bank / cash)"
+            options={paidFromOptions}
+            value={form.paymentFrom}
+            onChange={(value) => updateField("paymentFrom", value)}
+            placeholder={
+              voucherNoLoading && !paidFromOptions.length
+                ? "Loading accounts…"
+                : paidFromOptions.length
+                  ? "Select account"
+                  : "Add Bank or Cash In Hand in Account Master"
+            }
+            searchable
+            searchPlaceholder="Search account…"
             addNavigateTo="/dashboard/account"
             menuPortal
           />
@@ -356,6 +377,10 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
             placeholder="Reason for payment (optional)"
           />
         </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          When status is Paid, supplier and paid-from account balances update
+          (Tally-style). Use bank / cash-in-hand accounts from Account Master.
+        </p>
       </div>
     </CommonModal>
   );

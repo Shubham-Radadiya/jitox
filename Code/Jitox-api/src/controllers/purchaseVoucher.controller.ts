@@ -6,6 +6,10 @@ import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+import {
+  applyPartyLedgerCreditToAccountBalance,
+  reconcilePartyLedgerCreditOnVoucherChange,
+} from "../utils/applyPaymentToAccountBalance";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
 import { buildPurchasePaymentFields } from "../utils/purchasePaymentStatus";
 
@@ -176,6 +180,12 @@ export const createPurchaseVoucher = async (
       creditAmount: totalAmount,
     });
 
+    await applyPartyLedgerCreditToAccountBalance(
+      String(partyName || ""),
+      totalAmount,
+      "apply"
+    );
+
     sendCreated(res, savedVoucher, "Purchase voucher created successfully.");
   } catch (error) {
     console.error("Create Purchase Voucher Error:", error);
@@ -304,6 +314,9 @@ export const updatePurchaseVoucher = async (
       );
     }
 
+    const prevPartyName = String(voucher.partyName || "");
+    const prevTotalAmount = voucher.totalAmount;
+
     /** Snapshot stock state BEFORE patch so we can rollback the old delta cleanly. */
     const prevStockOn = shouldUpdateStock(voucher.stockDetails);
     const prevItems = Array.isArray(voucher.items)
@@ -376,6 +389,13 @@ export const updatePurchaseVoucher = async (
       creditAmount: voucher.totalAmount as unknown as string,
     });
 
+    await reconcilePartyLedgerCreditOnVoucherChange(
+      prevPartyName,
+      prevTotalAmount,
+      String(voucher.partyName || ""),
+      voucher.totalAmount
+    );
+
     sendSuccess(
       res,
       voucher,
@@ -414,6 +434,12 @@ export const deletePurchaseVoucher = async (
     }
 
     await removeDayBookEntry((deletedVoucher as any).voucherNo);
+
+    await applyPartyLedgerCreditToAccountBalance(
+      String((deletedVoucher as any).partyName || ""),
+      (deletedVoucher as any).totalAmount,
+      "reverse"
+    );
 
     res.status(200).json({ message: "Purchase voucher deleted successfully." });
   } catch (error) {

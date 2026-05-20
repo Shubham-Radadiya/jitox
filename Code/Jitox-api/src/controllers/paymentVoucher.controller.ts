@@ -12,15 +12,21 @@ import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
 import {
-  applyPaymentToAccountBalance,
+  findAccountByPartyName,
   parsePaymentAmount,
 } from "../utils/applyPaymentToAccountBalance";
+import {
+  inferPaymentThrough,
+  reconcilePaymentVoucherLedgers,
+  recomputeLinkedPurchasePayment,
+} from "../utils/paymentVoucherLedger";
 
 /** Fields accepted from PUT body when updating a payment voucher. */
 const PAYMENT_VOUCHER_PATCH_KEYS = [
   "voucherNo",
   "date",
   "paymentThrough",
+  "paymentFrom",
   "paymentTo",
   "amount",
   "remarks",
@@ -31,63 +37,41 @@ function parseAmountToNumber(value: unknown): number {
   return parsePaymentAmount(value);
 }
 
-/** Keep purchase voucher payment status in sync with its linked payment voucher. */
-async function syncLinkedPurchaseFromPaymentChange(
-  paymentDoc: {
-    sourcePurchaseId?: unknown;
-    amount?: unknown;
-  },
-  previousStatus: string,
-  nextStatus: string
-): Promise<void> {
-  const purchaseId = paymentDoc.sourcePurchaseId;
-  if (!purchaseId || !mongoose.isValidObjectId(purchaseId)) return;
-  if (previousStatus === nextStatus) return;
-
-  const purchase = await PurchaseVoucher.findById(purchaseId);
-  if (!purchase) return;
-
-  if (nextStatus === "Paid") {
-    const total = Number(purchase.totalAmount) || 0;
-    purchase.paidAmount = total;
-    purchase.paymentStatus = "Paid";
-  } else if (previousStatus === "Paid") {
-    purchase.paidAmount = 0;
-    purchase.paymentStatus = "Pending";
-  }
-  await purchase.save();
+function paymentLedgerSnapshot(doc: {
+  status?: unknown;
+  paymentTo?: unknown;
+  paymentFrom?: unknown;
+  amount?: unknown;
+}) {
+  return {
+    status: String(doc.status || ""),
+    paymentTo: String(doc.paymentTo || ""),
+    paymentFrom: String(doc.paymentFrom || ""),
+    amount: doc.amount,
+  };
 }
 
-async function reconcileAccountFromPaymentChange(
-  previousStatus: string,
-  nextStatus: string,
-  prevPaymentTo: string,
-  prevAmount: unknown,
-  nextPaymentTo: string,
-  nextAmount: unknown
-): Promise<void> {
-  const wasPaid = previousStatus === "Paid";
-  const isPaid = nextStatus === "Paid";
-
-  if (wasPaid && !isPaid) {
-    await applyPaymentToAccountBalance(prevPaymentTo, prevAmount, "reverse");
-    return;
+/** Resolve paymentThrough from paid-from account when client omits it. */
+async function resolvePaymentThroughFields(
+  paymentFrom: string,
+  paymentThrough?: unknown
+): Promise<{ paymentFrom: string; paymentThrough: "Cash" | "Bank" }> {
+  const from = String(paymentFrom || "").trim();
+  const explicit = String(paymentThrough || "").trim();
+  if (explicit === "Cash" || explicit === "Bank") {
+    return {
+      paymentFrom: from,
+      paymentThrough: explicit,
+    };
   }
-  if (!wasPaid && isPaid) {
-    await applyPaymentToAccountBalance(nextPaymentTo, nextAmount, "apply");
-    return;
+  if (!from) {
+    return { paymentFrom: from, paymentThrough: "Cash" };
   }
-  if (wasPaid && isPaid) {
-    const toChanged =
-      String(prevPaymentTo || "").trim().toLowerCase() !==
-      String(nextPaymentTo || "").trim().toLowerCase();
-    const amtChanged =
-      parsePaymentAmount(prevAmount) !== parsePaymentAmount(nextAmount);
-    if (toChanged || amtChanged) {
-      await applyPaymentToAccountBalance(prevPaymentTo, prevAmount, "reverse");
-      await applyPaymentToAccountBalance(nextPaymentTo, nextAmount, "apply");
-    }
-  }
+  const account = await findAccountByPartyName(from);
+  return {
+    paymentFrom: from,
+    paymentThrough: inferPaymentThrough(from, account?.accountType),
+  };
 }
 
 /**
@@ -135,6 +119,7 @@ export const createPaymentVoucher = async (
       voucherNo,
       date,
       paymentThrough,
+      paymentFrom,
       paymentTo,
       amount,
       remarks,
@@ -146,6 +131,19 @@ export const createPaymentVoucher = async (
     /** voucherNo is generated server-side, so it's not in the required list. */
     const requiredFields = ["date", "paymentTo", "amount"] as const;
     validateAndRespond(req.body, requiredFields, res);
+
+    const nextStatus = String(status || "Pending");
+    if (nextStatus === "Paid" && !String(paymentFrom || "").trim()) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Select Paid from (bank or cash account) when status is Paid."
+      );
+    }
+
+    const throughFields = await resolvePaymentThroughFields(
+      String(paymentFrom || ""),
+      paymentThrough
+    );
 
     if (
       sourceSalesId &&
@@ -195,12 +193,6 @@ export const createPaymentVoucher = async (
           "Linked purchase voucher not found."
         );
       }
-      if (purchase.paymentRequestId) {
-        throw new AppError(
-          HttpStatusCode.BAD_REQUEST,
-          "A payment voucher already exists for this purchase."
-        );
-      }
       if (String(purchase.paymentStatus || "") === "Paid") {
         throw new AppError(
           HttpStatusCode.BAD_REQUEST,
@@ -215,7 +207,8 @@ export const createPaymentVoucher = async (
     const newVoucher = new PaymentVoucher({
       voucherNo: resolvedVoucherNo,
       date,
-      paymentThrough,
+      paymentThrough: throughFields.paymentThrough,
+      paymentFrom: throughFields.paymentFrom,
       paymentTo,
       amount,
       remarks,
@@ -233,24 +226,37 @@ export const createPaymentVoucher = async (
       });
     }
     if (linkedPurchaseId) {
-      await PurchaseVoucher.findByIdAndUpdate(linkedPurchaseId, {
-        $set: { paymentRequestId: savedVoucher._id },
-      });
+      const purchaseLink = await PurchaseVoucher.findById(linkedPurchaseId).select(
+        "paymentRequestId"
+      );
+      if (purchaseLink && !purchaseLink.paymentRequestId) {
+        await PurchaseVoucher.findByIdAndUpdate(linkedPurchaseId, {
+          $set: { paymentRequestId: savedVoucher._id },
+        });
+      }
     }
 
     if (String(savedVoucher.status || "") === "Paid") {
-      await applyPaymentToAccountBalance(
-        String(savedVoucher.paymentTo || ""),
-        savedVoucher.amount,
-        "apply"
+      await reconcilePaymentVoucherLedgers(
+        paymentLedgerSnapshot({ status: "Pending" }),
+        paymentLedgerSnapshot(savedVoucher)
       );
     }
 
+    if (linkedPurchaseId) {
+      await recomputeLinkedPurchasePayment(linkedPurchaseId);
+    }
+
+    const particularsFrom = throughFields.paymentFrom
+      ? ` from ${throughFields.paymentFrom}`
+      : "";
     await logDayBookEntry({
       voucherNumber: savedVoucher.voucherNo as unknown as string,
       voucherType: "Payment",
-      particulars: `${paymentTo} — payment${
-        paymentThrough ? ` (${paymentThrough})` : ""
+      particulars: `${paymentTo} — payment${particularsFrom}${
+        throughFields.paymentThrough
+          ? ` (${throughFields.paymentThrough})`
+          : ""
       }`,
       debitAmount: amount,
       creditAmount: amount,
@@ -361,9 +367,8 @@ export const updatePaymentVoucher = async (
       }
     }
 
-    const previousStatus = String(voucher.status || "");
-    const prevPaymentTo = String(voucher.paymentTo || "");
-    const prevAmount = voucher.amount;
+    const previousSnap = paymentLedgerSnapshot(voucher);
+    const previousStatus = previousSnap.status;
     const patch: Record<string, unknown> = {};
     for (const key of PAYMENT_VOUCHER_PATCH_KEYS) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -371,19 +376,38 @@ export const updatePaymentVoucher = async (
       }
     }
 
+    const mergedFrom = Object.prototype.hasOwnProperty.call(patch, "paymentFrom")
+      ? String(patch.paymentFrom || "")
+      : String(voucher.paymentFrom || "");
+    const mergedThrough = Object.prototype.hasOwnProperty.call(
+      patch,
+      "paymentThrough"
+    )
+      ? patch.paymentThrough
+      : voucher.paymentThrough;
+    const throughFields = await resolvePaymentThroughFields(
+      mergedFrom,
+      mergedThrough
+    );
+    patch.paymentFrom = throughFields.paymentFrom;
+    patch.paymentThrough = throughFields.paymentThrough;
+
+    const nextStatus = String(
+      Object.prototype.hasOwnProperty.call(patch, "status")
+        ? patch.status
+        : voucher.status || ""
+    );
+    if (nextStatus === "Paid" && !throughFields.paymentFrom) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Select Paid from (bank or cash account) when status is Paid."
+      );
+    }
+
     voucher.set(patch);
     await voucher.save();
 
-    const nextStatus = String(voucher.status || "");
-
-    await reconcileAccountFromPaymentChange(
-      previousStatus,
-      nextStatus,
-      prevPaymentTo,
-      prevAmount,
-      String(voucher.paymentTo || ""),
-      voucher.amount
-    );
+    await reconcilePaymentVoucherLedgers(previousSnap, paymentLedgerSnapshot(voucher));
 
     /**
      * Keep the originating sales voucher in sync. When this payment flips
@@ -410,16 +434,17 @@ export const updatePaymentVoucher = async (
       }
     }
 
-    await syncLinkedPurchaseFromPaymentChange(
-      voucher,
-      previousStatus,
-      nextStatus
-    );
+    if (voucher.sourcePurchaseId) {
+      await recomputeLinkedPurchasePayment(voucher.sourcePurchaseId);
+    }
 
+    const particularsFrom = String(voucher.paymentFrom || "").trim()
+      ? ` from ${voucher.paymentFrom}`
+      : "";
     await logDayBookEntry({
       voucherNumber: voucher.voucherNo as unknown as string,
       voucherType: "Payment",
-      particulars: `${voucher.paymentTo} — payment${
+      particulars: `${voucher.paymentTo} — payment${particularsFrom}${
         voucher.paymentThrough ? ` (${voucher.paymentThrough})` : ""
       }`,
       debitAmount: voucher.amount as unknown as string,
@@ -455,10 +480,9 @@ export const deletePaymentVoucher = async (
      * revert the sale's `paidAmount` / `paymentStatus`.
      */
     if (String((deleted as any).status || "") === "Paid") {
-      await applyPaymentToAccountBalance(
-        String((deleted as any).paymentTo || ""),
-        (deleted as any).amount,
-        "reverse"
+      await reconcilePaymentVoucherLedgers(
+        paymentLedgerSnapshot(deleted as any),
+        paymentLedgerSnapshot({ status: "Pending" })
       );
     }
 
@@ -482,12 +506,15 @@ export const deletePaymentVoucher = async (
         (deleted as any).sourcePurchaseId
       );
       if (purchase) {
-        if (String((deleted as any).status || "") === "Paid") {
-          purchase.paidAmount = 0;
-          purchase.paymentStatus = "Pending";
+        const deletedId = String((deleted as any)._id || "");
+        if (
+          purchase.paymentRequestId &&
+          String(purchase.paymentRequestId) === deletedId
+        ) {
+          purchase.paymentRequestId = undefined;
+          await purchase.save();
         }
-        purchase.paymentRequestId = undefined;
-        await purchase.save();
+        await recomputeLinkedPurchasePayment((deleted as any).sourcePurchaseId);
       }
     }
 
@@ -554,17 +581,33 @@ export const getPaymentFormMeta = async (
     const accounts = await Account.find({
       customerStatus: { $ne: "Inactive" },
     })
-      .select("businessName name")
+      .select("businessName name accountType")
       .sort({ businessName: 1 })
       .lean();
 
-    const seen = new Set<string>();
+    const seenParty = new Set<string>();
     const parties: { value: string; label: string }[] = [];
+    const seenPaidFrom = new Set<string>();
+    const paidFromAccounts: { value: string; label: string }[] = [];
+
+    const PAID_FROM_TYPES = new Set(["BankAccounts", "CashInHand"]);
+
     for (const a of accounts) {
       const name = String(a?.businessName ?? a?.name ?? "").trim();
-      if (!name || seen.has(name)) continue;
-      seen.add(name);
-      parties.push({ value: name, label: name });
+      if (!name) continue;
+      if (!seenParty.has(name)) {
+        seenParty.add(name);
+        parties.push({ value: name, label: name });
+      }
+      const acctType = String(a?.accountType ?? "").trim();
+      if (PAID_FROM_TYPES.has(acctType) && !seenPaidFrom.has(name)) {
+        seenPaidFrom.add(name);
+        paidFromAccounts.push({ value: name, label: name });
+      }
+    }
+
+    if (!seenPaidFrom.has("Cash")) {
+      paidFromAccounts.unshift({ value: "Cash", label: "Cash" });
     }
 
     let nextPaymentVoucherNo = "JITOX-DEMO-PAY-001";
@@ -574,7 +617,7 @@ export const getPaymentFormMeta = async (
       console.error("computeNextPaymentVoucherNo", e);
     }
 
-    sendSuccess(res, { nextPaymentVoucherNo, parties });
+    sendSuccess(res, { nextPaymentVoucherNo, parties, paidFromAccounts });
   } catch (error) {
     console.error("getPaymentFormMeta", error);
     res

@@ -9,13 +9,16 @@ import {
   manufacturingVouchersApi,
   quotationsApi,
 } from "../../services/api";
-import { buildPaymentReceiptData } from "../../utils/paymentReceipt";
+import {
+  buildPaymentReceiptData,
+  receiptReceivedByFromParty,
+} from "../../utils/paymentReceipt";
 import dayjs from "dayjs";
 import {
   findAccountByBusinessName,
 } from "../../utils/accountMappers";
 import {
-  purchaseDocToDetailShape,
+  purchaseReturnDocToDetailShape,
   salesDocToOrderDetailShape,
   fmtRupee,
 } from "../../utils/voucherRowMappers";
@@ -53,7 +56,7 @@ export async function fetchQuotationDetail(id) {
 export async function fetchPurchaseReturnDetail(id) {
   const { data } = await purchaseReturnVouchersApi.getById(id);
   const partyAccount = await loadPartyAccountForVoucher(data);
-  return purchaseDocToDetailShape(data, partyAccount);
+  return purchaseReturnDocToDetailShape(data, partyAccount);
 }
 
 export async function fetchSalesOrderDetail(id) {
@@ -201,7 +204,17 @@ export async function fetchReceiptDetail(id) {
   const vRes = await receiptVouchersApi.getById(id);
   const p = vRes?.data;
   if (!p || !p._id) return null;
-  return buildPaymentReceiptData(p);
+  const partyAccount = await loadPartyAccountForVoucher({
+    partyName: p.receiptFrom,
+  });
+  return buildPaymentReceiptData({
+    ...p,
+    partyAccount,
+    receivedBy: receiptReceivedByFromParty(
+      partyAccount,
+      p.receiptFrom
+    ),
+  });
 }
 
 /** Shape for `PaymentDetailsDrawer`. */
@@ -217,6 +230,7 @@ export async function fetchPaymentDetail(id) {
     voucherNo: p.voucherNo || "—",
     dateLabel: p.date ? dayjs(p.date).format("DD MMM YYYY") : "—",
     partyLabel: String(p.paymentTo || "").trim() || "—",
+    paidFromLabel: String(p.paymentFrom || "").trim() || "—",
     modeLabel: String(p.paymentThrough || "").trim() || "—",
     amountLabel: amt != null ? fmtRupee(amt) : "—",
     remarks: String(p.remarks || "").trim() || "—",

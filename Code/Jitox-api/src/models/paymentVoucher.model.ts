@@ -6,6 +6,8 @@ const paymentVoucherSchema = new Schema<IPaymentVoucher>(
     voucherNo: { type: String, required: true, trim: true },
     date: { type: Date },
     paymentThrough: { type: String, trim: true, enum: ["Cash", "Bank"] },
+    /** Bank / cash-in-hand account money left (Tally Cr side). Generic "Cash" skips balance. */
+    paymentFrom: { type: String, trim: true },
     paymentTo: { type: String, trim: true },
     amount: { type: String, trim: true },
     remarks: { type: String, trim: true },

@@ -39,7 +39,7 @@ export function resolveDayBookAmounts(
 
   const t = String(voucherType || "").trim().toLowerCase();
 
-  if (t === "receipt" || t === "sales") {
+  if (t === "receipt" || t === "sales" || t === "sales return") {
     return { debitAmount: "0", creditAmount: amt };
   }
   if (t === "purchase return") {

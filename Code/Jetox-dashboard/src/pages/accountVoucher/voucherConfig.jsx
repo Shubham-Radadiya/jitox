@@ -27,13 +27,19 @@ import {
   shareOrCopyText,
 } from "../../utils/voucherShare";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { purchaseRowHasParty } from "../../utils/purchasePaymentStatus";
+import {
+  purchaseRowHasParty,
+  purchaseRowIsFullyPaid,
+  purchaseReturnRowHasParty,
+  purchaseReturnRowHasRefund,
+} from "../../utils/purchasePaymentStatus";
 import { buildUploadUrl } from "../../utils/uploadUrl";
 import { IoEyeOutline, IoDocumentTextOutline } from "react-icons/io5";
 import { TbEdit } from "react-icons/tb";
 import {
   BadgeCheck,
   CreditCard,
+  Banknote,
   FileSpreadsheet,
   Paperclip,
   Plus,
@@ -80,24 +86,36 @@ const withFooter = (columns, cells = []) => (
 );
 
 const purchaseFooterRenderer = (columns, rows = []) => {
-  let debit = 0;
+  let total = 0;
+  let paid = 0;
+  let remaining = 0;
   rows.forEach((r) => {
-    debit += parseRupeeCell(r["Debit Amount"]);
+    total += parseRupeeCell(r["Total Amount"] || r["Debit Amount"]);
+    paid += parseRupeeCell(r["Paid Amount"]);
+    remaining += parseRupeeCell(r["Due Amount"]);
   });
   return withFooter(columns, [
     { column: "Party Name", content: "Grand Total" },
-    { column: "Debit Amount", content: fmtRupee(debit) },
+    { column: "Total Amount", content: fmtRupee(total) },
+    { column: "Paid Amount", content: fmtRupee(paid) },
+    { column: "Due Amount", content: fmtRupee(remaining) },
   ]);
 };
 
 const purchaseReturnFooterRenderer = (columns, rows = []) => {
-  let debit = 0;
+  let total = 0;
+  let paid = 0;
+  let remaining = 0;
   rows.forEach((r) => {
-    debit += parseRupeeCell(r["Debit Amount"]);
+    total += parseRupeeCell(r["Total Amount"] || r["Debit Amount"]);
+    paid += parseRupeeCell(r["Paid Amount"]);
+    remaining += parseRupeeCell(r["Due Amount"]);
   });
   return withFooter(columns, [
     { column: "Party Name", content: "Grand Total" },
-    { column: "Debit Amount", content: fmtRupee(debit) },
+    { column: "Total Amount", content: fmtRupee(total) },
+    { column: "Paid Amount", content: fmtRupee(paid) },
+    { column: "Due Amount", content: fmtRupee(remaining) },
   ]);
 };
 
@@ -128,7 +146,9 @@ const purchaseColumns = [
   "Date",
   "Party Name",
   "Voucher No.",
-  "Debit Amount",
+  "Total Amount",
+  "Paid Amount",
+  "Due Amount",
   "Payment Status",
   "Actions",
 ];
@@ -137,7 +157,10 @@ const purchaseReturnColumns = [
   "Date",
   "Party Name",
   "Voucher No.",
-  "Debit Amount",
+  "Total Amount",
+  "Paid Amount",
+  "Due Amount",
+  "Payment Status",
   "Actions",
 ];
 
@@ -168,6 +191,7 @@ const paymentColumns = [
   "Voucher No",
   "Date",
   "Party",
+  "Paid From",
   "Mode",
   "Amount",
   "Status",
@@ -177,8 +201,8 @@ const paymentColumns = [
 const receiptColumns = [
   "Voucher No",
   "Date",
-  "Receipt Through",
-  "Receipt Form",
+  "Receipt From",
+  "Received In",
   "Amount (₹)",
   "Narration",
   "Status",
@@ -270,7 +294,8 @@ const voucherAddButton = (overrides = {}) => {
 const createActionButtons = (actions, { openDetails, navigate, row, openPurchaseModal }) => {
   const tooltipLabels = {
     eye: "View",
-    payNow: "Pay Now",
+    payNow: "Mark as Paid",
+    payNowPaid: "Already paid",
     payReqSend: "Request send Pay Now",
     edit: "Edit",
     revoucher: "Re-voucher",
@@ -285,6 +310,9 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
     mfgPause: "Pause",
     mfgStop: "Mark failed",
     purchaseMarkPaid: "Create payment voucher",
+    purchaseReturnRefund: "Refund money — create receipt",
+    receiptReceive: "Record refund — bank/cash and Received",
+    receiptReceived: "Already received",
   };
 
   /** Named group so tooltips only react to this wrapper, not the `<tr class="group">` in TableContent */
@@ -325,24 +353,42 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
             );
           } 
           if (action.type === "payNow") {
-            // Only show if status is Pending (unless condition is disabled)
-            if (action.showCondition !== false && row.Status !== "Pending") return null;
+            const isPaid = String(row.Status || "").trim() === "Paid";
+            const disabled =
+              (action.showCondition !== false && isPaid) ||
+              (typeof action.isDisabled === "function" &&
+                !!action.isDisabled(row));
+            let tooltip = action.tooltip || tooltipLabels.payNow;
+            if (disabled) {
+              if (isPaid) {
+                tooltip = action.paidTooltip || tooltipLabels.payNowPaid;
+              } else if (action.disabledTooltip) {
+                tooltip = action.disabledTooltip;
+              }
+            }
             return renderButtonWithTooltip(
               <button
                 type="button"
                 onClick={() => {
+                  if (disabled) return;
                   if (action.onClick) action.onClick(row, navigate);
                   else
                     toast.success(
                       `Record payment for ${row.Party || "party"} — use Add voucher on the list.`
                     );
                 }}
-                className="hover:text-blue transition"
+                disabled={disabled}
+                className={
+                  disabled
+                    ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                    : "hover:text-blue transition"
+                }
                 aria-label="Pay now"
+                aria-disabled={disabled || undefined}
               >
                 <CreditCard size={18} />
               </button>,
-              action.tooltip || tooltipLabels.payNow,
+              tooltip,
               index
             );
           }
@@ -552,6 +598,84 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
               index
             );
           }
+          if (action.type === "purchaseReturnRefund") {
+            const hasRefund =
+              typeof action.hasRefund === "function"
+                ? action.hasRefund(row)
+                : false;
+            const noParty =
+              typeof action.hasParty === "function"
+                ? !action.hasParty(row)
+                : false;
+            const disabled =
+              hasRefund ||
+              noParty ||
+              (typeof action.isDisabled === "function" &&
+                !!action.isDisabled(row));
+            let tooltip =
+              action.tooltip || tooltipLabels.purchaseReturnRefund;
+            if (disabled) {
+              if (hasRefund) {
+                tooltip = action.refundTooltip || "Refund receipt already created";
+              } else if (noParty) {
+                tooltip =
+                  action.noPartyTooltip ||
+                  "Set Party Name on purchase return first";
+              } else if (action.disabledTooltip) {
+                tooltip = action.disabledTooltip;
+              }
+            }
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => {
+                  if (disabled) return;
+                  action.onClick?.(row);
+                }}
+                disabled={disabled}
+                className={
+                  disabled
+                    ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                    : "text-emerald-500 hover:text-emerald-600 transition dark:text-emerald-400 dark:hover:text-emerald-300"
+                }
+                aria-label="Refund from supplier"
+                aria-disabled={disabled || undefined}
+              >
+                <Banknote size={18} />
+              </button>,
+              tooltip,
+              index
+            );
+          }
+          if (action.type === "receiptReceive") {
+            const isReceived = String(row.Status || "").trim() === "Received";
+            const disabled = isReceived;
+            let tooltip = action.tooltip || tooltipLabels.receiptReceive;
+            if (disabled) {
+              tooltip = action.receivedTooltip || tooltipLabels.receiptReceived;
+            }
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => {
+                  if (disabled) return;
+                  action.onClick?.(row);
+                }}
+                disabled={disabled}
+                className={
+                  disabled
+                    ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                    : "text-emerald-500 hover:text-emerald-600 transition dark:text-emerald-400 dark:hover:text-emerald-300"
+                }
+                aria-label="Record refund / receipt"
+                aria-disabled={disabled || undefined}
+              >
+                <Banknote size={18} />
+              </button>,
+              tooltip,
+              index
+            );
+          }
           if (action.type === "purchaseMarkPaid") {
             const current = String(row["Payment Status"] || "").trim();
             const isPaid = current === "Paid";
@@ -632,6 +756,18 @@ const purchaseReturnRowRenderer = (key, value, defaultRenderer) => {
     return (
       <td className={`${tableTdClasses(key)} text-slate-500 dark:text-slate-400`}>
         {dayjs(value).format("DD-MMM-YY")}
+      </td>
+    );
+  }
+  if (key === "Payment Status") {
+    const label = String(value || "Pending").trim() || "Pending";
+    return (
+      <td className={tableTdClasses(key)}>
+        <div className="flex justify-center">
+          <span className={paymentStatusBadgeClasses(label)}>
+            {label}
+          </span>
+        </div>
       </td>
     );
   }
@@ -787,8 +923,8 @@ export const voucherConfigs = {
               hasParty: (r) => purchaseRowHasParty(r),
               noPartyTooltip:
                 "Select Party Name (supplier) on purchase — use Edit first",
-              isDisabled: (r) => Boolean(r?._raw?.paymentRequestId),
-              disabledTooltip: "Payment voucher already created",
+              isDisabled: (r) => purchaseRowIsFullyPaid(r),
+              disabledTooltip: "Purchase bill fully paid",
               onClick: (r) => createPaymentRequestForPurchase?.(r),
             },
             {
@@ -855,6 +991,8 @@ export const voucherConfigs = {
     detailsComponent: PurchaseDetails,
     enableColumnPicker: false,
     renderRowCell: purchaseReturnRowRenderer,
+    /** Refund button opens receipt modal — must be registered on this slug too. */
+    modals: [{ key: "receipt-modal", component: ReceiptModal }],
     filterFields: [
       voucherAddButton({
         key: "addPurchaseReturn",
@@ -868,11 +1006,22 @@ export const voucherConfigs = {
         navigate,
         openPurchaseReturnModal,
         deletePurchaseReturnVoucher,
+        createRefundReceiptForPurchaseReturn,
       }) =>
       (row) =>
         createActionButtons(
           [
             { type: "eye" },
+            {
+              type: "purchaseReturnRefund",
+              tooltip: "Refund from supplier — create receipt",
+              refundTooltip: "Refund receipt already created",
+              hasParty: (r) => purchaseReturnRowHasParty(r),
+              hasRefund: (r) => purchaseReturnRowHasRefund(r),
+              noPartyTooltip:
+                "Set Party Name (supplier) on purchase return — use Edit first",
+              onClick: (r) => createRefundReceiptForPurchaseReturn?.(r),
+            },
             {
               type: "revoucher",
               onClick: (r) => openPurchaseReturnModal?.(r, "revoucher"),
@@ -1026,13 +1175,24 @@ export const voucherConfigs = {
             },
             {
               type: "payNow",
+              tooltip: "Mark voucher as Paid",
+              paidTooltip: "Already paid",
               onClick: async (r) => {
                 const id = r?._id;
                 const voucherNo = r?.["Voucher No"] || "";
                 const payTo = String(r.Party || "").trim();
+                const paidFrom = String(
+                  r["Paid From"] || r?._raw?.paymentFrom || ""
+                ).trim();
                 if (!payTo || payTo === "—") {
                   toast.error(
                     "Please select Payment To on this voucher (use Edit)."
+                  );
+                  return;
+                }
+                if (!paidFrom || paidFrom === "—") {
+                  toast.error(
+                    "Select Paid from (bank or cash) using Edit before marking Paid."
                   );
                   return;
                 }
@@ -1111,39 +1271,22 @@ export const voucherConfigs = {
       }),
     ],
     buildTableAction:
-      ({ openDetails, navigate, markReceiptVoucherPaid }) =>
+      ({ openDetails, navigate, openReceiptEdit, openReceiptRecordReceived }) =>
       (row) =>
         createActionButtons(
           [
             { type: "eye" },
             {
-              type: "payNow",
-              tooltip: "Mark as Received",
-              onClick: async (r) => {
-                const id = r?._id;
-                const voucherNo = r?.["Voucher No"] || "";
-                if (!id || typeof markReceiptVoucherPaid !== "function") {
-                  toast.error("Cannot update this voucher (missing id).");
-                  return;
-                }
-                if (
-                  !window.confirm(
-                    `Mark receipt voucher ${voucherNo} as Received?`
-                  )
-                ) {
-                  return;
-                }
-                try {
-                  await markReceiptVoucherPaid(id);
-                  toast.success(
-                    voucherNo
-                      ? `Voucher ${voucherNo} marked as Received.`
-                      : "Receipt voucher marked as Received."
-                  );
-                } catch (e) {
-                  toast.error(getApiErrorMessage(e, "Could not update status"));
-                }
-              },
+              type: "receiptReceive",
+              tooltip:
+                "Record refund — select Received in (bank/cash) and save",
+              receivedTooltip: "Already received",
+              onClick: (r) => openReceiptRecordReceived?.(r),
+            },
+            {
+              type: "edit",
+              tooltip: "Edit receipt voucher",
+              onClick: (r) => openReceiptEdit?.(r),
             },
           ],
           { openDetails, navigate, row }

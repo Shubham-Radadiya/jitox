@@ -6,6 +6,10 @@ import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
 import { logDayBookEntry, removeDayBookEntry } from "../utils/dayBookLogger";
+import {
+  applyPartyLedgerDebitToAccountBalance,
+  reconcilePartyLedgerDebitOnVoucherChange,
+} from "../utils/applyPaymentToAccountBalance";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
 
 /** Fields accepted from PUT body when updating a purchase return voucher */
@@ -145,6 +149,12 @@ export const createPurchaseReturnVoucher = async (
       creditAmount: totalAmount,
     });
 
+    await applyPartyLedgerDebitToAccountBalance(
+      String(partyName || ""),
+      totalAmount,
+      "apply"
+    );
+
     res.status(201).json({
       message: "Purchase return voucher created successfully.",
       data: savedVoucher,
@@ -207,6 +217,9 @@ export const getAllPurchaseReturnVouchers = async (
           stockDetails: 1,
           gstAmount: 1,
           paymentMode: 1,
+          refundRequestId: 1,
+          refundedAmount: 1,
+          refundStatus: 1,
           basePrice: 1,
           createdAt: 1,
           updatedAt: 1,
@@ -269,6 +282,9 @@ export const updatePurchaseReturnVoucher = async (
         "No purchase return vouchers found."
       );
     }
+
+    const prevPartyName = String(voucher.partyName || "");
+    const prevTotalAmount = voucher.totalAmount;
 
     /** Snapshot prior stock state so we can rollback before applying new lines. */
     const prevStockOn = shouldUpdateStock(voucher.stockDetails);
@@ -340,6 +356,13 @@ export const updatePurchaseReturnVoucher = async (
       creditAmount: voucher.totalAmount as unknown as string,
     });
 
+    await reconcilePartyLedgerDebitOnVoucherChange(
+      prevPartyName,
+      prevTotalAmount,
+      String(voucher.partyName || ""),
+      voucher.totalAmount
+    );
+
     res.status(200).json({
       message: "Purchase return voucher updated successfully.",
       data: voucher,
@@ -377,6 +400,12 @@ export const deletePurchaseReturnVoucher = async (
     }
 
     await removeDayBookEntry((deletedVoucher as any).voucherNo);
+
+    await applyPartyLedgerDebitToAccountBalance(
+      String((deletedVoucher as any).partyName || ""),
+      (deletedVoucher as any).totalAmount,
+      "reverse"
+    );
 
     res
       .status(200)

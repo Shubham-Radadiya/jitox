@@ -1,5 +1,8 @@
 import dayjs from "dayjs";
-import { resolvePurchasePaymentStatusDisplay } from "./purchasePaymentStatus";
+import {
+  resolvePurchasePaymentStatusDisplay,
+  resolvePurchaseReturnRefundStatusDisplay,
+} from "./purchasePaymentStatus";
 
 export function fmtRupee(n) {
   const x = Number(n);
@@ -32,22 +35,36 @@ export function sumPurchaseLineDiscounts(items) {
   return list.reduce((sum, it) => sum + purchaseLineDiscount(it), 0);
 }
 
+function purchaseRowPaidAmount(v) {
+  const total = Number(v.totalAmount) || 0;
+  const status = resolvePurchasePaymentStatusDisplay(v);
+  let paid = Number(v.paidAmount);
+  if (!Number.isFinite(paid)) {
+    if (status === "Paid") paid = total;
+    else if (status === "Unpaid") paid = 0;
+    else paid = 0;
+  }
+  return Math.max(0, Math.min(total, paid));
+}
+
 export function mapPurchaseAggregateRow(v) {
   const id = v._id;
   const date = v.voucherDate
     ? dayjs(v.voucherDate).format("YYYY-MM-DD")
     : "";
-  const debit =
-    v.totalAmount != null
-      ? fmtRupee(v.totalAmount)
-      : "—";
+  const total = Number(v.totalAmount) || 0;
+  const paid = purchaseRowPaidAmount(v);
+  const remaining = Math.max(0, total - paid);
   return {
     _id: id,
     _raw: v,
     Date: date,
     "Party Name": v.partyName || "—",
     "Voucher No.": v.voucherNo || "—",
-    "Debit Amount": debit,
+    "Total Amount": fmtRupee(total),
+    "Paid Amount": fmtRupee(paid),
+    "Due Amount": fmtRupee(remaining),
+    "Debit Amount": total > 0 ? fmtRupee(total) : "—",
     "Payment Status": resolvePurchasePaymentStatusDisplay(v),
   };
 }
@@ -57,14 +74,21 @@ export function mapPurchaseReturnAggregateRow(v) {
   const date = v.voucherDate
     ? dayjs(v.voucherDate).format("YYYY-MM-DD")
     : "";
+  const total = Number(v.totalAmount) || 0;
+  const paid = Number(v.refundedAmount) || 0;
+  const remaining = Math.max(0, total - paid);
+  const paymentStatus = resolvePurchaseReturnRefundStatusDisplay(v);
   return {
     _id: id,
     _raw: v,
     Date: date,
     "Party Name": v.partyName || "—",
     "Voucher No.": v.voucherNo || "—",
-    "Debit Amount":
-      v.totalAmount != null ? fmtRupee(v.totalAmount) : "—",
+    "Total Amount": fmtRupee(total),
+    "Paid Amount": fmtRupee(paid),
+    "Due Amount": fmtRupee(remaining),
+    "Payment Status": paymentStatus,
+    "Debit Amount": total > 0 ? fmtRupee(total) : "—",
   };
 }
 
@@ -162,6 +186,7 @@ export function mapPaymentVoucherRow(v) {
     "Voucher No": v.voucherNo || "—",
     Date: v.date ? dayjs(v.date).format("YYYY-MM-DD") : "—",
     Party: v.paymentTo || "—",
+    "Paid From": v.paymentFrom || "—",
     Mode: mode === "bank" ? "bank" : mode === "cash" ? "cash" : mode || "—",
     Amount: v.amount != null ? fmtRupee(parseFloat(String(v.amount))) : "—",
     Status: v.status || "Pending",
@@ -175,8 +200,9 @@ export function mapAccountingReceiptRow(v) {
     _raw: v,
     "Voucher No": v.voucherNo || "—",
     Date: v.date ? dayjs(v.date).format("YYYY-MM-DD") : "—",
-    "Receipt Through": v.receiptThrough || "—",
-    "Receipt Form": v.receiptFrom || "—",
+    "Receipt From": v.receiptFrom || "—",
+    "Received In": v.receivedIn || "—",
+    Mode: v.receiptThrough || "—",
     "Amount (₹)":
       v.amount != null
         ? Number(String(v.amount).replace(/,/g, "")).toLocaleString("en-IN")
@@ -268,9 +294,19 @@ function pushDetailRow(rows, label, value) {
 }
 
 /** Shape expected by PurchaseDetails drawer */
-export function purchaseDocToDetailShape(doc, partyAccount = null) {
+/** Purchase return view drawer — refund received = paid amount, status Received/Partial/Pending. */
+export function purchaseReturnDocToDetailShape(doc, partyAccount = null) {
+  return purchaseDocToDetailShape(doc, partyAccount, { isPurchaseReturn: true });
+}
+
+export function purchaseDocToDetailShape(
+  doc,
+  partyAccount = null,
+  options = {}
+) {
   const d = doc;
   if (!d) return null;
+  const isPurchaseReturn = options.isPurchaseReturn === true;
 
   const basePriceNum = Number(d.basePrice);
   const gstAmountNum = Number(d.gstAmount);
@@ -322,14 +358,20 @@ export function purchaseDocToDetailShape(doc, partyAccount = null) {
 
   const termsAndConditions = String(d.termsAndConditions || "").trim();
 
-  const paymentStatus = resolvePurchasePaymentStatusDisplay(d);
+  const paymentStatus = isPurchaseReturn
+    ? resolvePurchaseReturnRefundStatusDisplay(d)
+    : resolvePurchasePaymentStatusDisplay(d);
   const totalNum = Number(d.totalAmount) || 0;
-  let paidNum = Number(d.paidAmount);
+  let paidNum = isPurchaseReturn
+    ? Number(d.refundedAmount)
+    : Number(d.paidAmount);
   if (!Number.isFinite(paidNum)) {
-    if (paymentStatus === "Paid") paidNum = totalNum;
-    else if (paymentStatus === "Unpaid") paidNum = 0;
+    if (!isPurchaseReturn && paymentStatus === "Paid") paidNum = totalNum;
+    else if (!isPurchaseReturn && paymentStatus === "Unpaid") paidNum = 0;
+    else if (isPurchaseReturn && paymentStatus === "Received") paidNum = totalNum;
     else paidNum = 0;
   }
+  paidNum = Math.max(0, Math.min(totalNum, paidNum));
   const dueNum = Math.max(0, totalNum - paidNum);
 
   const discountNum = Math.round(sumPurchaseLineDiscounts(d.items));
@@ -343,6 +385,7 @@ export function purchaseDocToDetailShape(doc, partyAccount = null) {
   return {
     voucherNo: d.voucherNo || "—",
     status: paymentStatus,
+    isPurchaseReturn,
     paymentTerms: d.termsOfPayment
       ? String(d.termsOfPayment)
       : d.paymentMode

@@ -89,12 +89,17 @@ export function purchasePayloadToCreateBody(payload) {
   const shipStored = sd ? shipRaw : billTo;
 
   const paymentStatusRaw = String(payload.paymentStatus || "Pending").trim();
-  const normalizedStatus = ["Pending", "Paid", "Unpaid"].includes(
+  const normalizedStatus = ["Pending", "Partial", "Paid", "Unpaid"].includes(
     paymentStatusRaw
   )
     ? paymentStatusRaw
     : "Pending";
-  const paidAmount = normalizedStatus === "Paid" ? totalAmount : 0;
+  const paidFromPayload = Number(payload.paidAmount);
+  let paidAmount = 0;
+  if (normalizedStatus === "Paid") paidAmount = totalAmount;
+  else if (normalizedStatus === "Partial" && Number.isFinite(paidFromPayload)) {
+    paidAmount = Math.min(totalAmount, Math.max(0, paidFromPayload));
+  }
 
   const invoicePrefix = String(payload.invoicePrefix ?? "").trim();
   const invoiceNumber = String(payload.invoiceNumber ?? "").trim();

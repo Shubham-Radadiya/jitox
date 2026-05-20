@@ -1,5 +1,8 @@
 import dayjs from "dayjs";
-import { resolvePurchasePaymentStatusDisplay } from "../../../utils/purchasePaymentStatus";
+import {
+  resolvePurchasePaymentStatusDisplay,
+  resolvePurchaseReturnRefundStatusDisplay,
+} from "../../../utils/purchasePaymentStatus";
 
 export {
   PURCHASE_PAYMENT_STATUS_OPTIONS,
@@ -140,7 +143,17 @@ export function mapPurchaseApiDocToPrefill(doc) {
     else if (paymentLower === "credit") termsPayment = "credit";
   }
 
-  const paymentStatus = resolvePurchasePaymentStatusDisplay(doc);
+  const isReturnDoc =
+    doc.refundStatus != null ||
+    doc.refundedAmount != null ||
+    doc.refundRequestId != null;
+  const paymentStatus = isReturnDoc
+    ? resolvePurchaseReturnRefundStatusDisplay(doc)
+    : resolvePurchasePaymentStatusDisplay(doc);
+  const totalAmount = Number(doc.totalAmount) || 0;
+  const paidAmount = isReturnDoc
+    ? Number(doc.refundedAmount) || 0
+    : Number(doc.paidAmount) || 0;
 
   let gstRate = "";
   const base = Number(doc.basePrice);
@@ -210,6 +223,9 @@ export function mapPurchaseApiDocToPrefill(doc) {
     termsText,
     termsPayment,
     paymentStatus,
+    totalAmount,
+    paidAmount,
+    isPurchaseReturnDoc: isReturnDoc,
     gstRate,
     productRows,
     stockToggle: doc.stockDetails?.stockQuantity !== false,

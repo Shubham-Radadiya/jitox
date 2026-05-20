@@ -10,11 +10,7 @@ import {
 } from "../../../components/ui/CommanUI";
 import { receiptVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
-
-const RECEIPT_THROUGH_OPTIONS = [
-  { value: "Cash", label: "Cash" },
-  { value: "Bank", label: "Bank" },
-];
+import { usePurchaseFormMeta } from "../../../hooks/usePurchaseFormMeta";
 
 const RECEIPT_STATUS_OPTIONS = [
   { value: "Pending", label: "Pending" },
@@ -23,17 +19,59 @@ const RECEIPT_STATUS_OPTIONS = [
 
 const emptyForm = () => ({
   date: dayjs().format("YYYY-MM-DD"),
-  receiptThrough: "Cash",
+  receivedIn: "",
   receiptFrom: "",
   amount: "",
   remarks: "",
   status: "Paid",
+  voucherNo: "",
 });
 
-const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
+function receiptToForm(receipt) {
+  if (!receipt?._id) return emptyForm();
+  return {
+    date: receipt.date
+      ? dayjs(receipt.date).format("YYYY-MM-DD")
+      : dayjs().format("YYYY-MM-DD"),
+    receivedIn: String(receipt.receivedIn || "").trim(),
+    receiptFrom: String(receipt.receiptFrom || "").trim(),
+    amount:
+      receipt.amount != null && receipt.amount !== ""
+        ? String(receipt.amount).replace(/,/g, "")
+        : "",
+    remarks: String(receipt.remarks || ""),
+    status: String(receipt.status || "Pending") === "Paid" ? "Paid" : "Pending",
+    voucherNo: String(receipt.voucherNo || "").trim(),
+  };
+}
+
+const ReceiptModal = ({
+  open,
+  onClose,
+  sourceSalesId,
+  prefilled,
+  draft = null,
+  receipt = null,
+}) => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(receipt?._id);
+  const linkedSalesId = String(
+    draft?.sourceSalesId ||
+      sourceSalesId ||
+      receipt?.sourceSalesId ||
+      ""
+  ).trim();
+  const linkedPurchaseReturnId = String(
+    draft?.sourcePurchaseReturnId || receipt?.sourcePurchaseReturnId || ""
+  ).trim();
+
+  const {
+    data: purchaseMeta,
+    isLoading: partiesLoading,
+    isError: partiesError,
+  } = usePurchaseFormMeta({ enabled: open });
 
   const { data: metaRes, isLoading: metaLoading, isError: metaError } = useQuery({
     queryKey: ["receipt-voucher-form-meta"],
@@ -51,34 +89,99 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
       setSaving(false);
       return;
     }
+    if (receipt?._id) {
+      setForm(receiptToForm(receipt));
+      setSaving(false);
+      return;
+    }
+    if (draft) {
+      setForm({
+        ...emptyForm(),
+        date: draft.date
+          ? dayjs(draft.date).format("YYYY-MM-DD")
+          : dayjs().format("YYYY-MM-DD"),
+        receivedIn: String(draft.receivedIn || "").trim(),
+        receiptFrom: String(draft.receiptFrom || "").trim(),
+        amount:
+          draft.amount != null && draft.amount !== ""
+            ? String(draft.amount).replace(/,/g, "")
+            : "",
+        remarks: String(draft.remarks || ""),
+        status: String(draft.status || "Paid") === "Paid" ? "Paid" : "Pending",
+      });
+      setSaving(false);
+      return;
+    }
     if (prefilled) {
       setForm((prev) => ({
         ...prev,
         ...prefilled,
+        receivedIn: String(prefilled.receivedIn || prev.receivedIn || "").trim(),
+        receiptFrom: String(prefilled.receiptFrom || prev.receiptFrom || "").trim(),
       }));
+    } else {
+      setForm(emptyForm());
     }
-  }, [open, prefilled]);
+    setSaving(false);
+  }, [open, prefilled, draft, receipt]);
 
   useEffect(() => {
     if (metaError) {
-      toast.error("Could not load parties or voucher number. Please retry.");
+      toast.error("Could not load voucher number or bank/cash accounts.");
     }
   }, [metaError]);
 
+  useEffect(() => {
+    if (partiesError) {
+      toast.error(
+        "Could not load party list. Check Account Master or refresh."
+      );
+    }
+  }, [partiesError]);
+
   const nextVoucherNo = useMemo(() => {
+    if (isEdit) return form.voucherNo || "—";
     const v = String(metaRes?.nextReceiptVoucherNo ?? "").trim();
     return v || "Auto";
-  }, [metaRes]);
+  }, [metaRes, isEdit, form.voucherNo]);
 
   const partyOptions = useMemo(() => {
-    const list = Array.isArray(metaRes?.parties) ? metaRes.parties : [];
-    return list
-      .filter((p) => p && String(p.value ?? "").trim())
-      .map((p) => ({
-        value: String(p.value),
-        label: String(p.label ?? p.value),
-      }));
-  }, [metaRes]);
+    const list = Array.isArray(purchaseMeta?.parties) ? purchaseMeta.parties : [];
+    const byValue = new Map();
+    for (const p of list) {
+      if (!p || !String(p.value ?? "").trim()) continue;
+      const value = String(p.value).trim();
+      byValue.set(value, {
+        value,
+        label: String(p.label ?? value).trim() || value,
+      });
+    }
+    const current = String(form.receiptFrom || "").trim();
+    if (current && !byValue.has(current)) {
+      byValue.set(current, { value: current, label: current });
+    }
+    return Array.from(byValue.values());
+  }, [purchaseMeta, form.receiptFrom]);
+
+  const receivedInOptions = useMemo(() => {
+    const list = Array.isArray(metaRes?.receivedInAccounts)
+      ? metaRes.receivedInAccounts
+      : [];
+    const byValue = new Map();
+    for (const p of list) {
+      if (!p || !String(p.value ?? "").trim()) continue;
+      const value = String(p.value).trim();
+      byValue.set(value, {
+        value,
+        label: String(p.label ?? value).trim() || value,
+      });
+    }
+    const current = String(form.receivedIn || "").trim();
+    if (current && !byValue.has(current)) {
+      byValue.set(current, { value: current, label: current });
+    }
+    return Array.from(byValue.values());
+  }, [metaRes, form.receivedIn]);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -86,7 +189,10 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
 
   const validate = () => {
     if (!form.date) return "Pick a date.";
-    if (!form.receiptFrom.trim()) return "Select who paid you.";
+    if (!form.receiptFrom.trim()) return "Please select Receipt From (party).";
+    if (form.status === "Paid" && !form.receivedIn.trim()) {
+      return "Please select Received in (bank or cash account).";
+    }
     const n = Number(form.amount);
     if (!Number.isFinite(n) || n <= 0) return "Enter a valid amount.";
     return null;
@@ -101,24 +207,35 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
 
     const body = {
       date: form.date,
-      receiptThrough: form.receiptThrough || "Cash",
+      receivedIn: form.receivedIn.trim(),
       receiptFrom: form.receiptFrom.trim(),
       amount: String(form.amount).trim(),
       remarks: form.remarks.trim(),
       status: form.status || "Paid",
     };
 
-    if (sourceSalesId) {
-      body.sourceSalesId = sourceSalesId;
+    if (!isEdit) {
+      if (linkedSalesId) {
+        body.sourceSalesId = linkedSalesId;
+      }
+      if (linkedPurchaseReturnId) {
+        body.sourcePurchaseReturnId = linkedPurchaseReturnId;
+      }
     }
 
     try {
       setSaving(true);
-      const res = await receiptVouchersApi.create(body);
-      const savedNo =
-        res?.data?.data?.voucherNo ||
-        res?.data?.voucherNo ||
-        nextVoucherNo;
+      let savedNo = nextVoucherNo;
+      if (isEdit) {
+        await receiptVouchersApi.update(String(receipt._id), body);
+        savedNo = form.voucherNo || savedNo;
+      } else {
+        const res = await receiptVouchersApi.create(body);
+        savedNo =
+          res?.data?.data?.voucherNo ||
+          res?.data?.voucherNo ||
+          nextVoucherNo;
+      }
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["voucher-list", "receipt"] }),
@@ -127,12 +244,24 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
         body.status === "Paid"
           ? queryClient.invalidateQueries({ queryKey: ["accounts"] })
           : Promise.resolve(),
-        sourceSalesId
+        linkedSalesId || receipt?.sourceSalesId
           ? queryClient.invalidateQueries({ queryKey: ["voucher-list", "sales"] })
+          : Promise.resolve(),
+        linkedPurchaseReturnId || receipt?.sourcePurchaseReturnId
+          ? queryClient.invalidateQueries({
+              queryKey: ["voucher-list", "purchase-return"],
+            })
+          : Promise.resolve(),
+        body.status === "Paid"
+          ? queryClient.invalidateQueries({ queryKey: ["account-ledger"] })
           : Promise.resolve(),
       ]);
 
-      toast.success(`Receipt voucher ${savedNo} saved.`);
+      toast.success(
+        isEdit
+          ? `Receipt voucher ${savedNo} updated.`
+          : `Receipt voucher ${savedNo} saved.`
+      );
       onClose();
     } catch (e) {
       toast.error(getApiErrorMessage(e, "Could not save receipt voucher"));
@@ -151,7 +280,7 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
         disabled={saving}
       />
       <Button
-        label={saving ? "Saving…" : "Save"}
+        label={saving ? "Saving…" : isEdit ? "Update" : "Save"}
         variant="primary"
         className="w-28"
         onClick={handleSave}
@@ -164,7 +293,13 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
     <CommonModal
       open={open}
       onClose={onClose}
-      title="Add Receipt"
+      title={
+        isEdit
+          ? "Edit Receipt"
+          : linkedPurchaseReturnId
+            ? "Refund — Add Receipt"
+            : "Add Receipt"
+      }
       width="720px"
       footer={footer}
     >
@@ -187,22 +322,36 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <CommonDropdown
-            label="Receipt Through"
-            options={RECEIPT_THROUGH_OPTIONS}
-            value={form.receiptThrough}
-            onChange={(value) => updateField("receiptThrough", value)}
-            placeholder="Cash or Bank"
-            hideAdd
-            menuPortal
-          />
-          <CommonDropdown
-            label="Receipt From"
+            label="Receipt From (party)"
             options={partyOptions}
             value={form.receiptFrom}
             onChange={(value) => updateField("receiptFrom", value)}
-            placeholder={metaLoading ? "Loading parties…" : "Select party"}
+            placeholder={
+              partiesLoading
+                ? "Loading parties…"
+                : partyOptions.length
+                  ? "Select customer / supplier"
+                  : "No parties — add in Account Master"
+            }
             searchable
             searchPlaceholder="Search party…"
+            addNavigateTo="/dashboard/account"
+            menuPortal
+          />
+          <CommonDropdown
+            label="Received in (bank / cash)"
+            options={receivedInOptions}
+            value={form.receivedIn}
+            onChange={(value) => updateField("receivedIn", value)}
+            placeholder={
+              metaLoading && !receivedInOptions.length
+                ? "Loading accounts…"
+                : receivedInOptions.length
+                  ? "Select account"
+                  : "Add Bank or Cash In Hand in Account Master"
+            }
+            searchable
+            searchPlaceholder="Search account…"
             addNavigateTo="/dashboard/account"
             menuPortal
           />
@@ -234,6 +383,18 @@ const ReceiptModal = ({ open, onClose, sourceSalesId, prefilled }) => {
             placeholder="Against invoice, advance, etc. (optional)"
           />
         </div>
+        {linkedPurchaseReturnId ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Refund from supplier for a purchase return. When status is Received,
+            pick the bank or cash account where the money was deposited.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            When status is Received, party and received-in account balances
+            update (Tally-style). Use bank / cash-in-hand accounts from Account
+            Master.
+          </p>
+        )}
       </div>
     </CommonModal>
   );

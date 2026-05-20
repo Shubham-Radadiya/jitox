@@ -56,7 +56,7 @@ const PurchaseVoucherSchema = new Schema<IPurchaseVoucher>(
       type: String,
       trim: true,
       default: "Pending",
-      enum: ["Pending", "Paid", "Unpaid"],
+      enum: ["Pending", "Partial", "Paid", "Unpaid"],
     },
     /** Payment voucher created from this purchase — disables duplicate pay requests. */
     paymentRequestId: {

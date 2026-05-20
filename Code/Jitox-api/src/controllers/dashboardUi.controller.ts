@@ -529,22 +529,13 @@ export const getPurchaseFormMeta = async (
       .select("name")
       .sort({ name: 1 })
       .lean();
-    const employeesFromDb = emps.map((e) => ({
-      value: e.name,
-      label: e.name,
-    }));
-    const employeesFromAccounts = accounts
-      .filter((a) => a.name)
-      .map((a) => ({
-        value: String(a.name),
-        label: `${String(a.name)} (${String(a.businessName)})`,
-      }));
-    const seen = new Set<string>();
+    const seenEmp = new Set<string>();
     const employees: { value: string; label: string }[] = [];
-    for (const row of [...employeesFromDb, ...employeesFromAccounts]) {
-      if (seen.has(row.value)) continue;
-      seen.add(row.value);
-      employees.push(row);
+    for (const e of emps) {
+      const name = String(e.name || "").trim();
+      if (!name || seenEmp.has(name)) continue;
+      seenEmp.add(name);
+      employees.push({ value: name, label: name });
     }
 
     const gst = ["0", "5", "12", "18"].map((v) => ({

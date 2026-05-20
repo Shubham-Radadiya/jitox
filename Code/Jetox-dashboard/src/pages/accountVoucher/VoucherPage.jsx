@@ -18,6 +18,9 @@ import { getApiErrorMessage } from "../../utils/apiError";
 import {
   purchaseRowHasParty,
   purchaseRowPartyName,
+  purchaseReturnRowHasParty,
+  purchaseReturnRowHasRefund,
+  purchaseReturnRowPartyName,
 } from "../../utils/purchasePaymentStatus";
 import { invalidateProductAndStockQueries } from "../../utils/invalidateStockQueries";
 import {
@@ -145,6 +148,8 @@ const VoucherPage = () => {
   const [editingPayment, setEditingPayment] = useState(null);
   /** Prefill amount/link when paying a purchase — Payment To chosen in modal. */
   const [paymentDraft, setPaymentDraft] = useState(null);
+  const [receiptDraft, setReceiptDraft] = useState(null);
+  const [editingReceipt, setEditingReceipt] = useState(null);
 
   useEffect(() => {
     setActiveModalKey(null);
@@ -152,6 +157,8 @@ const VoucherPage = () => {
     setEditingJournal(null);
     setEditingPayment(null);
     setPaymentDraft(null);
+    setReceiptDraft(null);
+    setEditingReceipt(null);
   }, [voucherSlug]);
 
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -388,6 +395,7 @@ const VoucherPage = () => {
           queryKey: ["voucher-list", "purchase"],
         }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["account-ledger"] }),
       ]);
     },
     [queryClient]
@@ -558,6 +566,79 @@ const VoucherPage = () => {
       sourcePurchaseId: raw._id,
     });
     setActiveModalKey("payment-modal");
+  }, []);
+
+  /**
+   * Purchase-return row — opens Add Receipt (refund) with amount/party prefilled.
+   */
+  const createRefundReceiptForPurchaseReturn = useCallback((row) => {
+    const raw = row?._raw || {};
+    if (!raw._id) {
+      toast.error(
+        "This purchase return row is missing an id — cannot create receipt."
+      );
+      return;
+    }
+    if (!purchaseReturnRowHasParty(row)) {
+      toast.error(
+        "Please set Party Name on this purchase return, then create refund receipt."
+      );
+      return;
+    }
+    const amount = Number(raw.totalAmount) || 0;
+    if (!amount) {
+      toast.error("Cannot create a receipt for ₹0.");
+      return;
+    }
+    const voucherNo = raw.voucherNo || row?.["Voucher No."] || "";
+    const today = new Date().toISOString().slice(0, 10);
+    setEditingReceipt(null);
+    setReceiptDraft({
+      date: today,
+      amount,
+      receivedIn: "",
+      receiptFrom: purchaseReturnRowPartyName(row),
+      remarks: voucherNo
+        ? `Refund for purchase return ${voucherNo}`
+        : "Refund for purchase return",
+      status: "Paid",
+      sourcePurchaseReturnId: raw._id,
+    });
+    setActiveModalKey("receipt-modal");
+  }, []);
+
+  const closeReceiptModal = useCallback(() => {
+    setActiveModalKey(null);
+    setReceiptDraft(null);
+    setEditingReceipt(null);
+  }, []);
+
+  /** Open receipt modal to complete a Pending receipt (bank/cash + Received). */
+  const openReceiptRecordReceived = useCallback((row) => {
+    const raw = row?._raw;
+    if (!raw?._id) {
+      toast.error("This receipt row is missing an id — cannot update.");
+      return;
+    }
+    const statusLabel = String(row?.Status || "").trim();
+    if (statusLabel === "Received") {
+      toast.error("This receipt is already marked as Received.");
+      return;
+    }
+    setReceiptDraft(null);
+    setEditingReceipt(raw);
+    setActiveModalKey("receipt-modal");
+  }, []);
+
+  const openReceiptEdit = useCallback((row) => {
+    const raw = row?._raw;
+    if (!raw?._id) {
+      toast.error("This receipt is missing an id — cannot edit.");
+      return;
+    }
+    setReceiptDraft(null);
+    setEditingReceipt(raw);
+    setActiveModalKey("receipt-modal");
   }, []);
 
   // ---- Expense voucher: edit + quick-attach proof --------------------------
@@ -879,10 +960,13 @@ const VoucherPage = () => {
       createPaymentRequestForPurchase,
       deleteQuotationVoucher,
       deletePurchaseReturnVoucher,
+      createRefundReceiptForPurchaseReturn,
       deleteSalesVoucher,
       createPaymentRequestForSale,
       markPaymentVoucherPaid,
       markReceiptVoucherPaid,
+      openReceiptEdit,
+      openReceiptRecordReceived,
       openExpenseEdit,
       openPaymentEdit,
       attachExpenseProof,
@@ -1209,6 +1293,7 @@ const VoucherPage = () => {
           const isExpense = key === "expense-modal";
           const isJournal = key === "journal-modal";
           const isPayment = key === "payment-modal";
+          const isReceipt = key === "receipt-modal";
           return (
             <ModalComponent
               key={key}
@@ -1220,7 +1305,9 @@ const VoucherPage = () => {
                     ? closeJournalModal
                     : isPayment
                       ? closePaymentModal
-                      : () => setActiveModalKey(null)
+                      : isReceipt
+                        ? closeReceiptModal
+                        : () => setActiveModalKey(null)
               }
               {...(isExpense ? { expense: editingExpense } : {})}
               {...(isJournal
@@ -1231,6 +1318,9 @@ const VoucherPage = () => {
                 : {})}
               {...(isPayment
                 ? { payment: editingPayment, draft: paymentDraft }
+                : {})}
+              {...(isReceipt
+                ? { receipt: editingReceipt, draft: receiptDraft }
                 : {})}
               {...(props || {})}
             />
