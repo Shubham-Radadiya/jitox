@@ -149,7 +149,9 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const LanguageScreen());
 
       default:
-        return MaterialPageRoute(builder: (_) => SplashScreen());
+        return MaterialPageRoute(
+          builder: (_) => AuthScreen(openLogin: true),
+        );
     }
   }
 }

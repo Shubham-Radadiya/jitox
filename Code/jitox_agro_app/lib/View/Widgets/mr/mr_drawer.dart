@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
 import 'package:jitox_agro_app/Constants/route_names.dart';
+import 'package:jitox_agro_app/services/auth_session.dart';
+import 'package:jitox_agro_app/utils/app_navigator.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
 class MrDrawer extends StatelessWidget {
@@ -37,6 +39,12 @@ class MrDrawer extends StatelessWidget {
         Navigator.pushNamed(context, profileInfoScreen);
       }),
       _DrawerItem(Icons.vpn_key_outlined, 'Change Password', () => Navigator.pop(context)),
+      _DrawerItem(Icons.logout, 'Logout', () async {
+        Navigator.pop(context);
+        await AuthSession.clearSession();
+        if (!context.mounted) return;
+        navigateToLogin(context);
+      }),
     ];
 
     return Drawer(

@@ -17,6 +17,7 @@ class MyApp extends StatelessWidget {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
+        restorationScopeId: null,
         initialRoute: splashScreen,
         onGenerateRoute: AppRoutes.routes,
       );

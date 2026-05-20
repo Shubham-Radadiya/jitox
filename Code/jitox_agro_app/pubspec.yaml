@@ -43,6 +43,8 @@ dependencies:
   # Pin so Android build uses v2 embedding–compatible Java (Registrar removed in current Flutter).
   flutter_plugin_android_lifecycle: ^2.0.34
   dotted_border: ^2.1.0
+  http: ^1.2.2
+  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:

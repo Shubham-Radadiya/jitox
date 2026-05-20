@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/asset_paths.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
-import 'package:jitox_agro_app/Constants/route_names.dart';
+import 'package:jitox_agro_app/services/auth_session.dart';
+import 'package:jitox_agro_app/utils/app_navigator.dart';
 import 'package:jitox_agro_app/View/Widgets/image.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
@@ -18,9 +19,21 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(milliseconds: 2400), () {
+    Timer(const Duration(milliseconds: 2400), () async {
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, onboardScreen);
+      final loggedIn = await AuthSession.isLoggedIn();
+      if (!mounted) return;
+      if (loggedIn) {
+        navigateToHome(context);
+        return;
+      }
+      final seenOnboard = await AuthSession.hasSeenOnboard();
+      if (!mounted) return;
+      if (seenOnboard) {
+        navigateToLogin(context);
+      } else {
+        navigateToOnboard(context);
+      }
     });
   }
 

@@ -27,6 +27,14 @@ Health check: `GET https://jitox.onrender.com/` → `{"ok":true,"service":"jitox
 - Manager: `manager@gmail.com` / `123456`
 - User: `testuser@gmail.com` / `123456`
 
+## App launch flow (after fix)
+
+1. Splash → Onboarding (first time only) or **Login**
+2. After successful login → Home (field dashboard)
+3. Leave / Task screens open only when the user navigates there — not on cold start
+
+If an old APK still opens Leave directly: uninstall the app, install the new APK, or use **Logout** in the drawer.
+
 ## Build Android APK (points to live API)
 
 From `Code/jitox_agro_app`:

@@ -61,7 +61,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
                   Expanded(
                     child: Center(
                       child: Text(
-                        "Task Detail",
+                        "Leave Request",
                         style: TextStyle(
                           fontSize: 17.sp,
                           fontWeight: FontWeight.w500,

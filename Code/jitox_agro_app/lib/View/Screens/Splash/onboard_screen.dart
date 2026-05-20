@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
 import 'package:jitox_agro_app/Constants/route_names.dart';
+import 'package:jitox_agro_app/services/auth_session.dart';
+import 'package:jitox_agro_app/utils/app_navigator.dart';
 import 'package:jitox_agro_app/View/Widgets/button.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
@@ -43,19 +45,19 @@ class OnboardScreen extends StatelessWidget {
                 child: CustomButton(
                   isOutlined: true,
                   text: 'Create account',
-                  onPressed: () {
+                  onPressed: () async {
+                    await AuthSession.markOnboardSeen();
+                    if (!context.mounted) return;
                     Navigator.pushNamed(context, authScreen);
                   },
                 ),
               ),
               SizedBox(height: 2.h),
               TextButton(
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    authScreen,
-                    arguments: {'login': true},
-                  );
+                onPressed: () async {
+                  await AuthSession.markOnboardSeen();
+                  if (!context.mounted) return;
+                  navigateToLogin(context);
                 },
                 child: Text(
                   'Already have an account? Login',
