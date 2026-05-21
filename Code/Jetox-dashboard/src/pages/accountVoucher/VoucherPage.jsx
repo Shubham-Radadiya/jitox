@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
@@ -24,6 +24,20 @@ import {
 } from "../../utils/purchasePaymentStatus";
 import { invalidateProductAndStockQueries } from "../../utils/invalidateStockQueries";
 import {
+  hasOrderListDecisionMade,
+  isQuotationOnOrderList,
+} from "../../constants/orderStatus";
+import {
+  mapQuotationRow,
+  resolveVoucherRowId,
+} from "../../utils/voucherRowMappers";
+
+function quotationDocPlain(saved) {
+  if (!saved || typeof saved !== "object") return null;
+  if (typeof saved.toObject === "function") return saved.toObject();
+  return saved;
+}
+import {
   TABLE_ELEMENT_CLASS,
   TABLE_WRAPPER_CLASS,
   tableThClasses,
@@ -40,6 +54,7 @@ import { ManufacturingBlockedModal } from "./manufacturing/ManufacturingStockMod
 import PurchaseVoucherModal from "./purchase/PurchaseVoucherModal";
 import PurchaseReturnModal from "./purchase/PurchaseReturnModal";
 import SalesVoucherModal from "./purchase/SalesVoucherModal";
+import QuotationVoucherModal from "./purchase/QuotationVoucherModal";
 import {
   expenseVouchersApi,
   journalVouchersApi,
@@ -62,6 +77,8 @@ const PAYMENT_SUMMARY_VALUE_PILL =
 const VoucherPage = () => {
   const { voucherSlug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const config = voucherConfigs[voucherSlug];
   const filterDefinitions = useMemo(() => config?.filterFields || [], [config]);
@@ -215,6 +232,24 @@ const VoucherPage = () => {
     setSalesModal({ open: false, sourceRow: null, mode: "create" });
   }, []);
 
+  const [quotationModal, setQuotationModal] = useState({
+    open: false,
+    sourceRow: null,
+    mode: "create",
+  });
+  const [quotationOrderBusyId, setQuotationOrderBusyId] = useState(null);
+  const openQuotationModal = useCallback((sourceRow, mode) => {
+    setQuotationModal({
+      open: true,
+      sourceRow:
+        sourceRow && typeof sourceRow === "object" ? sourceRow : null,
+      mode: mode || "create",
+    });
+  }, []);
+  const closeQuotationModal = useCallback(() => {
+    setQuotationModal({ open: false, sourceRow: null, mode: "create" });
+  }, []);
+
   const [excelFilters, setExcelFilters] = useState({});
   const [columnSort, setColumnSort] = useState(null);
 
@@ -222,6 +257,39 @@ const VoucherPage = () => {
     setExcelFilters({});
     setColumnSort(null);
   }, [voucherSlug]);
+
+  /** Open quotation modal from legacy `/add-quotation` redirect or `?editId=` on list URL. */
+  useEffect(() => {
+    if (voucherSlug !== "quotation") return;
+    const state = location.state || {};
+    const editIdFromQuery = String(searchParams.get("editId") || "").trim();
+    const editIdFromState = String(state.openQuotationEditId || "").trim();
+
+    if (state.openQuotationCreate) {
+      openQuotationModal(null, "create");
+      navigate(location.pathname, { replace: true, state: {} });
+      return;
+    }
+    const editId = editIdFromState || editIdFromQuery;
+    if (editId) {
+      openQuotationModal({ _id: editId }, "edit");
+      if (editIdFromQuery) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("editId");
+        setSearchParams(next, { replace: true });
+      } else {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [
+    voucherSlug,
+    location.pathname,
+    location.state,
+    searchParams,
+    navigate,
+    setSearchParams,
+    openQuotationModal,
+  ]);
 
   const handleExcelApply = useCallback((colKey, keys) => {
     setExcelFilters((prev) => {
@@ -370,6 +438,74 @@ const VoucherPage = () => {
         queryClient.invalidateQueries({ queryKey: ["voucher-list", "quotation"] }),
         queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] }),
       ]);
+    },
+    [queryClient]
+  );
+
+  const setQuotationAddedToOrder = useCallback(
+    async (row, added) => {
+      const id = resolveVoucherRowId(row);
+      if (!id) {
+        toast.error("Cannot update this row (missing id).");
+        return;
+      }
+      if (hasOrderListDecisionMade(row._raw ?? row)) {
+        toast.error("Order list choice was already set for this quotation.");
+        return;
+      }
+
+      setQuotationOrderBusyId(id);
+      queryClient.setQueryData(["voucher-list", "quotation"], (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((r) => {
+          if (String(r._id) !== String(id)) return r;
+          const raw = {
+            ...(r._raw && typeof r._raw === "object" ? r._raw : {}),
+            addedToOrder: added,
+            orderListDecisionMade: true,
+            dashboardOrderStatus: "Pending",
+            dashboardTab: "pending",
+          };
+          return mapQuotationRow(raw);
+        });
+      });
+
+      try {
+        const res = await quotationsApi.setAddedToOrder(id, added);
+        const saved = quotationDocPlain(res?.data);
+        if (saved) {
+          queryClient.setQueryData(["voucher-list", "quotation"], (old) => {
+            if (!Array.isArray(old)) return old;
+            return old.map((r) => {
+              if (String(r._id) !== String(id)) return r;
+              return mapQuotationRow(saved);
+            });
+          });
+        }
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "quotation"],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] }),
+          queryClient.invalidateQueries({
+            queryKey: ["quotation-voucher-detail", id],
+          }),
+        ]);
+        toast.success(
+          added
+            ? "Quotation added to Order List (quotation kept)."
+            : "Removed from Order List only (quotation kept)."
+        );
+      } catch (e) {
+        await queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "quotation"],
+        });
+        toast.error(
+          getApiErrorMessage(e, "Could not update order list status")
+        );
+      } finally {
+        setQuotationOrderBusyId(null);
+      }
     },
     [queryClient]
   );
@@ -571,6 +707,69 @@ const VoucherPage = () => {
   /**
    * Purchase-return row — opens Add Receipt (refund) with amount/party prefilled.
    */
+  /** Sales row — opens Receipt Voucher (money received), linked to the sale. */
+  const createReceiptForSale = useCallback((row) => {
+    const raw = row?._raw || {};
+    if (!raw._id) {
+      toast.error("This sales row is missing an id — cannot create receipt.");
+      return;
+    }
+    const paymentStatus = String(
+      raw.paymentStatus || row?.["Payment Status"] || ""
+    ).trim();
+    const totalAmount = Number(raw.totalAmount) || 0;
+    const paidAmount = Number(raw.paidAmount) || 0;
+    if (
+      paymentStatus === "Paid" ||
+      (totalAmount > 0 && paidAmount >= totalAmount)
+    ) {
+      toast.error("This sales invoice is already fully paid.");
+      return;
+    }
+    const partyName =
+      raw.partyName || row?.["Party Name"] || row?.Party || "";
+    if (!partyName) {
+      toast.error("This sales row is missing a party name.");
+      return;
+    }
+
+    const outstanding = Math.max(0, totalAmount - paidAmount);
+    const amount = outstanding > 0 ? outstanding : totalAmount;
+    if (!amount) {
+      toast.error("Cannot create a receipt voucher for ₹0.");
+      return;
+    }
+
+    const invoiceNo = raw.voucherNo || row?.["Invoice No."] || "";
+    const today = new Date().toISOString().slice(0, 10);
+    const paymentMode = String(raw.paymentMode || "").trim().toLowerCase();
+    const receivedIn =
+      paymentMode === "cash"
+        ? "Cash"
+        : paymentMode === "bank" || paymentMode === "online" || paymentMode === "cheque"
+          ? "Bank"
+          : "";
+
+    setEditingReceipt(null);
+    const quotationId = raw.sourceQuotationId
+      ? String(raw.sourceQuotationId)
+      : "";
+
+    setReceiptDraft({
+      date: today,
+      amount,
+      receivedIn,
+      receiptFrom: partyName,
+      remarks: invoiceNo
+        ? `Receipt for sales voucher ${invoiceNo}`
+        : "Receipt for sales voucher",
+      status: "Paid",
+      sourceSalesId: raw._id,
+      ...(quotationId ? { sourceQuotationId: quotationId } : {}),
+    });
+    setActiveModalKey("receipt-modal");
+  }, []);
+
   const createRefundReceiptForPurchaseReturn = useCallback((row) => {
     const raw = row?._raw || {};
     if (!raw._id) {
@@ -900,12 +1099,19 @@ const VoucherPage = () => {
         });
         return;
       }
-      if (typeof config.fetchDetail === "function" && row?._id) {
+      if (typeof config.fetchDetail === "function") {
+        const rowId = resolveVoucherRowId(row);
+        if (!rowId) {
+          toast.error("Cannot view this row (missing record id).");
+          return;
+        }
         try {
-          const detail = await config.fetchDetail(row._id);
+          const detail = await config.fetchDetail(rowId);
           if (detail) {
             setSelectedDetails(detail);
             setIsDetailsOpen(true);
+          } else {
+            toast.error("Could not load details for this record.");
           }
         } catch (e) {
           toast.error(getApiErrorMessage(e, "Could not load details"));
@@ -958,11 +1164,15 @@ const VoucherPage = () => {
       openSalesModal,
       deletePurchaseVoucher,
       createPaymentRequestForPurchase,
+      openQuotationModal,
       deleteQuotationVoucher,
+      setQuotationAddedToOrder,
+      quotationOrderBusyId,
       deletePurchaseReturnVoucher,
       createRefundReceiptForPurchaseReturn,
       deleteSalesVoucher,
       createPaymentRequestForSale,
+      createReceiptForSale,
       markPaymentVoucherPaid,
       markReceiptVoucherPaid,
       openReceiptEdit,
@@ -1005,6 +1215,10 @@ const VoucherPage = () => {
         }
         if (field.action === "sales-open") {
           openSalesModal(null, "create");
+          return;
+        }
+        if (field.action === "quotation-open") {
+          openQuotationModal(null, "create");
           return;
         }
         if (field.action === "navigate" && field.path) {
@@ -1351,6 +1565,15 @@ const VoucherPage = () => {
             onClose={closeSalesModal}
             sourceRow={salesModal.sourceRow}
             mode={salesModal.mode}
+          />
+        )}
+
+        {voucherSlug === "quotation" && (
+          <QuotationVoucherModal
+            open={quotationModal.open}
+            onClose={closeQuotationModal}
+            sourceRow={quotationModal.sourceRow}
+            mode={quotationModal.mode}
           />
         )}
 

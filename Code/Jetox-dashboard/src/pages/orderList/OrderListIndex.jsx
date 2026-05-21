@@ -1,13 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
 import dayjs from "dayjs";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { SearchBar, CommonDropdown, DateRangePicker } from "../../components/ui/CommanUI";
 import { TableContent } from "../../hooks/TableCustomHook";
 import { LuArrowUpDown } from "react-icons/lu";
 import { IoEyeOutline } from "react-icons/io5";
-import { CreditCard, CalendarDays, FileText } from "lucide-react";
-import { dashboardUiApi } from "../../services/api";
+import { CalendarDays, Receipt, ScrollText } from "lucide-react";
+import { dashboardUiApi, quotationsApi } from "../../services/api";
+import { parseRupeeCell, salesDocToOrderDetailShape } from "../../utils/voucherRowMappers";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../utils/apiError";
 import TruncatedText from "../../components/ui/table/TruncatedText";
@@ -23,11 +24,13 @@ import {
   TABLE_ACTIONS_ROW_DENSE,
 } from "../../utils/tableUi";
 import OrderDetailsDrawer from "./OrderDetailsDrawer";
-import InvoiceModal from "./InvoiceModal";
+import SalesVoucherModal from "../accountVoucher/purchase/SalesVoucherModal";
+import ReceiptModal from "../accountVoucher/modals/ReceiptModal";
 import {
   ORDER_SORT_OPTIONS,
   sortOrderRows,
 } from "../../utils/orderListSort";
+import { ORDER_STATUS_OPTIONS } from "../../constants/orderStatus";
 
 /** Matches Product Master summary cards (gradient panel + value pill). */
 const ORDER_SUMMARY_METRIC_CARD = {
@@ -63,6 +66,12 @@ const OrderListIndex = () => {
   const [detail, setDetail] = useState(null);
   const [orderDateRange, setOrderDateRange] = useState(null);
   const [orderSort, setOrderSort] = useState("newest");
+  const [salesModal, setSalesModal] = useState({
+    open: false,
+    sourceRow: null,
+  });
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptDraft, setReceiptDraft] = useState(null);
 
   const columns = useMemo(
     () => [
@@ -147,33 +156,105 @@ const OrderListIndex = () => {
     [orders, orderSort]
   );
 
-  const payMutation = useMutation({
-    mutationFn: (id) => dashboardUiApi.payOrder(id),
-    onSuccess: () => {
-      toast.success("Payment recorded");
-      queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] });
-    },
-    onError: (e) => {
-      toast.error(getApiErrorMessage(e, "Pay action failed"));
-    },
-  });
+  const refreshOrderDetail = async (row) => {
+    if (!row) return;
+    const id = row._id || row["Order ID"];
+    try {
+      const res = await quotationsApi.getById(id);
+      const doc = res?.data;
+      setDetail(doc ? salesDocToOrderDetailShape(doc) : null);
+    } catch {
+      try {
+        const { data } = await dashboardUiApi.getOrder(id);
+        setDetail(data.detail || null);
+      } catch {
+        setDetail(null);
+      }
+    }
+  };
 
   const openDrawer = async (row) => {
     setSelectedRow(row);
     setDrawerOpen(true);
     setDetail(null);
-    const id = row._id || row["Order ID"];
-    try {
-      const { data } = await dashboardUiApi.getOrder(id);
-      setDetail(data.detail || null);
-    } catch {
-      setDetail(null);
+    await refreshOrderDetail(row);
+  };
+
+  const handleOrderStatusUpdated = async (newStatus) => {
+    await queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] });
+    if (selectedRow) {
+      setSelectedRow((prev) =>
+        prev ? { ...prev, "Order Status": newStatus } : prev
+      );
+      await refreshOrderDetail(selectedRow);
     }
   };
 
-  const handlePay = (row) => {
-    const id = row._id || row["Order ID"];
-    payMutation.mutate(id);
+  const openReceiptFromOrder = async (row) => {
+    const id = row?._id || row?.["Order ID"];
+    if (!id) {
+      toast.error("This order has no id — cannot create receipt.");
+      return;
+    }
+    const orderLabel = row["Order ID"] || id;
+    let party = String(row["Client Name"] || "").trim();
+    let amount = parseRupeeCell(row["Due"]);
+    if (!amount) amount = parseRupeeCell(row["Total Amount"]);
+    let receivedIn = "";
+
+    try {
+      const res = await quotationsApi.getById(id);
+      const doc = res?.data;
+      if (doc) {
+        const payStatus = String(doc.paymentStatus || "").trim();
+        const total = Number(doc.totalAmount) || 0;
+        const paid = Number(doc.paidAmount) || 0;
+        if (payStatus === "Paid" || (total > 0 && paid >= total)) {
+          toast.error("This order is already fully paid.");
+          return;
+        }
+        party = String(doc.partyName || party).trim();
+        const outstanding = Math.max(0, total - paid);
+        amount = outstanding > 0 ? outstanding : total;
+        const pm = String(doc.paymentMode || "").trim().toLowerCase();
+        if (pm === "cash") receivedIn = "Cash";
+        else if (pm === "bank" || pm === "online" || pm === "cheque") {
+          receivedIn = "Bank";
+        }
+      }
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Could not load order for receipt"));
+      return;
+    }
+
+    if (!party) {
+      toast.error("This order has no client name — cannot create receipt.");
+      return;
+    }
+    if (!amount) {
+      toast.error("Cannot create a receipt voucher for ₹0.");
+      return;
+    }
+
+    setReceiptDraft({
+      date: dayjs().format("YYYY-MM-DD"),
+      receiptFrom: party,
+      amount: String(amount),
+      receivedIn,
+      remarks: `Receipt for order ${orderLabel}`,
+      status: "Paid",
+      sourceQuotationId: String(id),
+    });
+    setReceiptModalOpen(true);
+  };
+
+  const openSalesVoucherFromOrder = (row) => {
+    const id = row?._id || row?.["Order ID"];
+    if (!id) {
+      toast.error("This order has no id — cannot create a sales voucher.");
+      return;
+    }
+    setSalesModal({ open: true, sourceRow: { _id: String(id) } });
   };
 
   const renderRowCell = (key, value, row) => {
@@ -253,12 +334,20 @@ const OrderListIndex = () => {
         </button>
         <button
           type="button"
-          title="Pay now"
+          title="Create receipt voucher — record payment received"
           className={TABLE_ACTION_ICON_BTN_DENSE}
           disabled={String(row["Payment Status"]).toLowerCase() === "paid"}
-          onClick={() => handlePay(row)}
+          onClick={() => openReceiptFromOrder(row)}
         >
-          <CreditCard size={14} strokeWidth={2} />
+          <Receipt size={14} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          title="Create sales voucher from this order"
+          className={TABLE_ACTION_ICON_BTN_DENSE}
+          onClick={() => openSalesVoucherFromOrder(row)}
+        >
+          <ScrollText size={14} strokeWidth={2} />
         </button>
         <button
           type="button"
@@ -266,14 +355,6 @@ const OrderListIndex = () => {
           className={TABLE_ACTION_ICON_BTN_DENSE}
         >
           <CalendarDays size={14} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          title="Document / details"
-          className={TABLE_ACTION_ICON_BTN_DENSE}
-          onClick={() => openDrawer(row)}
-        >
-          <FileText size={14} strokeWidth={2} />
         </button>
       </div>
     </td>
@@ -305,16 +386,13 @@ const OrderListIndex = () => {
 
   const orderStatusOptions = [
     { value: "all", label: "Order Status" },
-    { value: "Pending", label: "Pending" },
-    { value: "Approved", label: "Approved" },
-    { value: "Processing", label: "Processing" },
-    { value: "Dispatched", label: "Dispatched" },
-    { value: "Cancelled", label: "Cancelled" },
+    ...ORDER_STATUS_OPTIONS,
   ];
 
   const paymentStatusOptions = [
     { value: "all", label: "Payment Status" },
     { value: "Paid", label: "Paid" },
+    { value: "Partial", label: "Partial" },
     { value: "Unpaid", label: "Unpaid" },
     { value: "Pending", label: "Pending" },
   ];
@@ -504,16 +582,25 @@ const OrderListIndex = () => {
         row={selectedRow}
         detail={detail}
         invoice={invoiceData}
-        onGenerateInvoice={() => {
-          if (invoiceData) setInvoiceOpen(true);
-          else toast.error("No invoice data for this order");
-        }}
+        onOrderStatusUpdated={handleOrderStatusUpdated}
       />
 
-      <InvoiceModal
-        open={invoiceOpen}
-        onClose={() => setInvoiceOpen(false)}
-        invoice={invoiceData}
+      <SalesVoucherModal
+        open={salesModal.open}
+        onClose={() => setSalesModal({ open: false, sourceRow: null })}
+        sourceRow={salesModal.sourceRow}
+        sourceKind="quotation"
+        mode="fromOrder"
+      />
+
+      <ReceiptModal
+        open={receiptModalOpen}
+        onClose={() => {
+          setReceiptModalOpen(false);
+          setReceiptDraft(null);
+          queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] });
+        }}
+        draft={receiptDraft}
       />
     </DashboardLayout>
   );

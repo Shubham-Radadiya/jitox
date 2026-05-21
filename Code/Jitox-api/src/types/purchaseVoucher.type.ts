@@ -34,6 +34,7 @@ export interface IPurchaseVoucher extends Document {
   shipToAndBillTo?: string;
   billTo?: string;
   shipTo?: string;
+  shipToPartyName?: string;
   shipDifferent?: boolean;
   narration?: string;
   termsAndConditions?: string;
@@ -72,6 +73,10 @@ export interface IPurchaseReturnVoucher extends Document {
   deliveryAt?: string;
   orderby?: string;
   shipToAndBillTo?: string;
+  billTo?: string;
+  shipTo?: string;
+  shipToPartyName?: string;
+  shipDifferent?: boolean;
   voucherNo: string;
   voucherDate: Date;
   items: IPurchaseItem[];

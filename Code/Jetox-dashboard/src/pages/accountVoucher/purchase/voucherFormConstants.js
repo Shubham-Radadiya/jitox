@@ -35,6 +35,51 @@ export function partyValueFromPartyNameLabel(label) {
   return String(label || "").trim();
 }
 
+/** Default quotation invoice prefix (matches purchase invoice series). */
+export const QUOTATION_INVOICE_PREFIX = "RH-P-24-25/";
+
+/** Parse `QT-001` style quotation voucher numbers. */
+export function parseQtSeriesNo(raw) {
+  const s = String(raw ?? "").trim();
+  const m = /^QT-(\d+)$/i.exec(s);
+  if (!m) return null;
+  const digits = String(parseInt(m[1], 10)).padStart(3, "0");
+  return { prefix: "QT-", number: digits, full: `QT-${digits}` };
+}
+
+/** Parse `RH-P-24-25/001` style quotation invoice numbers. */
+export function parseRhQuotationInvoiceNo(raw) {
+  const s = String(raw ?? "").trim();
+  const prefix = QUOTATION_INVOICE_PREFIX;
+  if (!s.startsWith(prefix)) return null;
+  const tail = s.slice(prefix.length).trim();
+  if (!tail) return null;
+  const digits = tail.replace(/\D/g, "");
+  if (!digits) return null;
+  const n = parseInt(digits, 10);
+  if (!Number.isFinite(n)) return null;
+  const number = String(n).padStart(3, "0");
+  return {
+    invoicePrefix: prefix,
+    invoiceNumber: number,
+    invoiceNo: `${prefix}${number}`,
+  };
+}
+
+/**
+ * Invoice fields for quotation form: voucher ref stays `QT-001`, invoice is `RH-P-24-25/001`.
+ */
+export function quotationInvoiceFieldsFromNo(voucherOrInvoiceNo) {
+  const rh = parseRhQuotationInvoiceNo(voucherOrInvoiceNo);
+  if (rh) return rh;
+
+  const qt = parseQtSeriesNo(voucherOrInvoiceNo);
+  const number = qt ? qt.number : "001";
+  const invoicePrefix = QUOTATION_INVOICE_PREFIX;
+  const invoiceNo = `${invoicePrefix}${number}`;
+  return { invoicePrefix, invoiceNumber: number, invoiceNo };
+}
+
 export function nextRevoucherNumber(current) {
   const s = String(current || "V000");
   const digits = s.match(/(\d+)/);
@@ -96,22 +141,67 @@ export function mapPurchaseApiDocToPrefill(doc) {
       : it.product != null
         ? String(it.product)
         : "";
+    const popHsn =
+      pop?.hsnCode != null && String(pop.hsnCode).trim()
+        ? String(pop.hsnCode)
+        : pop?.hsn != null && String(pop.hsn).trim()
+          ? String(pop.hsn)
+          : "";
+    const popUnit =
+      pop?.units != null && String(pop.units).trim()
+        ? String(pop.units)
+        : pop?.unit != null && String(pop.unit).trim()
+          ? String(pop.unit)
+          : "";
+    const fmtPopDate = (d) => {
+      if (d == null || d === "") return "";
+      if (typeof d === "string") return d;
+      try {
+        return dayjs(d).format("YYYY-MM-DD");
+      } catch {
+        return String(d);
+      }
+    };
     return {
       id: `${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 9)}`,
       product: productId,
-      description: "",
-      hsn: it.hsn != null ? String(it.hsn) : "",
-      batch: it.batch != null ? String(it.batch) : "",
-      expDate: it.expDate != null ? String(it.expDate) : "",
-      mfgDate: it.mfgDate != null ? String(it.mfgDate) : "",
-      mrp: it.mrp != null ? String(it.mrp) : "",
+      description: String(
+        it.description ?? it.remarks ?? pop?.productDescription ?? ""
+      ).trim(),
+      hsn:
+        it.hsn != null && String(it.hsn).trim()
+          ? String(it.hsn)
+          : popHsn,
+      batch:
+        it.batch != null && String(it.batch).trim()
+          ? String(it.batch)
+          : pop?.batchNo != null
+            ? String(pop.batchNo)
+            : "",
+      expDate:
+        it.expDate != null && String(it.expDate).trim()
+          ? String(it.expDate)
+          : fmtPopDate(pop?.expDt),
+      mfgDate:
+        it.mfgDate != null && String(it.mfgDate).trim()
+          ? String(it.mfgDate)
+          : fmtPopDate(pop?.mfgDt),
+      mrp:
+        it.mrp != null && String(it.mrp).trim()
+          ? String(it.mrp)
+          : pop?.mrpPerUnit != null
+            ? String(pop.mrpPerUnit)
+            : "",
       group:
         it.group != null && String(it.group).trim()
           ? String(it.group)
           : pop?.group != null
             ? String(pop.group)
             : "",
-      unit: it.unit != null ? String(it.unit) : "",
+      unit:
+        it.unit != null && String(it.unit).trim()
+          ? String(it.unit)
+          : popUnit,
       category:
         it.category != null && String(it.category).trim()
           ? String(it.category)
@@ -166,7 +256,6 @@ export function mapPurchaseApiDocToPrefill(doc) {
   const legacySingle = String(doc.shipToAndBillTo || "").trim();
   const billStored = String(doc.billTo ?? "").trim();
   const shipStored = String(doc.shipTo ?? "").trim();
-  const billTo = billStored || legacySingle;
 
   let shipDifferent = false;
   if (typeof doc.shipDifferent === "boolean") {
@@ -177,11 +266,9 @@ export function mapPurchaseApiDocToPrefill(doc) {
     shipDifferent = true;
   }
 
-  /** Prefer explicit `shipTo` from DB when addresses differ; otherwise same-as-bill line. */
+  const billTo = shipDifferent ? billStored : billStored || legacySingle;
   const shipTo =
-    shipDifferent && shipStored
-      ? shipStored
-      : shipStored || legacySingle || billTo;
+    shipDifferent && shipStored ? shipStored : billTo;
 
   const termsFromApi = doc.termsAndConditions;
   const termsText =
@@ -197,20 +284,44 @@ export function mapPurchaseApiDocToPrefill(doc) {
 
   const invoicePrefix = String(doc.invoicePrefix ?? "").trim();
   const invoiceNumber = String(doc.invoiceNumber ?? "").trim();
-  const invoiceNo =
+  let invoiceNo =
     doc.invoiceNo != null && String(doc.invoiceNo).trim() !== ""
       ? String(doc.invoiceNo).trim()
       : `${invoicePrefix}${invoiceNumber}`.trim();
+  const voucherNoStr = String(doc.voucherNo ?? "").trim();
+  const rhInvoice = parseRhQuotationInvoiceNo(invoiceNo);
+  let resolvedPrefix = invoicePrefix || QUOTATION_INVOICE_PREFIX;
+  let resolvedNumber = invoiceNumber;
+  let resolvedInvoiceNo = invoiceNo;
+
+  if (rhInvoice) {
+    resolvedPrefix = rhInvoice.invoicePrefix;
+    resolvedNumber = rhInvoice.invoiceNumber;
+    resolvedInvoiceNo = rhInvoice.invoiceNo;
+  } else if (
+    parseQtSeriesNo(voucherNoStr) &&
+    (!invoiceNo || /-INV/i.test(invoiceNo) || parseQtSeriesNo(invoiceNo))
+  ) {
+    const inv = quotationInvoiceFieldsFromNo(voucherNoStr);
+    resolvedPrefix = inv.invoicePrefix;
+    resolvedNumber = inv.invoiceNumber;
+    resolvedInvoiceNo = inv.invoiceNo;
+  } else if (!resolvedNumber && voucherNoStr) {
+    const inv = quotationInvoiceFieldsFromNo(voucherNoStr);
+    resolvedPrefix = inv.invoicePrefix;
+    resolvedNumber = inv.invoiceNumber;
+    if (!resolvedInvoiceNo) resolvedInvoiceNo = inv.invoiceNo;
+  }
 
   return {
     partyName,
     purchaseDate,
     voucherNo,
-    invoiceNo,
-    invoicePrefix: invoicePrefix || undefined,
+    invoiceNo: resolvedInvoiceNo,
+    invoicePrefix: resolvedPrefix || undefined,
     invoiceNumber:
-      invoiceNumber ||
-      (invoiceNo && !invoicePrefix ? invoiceNo : undefined),
+      resolvedNumber ||
+      (resolvedInvoiceNo && !resolvedPrefix ? resolvedInvoiceNo : undefined),
     originalInvNo: String(doc.originalInvNo ?? "").trim() || undefined,
     ewayBill: String(doc.ewayBill ?? "").trim() || undefined,
     transporter: String(doc.transportDetails || "").trim(),
@@ -218,6 +329,7 @@ export function mapPurchaseApiDocToPrefill(doc) {
     orderBy: String(doc.orderby || "").trim(),
     billTo,
     shipTo,
+    shipToPartyName: String(doc.shipToPartyName ?? "").trim() || undefined,
     shipDifferent,
     narration,
     termsText,

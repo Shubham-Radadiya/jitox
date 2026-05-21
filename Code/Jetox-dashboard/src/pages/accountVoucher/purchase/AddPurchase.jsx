@@ -10,7 +10,11 @@ import { purchaseVouchersApi, quotationsApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { invalidateProductAndStockQueries } from "../../../utils/invalidateStockQueries";
 import { purchasePayloadToCreateBody } from "./purchasePayloadToApi";
-import { quotationPayloadToCreateBody } from "./quotationPayloadToApi";
+import { hasOrderListDecisionMade } from "../../../constants/orderStatus";
+import {
+  quotationPayloadToCreateBody,
+  quotationPayloadToUpdateBody,
+} from "./quotationPayloadToApi";
 import { mapPurchaseApiDocToPrefill } from "./voucherFormConstants";
 
 const AddPurchase = ({ formType = "purchase" }) => {
@@ -50,6 +54,37 @@ const AddPurchase = ({ formType = "purchase" }) => {
     if (!isEdit || !quotationDoc) return null;
     return mapPurchaseApiDocToPrefill(quotationDoc);
   }, [isEdit, quotationDoc]);
+
+  const showOrderListChoice =
+    isEdit && quotationDoc && !hasOrderListDecisionMade(quotationDoc);
+
+  const toggleQuotationOrder = async (added) => {
+    if (!editId) {
+      toast.error("Save the quotation first, then choose order list.");
+      return;
+    }
+    if (hasOrderListDecisionMade(quotationDoc)) {
+      toast.error("Order list choice was already set for this quotation.");
+      return;
+    }
+    try {
+      await quotationsApi.setAddedToOrder(editId, added);
+      await queryClient.invalidateQueries({
+        queryKey: ["quotation-voucher-detail", editId],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["voucher-list", "quotation"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] });
+      toast.success(
+        added
+          ? "Quotation added to Order List (quotation kept)."
+          : "Removed from Order List only (quotation kept)."
+      );
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Could not update order status"));
+    }
+  };
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -101,7 +136,23 @@ const AddPurchase = ({ formType = "purchase" }) => {
               editMode={isEdit}
               showPageHeader
             />
-            <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end">
+            <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:flex-wrap sm:justify-end">
+              {isQuotation && showOrderListChoice ? (
+                <>
+                  <Button
+                    label="Add to order list"
+                    variant="outline"
+                    className="w-full sm:w-44"
+                    onClick={() => toggleQuotationOrder(true)}
+                  />
+                  <Button
+                    label="Keep off order list"
+                    variant="outline"
+                    className="w-full sm:w-44"
+                    onClick={() => toggleQuotationOrder(false)}
+                  />
+                </>
+              ) : null}
               <Button
                 label="Cancel"
                 variant="outline"
@@ -119,7 +170,9 @@ const AddPurchase = ({ formType = "purchase" }) => {
                     return;
                   }
                   const body = isQuotation
-                    ? quotationPayloadToCreateBody(payload)
+                    ? isEdit
+                      ? quotationPayloadToUpdateBody(payload, quotationDoc)
+                      : quotationPayloadToCreateBody(payload)
                     : purchasePayloadToCreateBody(payload);
                   if (!body.items?.length) {
                     toast.error(

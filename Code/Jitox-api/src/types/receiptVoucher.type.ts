@@ -12,6 +12,7 @@ export interface IReceiptVoucher extends Document {
   status: String;
   sourceSalesId?: mongoose.Schema.Types.ObjectId;
   sourcePurchaseReturnId?: mongoose.Schema.Types.ObjectId;
+  sourceQuotationId?: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

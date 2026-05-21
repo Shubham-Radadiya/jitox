@@ -5,6 +5,10 @@ import { IProductItem } from "../types/quatation.type";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendCreated, sendSuccess } from "../utils/apiResponse";
+import {
+  dashboardTabForOrderStatus,
+  normalizeOrderStatus,
+} from "../constants/orderStatus";
 
 async function computeNextQuotationVoucherNo(): Promise<string> {
   const docs = await Quotation.find().select("voucherNo").lean();
@@ -58,6 +62,8 @@ function normalizeQuotationItems(items: IProductItem[]): IProductItem[] {
   return items.map((item) => {
     const quantity = Number(item.quantity) || 0;
     const rateParUnit = Number(item.rateParUnit) || 0;
+    const discountPct = Number(item.discountPct) || 0;
+    const discountAmt = Number(item.discountAmt) || 0;
     const subtotal =
       Number(item.subtotal) || quantity * rateParUnit;
     const amount = Number(item.amount) || subtotal;
@@ -70,9 +76,20 @@ function normalizeQuotationItems(items: IProductItem[]): IProductItem[] {
       category: item.category || "",
       unit: item.unit || "Nos",
       subtotal,
+      discountPct,
+      discountAmt,
+      description: String(item.description ?? "").trim(),
+      hsn: String(item.hsn ?? "").trim(),
+      batch: String(item.batch ?? "").trim(),
+      expDate: String(item.expDate ?? "").trim(),
+      mfgDate: String(item.mfgDate ?? "").trim(),
+      mrp: String(item.mrp ?? "").trim(),
     };
   });
 }
+
+const QUOTATION_PRODUCT_POPULATE =
+  "productName category group units hsnCode batchNo mrpPerUnit quantity mfgDt expDt billingRatePerUnit productDescription";
 
 export const createQuotation = async (
   req: Request,
@@ -88,7 +105,14 @@ export const createQuotation = async (
       deliveryAt,
       orderby,
       shipToAndBillTo,
+      billTo,
+      shipTo,
+      shipToPartyName,
+      shipDifferent,
       items,
+      termsOfPayment,
+      narration,
+      termsAndConditions,
       paymentMode,
       dueDate,
       gstAmount,
@@ -130,19 +154,28 @@ export const createQuotation = async (
       deliveryAt,
       orderby,
       shipToAndBillTo,
+      billTo,
+      shipTo,
+      shipToPartyName,
+      shipDifferent,
       voucherNo: resolvedVoucherNo,
       voucherDate,
       items: normalizedItems,
       invoiceNo: resolvedInvoiceNo,
+      termsOfPayment: String(termsOfPayment ?? "").trim(),
+      narration: String(narration ?? "").trim(),
+      termsAndConditions: String(termsAndConditions ?? "").trim(),
       gstAmount,
       totalAmount,
       paymentMode,
       basePrice,
       dueDate,
       stockDetails,
+      addedToOrder: false,
+      orderListDecisionMade: false,
       paidAmount: 0,
       dashboardTab: "pending",
-      dashboardOrderStatus: "Processing",
+      dashboardOrderStatus: "Pending",
     });
 
     const savedQuotation = await newQuotation.save();
@@ -196,6 +229,7 @@ export const getAllQuotations = async (
 
       {
         $project: {
+          _id: 1,
           partyName: 1,
           voucherNo: 1,
           voucherDate: 1,
@@ -207,6 +241,8 @@ export const getAllQuotations = async (
           paymentMode: 1,
           basePrice: 1,
           paidAmount: 1,
+          addedToOrder: 1,
+          orderListDecisionMade: 1,
           dashboardTab: 1,
           dashboardOrderStatus: 1,
           createdAt: 1,
@@ -238,7 +274,7 @@ export const getQuotationById = async (
 
     const quotations = await Quotation.findById(id).populate(
       "items.product",
-      "productName category group"
+      QUOTATION_PRODUCT_POPULATE
     );
 
     if (!quotations) {
@@ -290,9 +326,50 @@ export const updateQuotation = async (
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(updateData, "addedToOrder")) {
+      const rawFlag = updateData.addedToOrder;
+      const added =
+        rawFlag === true ||
+        rawFlag === 1 ||
+        String(rawFlag).trim().toLowerCase() === "true";
+      updateData.addedToOrder = added;
+      updateData.orderListDecisionMade = true;
+      if (added) {
+        const st =
+          normalizeOrderStatus(
+            String(updateData.dashboardOrderStatus || "")
+          ) || "Pending";
+        updateData.dashboardOrderStatus = st;
+        updateData.dashboardTab = dashboardTabForOrderStatus(st);
+      } else {
+        updateData.dashboardOrderStatus = "Pending";
+        updateData.dashboardTab = "pending";
+      }
+    }
+
+    if (
+      updateData.dashboardOrderStatus != null &&
+      !Object.prototype.hasOwnProperty.call(updateData, "addedToOrder")
+    ) {
+      const normalized = normalizeOrderStatus(
+        String(updateData.dashboardOrderStatus)
+      );
+      if (!normalized) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "Invalid order status. Use Pending, Dispatched, Processing, Cancelled, Approved, or Quotation."
+        );
+      }
+      updateData.dashboardOrderStatus = normalized;
+      const docBefore = await Quotation.findById(id).select("addedToOrder").lean();
+      if (docBefore?.addedToOrder !== false) {
+        updateData.dashboardTab = dashboardTabForOrderStatus(normalized);
+      }
+    }
+
     const updatedQuotation = await Quotation.findByIdAndUpdate(id, updateData, {
       new: true,
-    }).populate("items.product", "productName category group");
+    }).populate("items.product", QUOTATION_PRODUCT_POPULATE);
 
     if (!updatedQuotation) {
       throw new AppError(HttpStatusCode.NOT_FOUND, "No quotations found.");

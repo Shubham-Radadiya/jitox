@@ -332,6 +332,10 @@ const EMPTY_FORM = {
   transportMode: "",
   deliveryAt: "",
   customerStatus: "Active",
+  bankName: "",
+  bankAccountNo: "",
+  bankBranch: "",
+  bankIfscCode: "",
 };
 
 function mergeOption(list, value, labelForValue) {
@@ -513,6 +517,10 @@ const CreateAccountModal = ({ open, onClose, onSaved, accountId }) => {
           deliveryAt: a.deliveryAt ?? "",
           customerStatus:
             String(a.customerStatus) === "Inactive" ? "Inactive" : "Active",
+          bankName: a.bankName ?? "",
+          bankAccountNo: a.bankAccountNo ?? "",
+          bankBranch: a.bankBranch ?? "",
+          bankIfscCode: a.bankIfscCode ?? "",
         });
         setAddrErrors({});
         setBusinessAddrErrors({});
@@ -801,6 +809,10 @@ const CreateAccountModal = ({ open, onClose, onSaved, accountId }) => {
           businessState: String(form.businessState || "").trim(),
           businessPincode: String(form.businessPincode || "").replace(/\D/g, ""),
           businessCountry: String(form.businessCountry || "India").trim(),
+          bankName: String(form.bankName || "").trim(),
+          bankAccountNo: String(form.bankAccountNo || "").trim(),
+          bankBranch: String(form.bankBranch || "").trim(),
+          bankIfscCode: String(form.bankIfscCode || "").trim(),
         };
 
         await accountsApi.update(String(accountId), body);
@@ -864,6 +876,13 @@ const CreateAccountModal = ({ open, onClose, onSaved, accountId }) => {
           fd.append("deliveryAt", String(form.deliveryAt).trim());
         if (form.customerStatus)
           fd.append("customerStatus", String(form.customerStatus).trim());
+        if (form.bankName) fd.append("bankName", String(form.bankName).trim());
+        if (form.bankAccountNo)
+          fd.append("bankAccountNo", String(form.bankAccountNo).trim());
+        if (form.bankBranch)
+          fd.append("bankBranch", String(form.bankBranch).trim());
+        if (form.bankIfscCode)
+          fd.append("bankIfscCode", String(form.bankIfscCode).trim());
 
         const file = fileRef.current?.files?.[0];
         if (file) fd.append("documentUpload", file);
@@ -1165,6 +1184,60 @@ const CreateAccountModal = ({ open, onClose, onSaved, accountId }) => {
                   placeholder="Status"
                 />
               </div>
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection
+          title="Bank details (optional)"
+          book
+          hint="for invoices"
+        >
+          <p className="mb-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+            Shown on tax invoices when filled. Leave blank to use the company
+            default bank on PDF.
+          </p>
+          <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-2">
+            <div className="min-w-0">
+              <InputField
+                dense
+                label="Bank name"
+                name="bankName"
+                value={form.bankName}
+                onChange={handleChange}
+                placeholder="e.g. HDFC Bank"
+              />
+            </div>
+            <div className="min-w-0">
+              <InputField
+                dense
+                label="A/C no."
+                name="bankAccountNo"
+                value={form.bankAccountNo}
+                onChange={handleChange}
+                placeholder="Account number"
+                inputMode="numeric"
+              />
+            </div>
+            <div className="min-w-0">
+              <InputField
+                dense
+                label="Branch"
+                name="bankBranch"
+                value={form.bankBranch}
+                onChange={handleChange}
+                placeholder="e.g. Sarkhej"
+              />
+            </div>
+            <div className="min-w-0">
+              <InputField
+                dense
+                label="IFSC code"
+                name="bankIfscCode"
+                value={form.bankIfscCode}
+                onChange={handleChange}
+                placeholder="e.g. HDFC0001234"
+              />
             </div>
           </div>
         </FormSection>

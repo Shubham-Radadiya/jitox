@@ -3,6 +3,7 @@ import { dashboardUiApi } from "../services/api";
 
 export const emptyMeta = {
   parties: [],
+  partyAddresses: {},
   partyCreditHints: {},
   products: [],
   groups: [],
@@ -39,6 +40,10 @@ export function usePurchaseFormMeta({ enabled = true } = {}) {
       if (!data || typeof data !== "object") return { ...emptyMeta };
       return {
         parties: Array.isArray(data.parties) ? data.parties : [],
+        partyAddresses:
+          data.partyAddresses && typeof data.partyAddresses === "object"
+            ? data.partyAddresses
+            : {},
         partyCreditHints:
           data.partyCreditHints && typeof data.partyCreditHints === "object"
             ? data.partyCreditHints

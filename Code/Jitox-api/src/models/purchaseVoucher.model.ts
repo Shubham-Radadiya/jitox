@@ -38,6 +38,7 @@ const PurchaseVoucherSchema = new Schema<IPurchaseVoucher>(
     shipToAndBillTo: { type: String, trim: true },
     billTo: { type: String, trim: true },
     shipTo: { type: String, trim: true },
+    shipToPartyName: { type: String, trim: true },
     shipDifferent: { type: Boolean, default: false },
     narration: { type: String, trim: true },
     termsAndConditions: { type: String, trim: true },

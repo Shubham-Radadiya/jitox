@@ -3,11 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { CheckCircle2 } from "lucide-react";
 import { CommonModal, Button } from "../../components/ui/CommanUI";
-import {
-  escapeHtml,
-  buildStandalonePrintableHtml,
-  downloadHtmlDocumentAsPdf,
-} from "../../utils/printAndExport";
+import { downloadSalesInvoiceEditorPdf } from "../../utils/salesInvoiceDownload";
 
 export default function InvoiceModal({ open, onClose, invoice }) {
   const navigate = useNavigate();
@@ -25,40 +21,56 @@ export default function InvoiceModal({ open, onClose, invoice }) {
     : ["Please pay within the agreed credit period."];
 
   const printInvoiceSummary = async () => {
-    const rows = lines
-      .map(
-        (line) =>
-          `<tr><td>${escapeHtml(line.detail)}</td><td>${escapeHtml(line.qty)}</td><td>${escapeHtml(line.rate)}</td><td>${escapeHtml(line.amount)}</td></tr>`
-      )
-      .join("");
-    const title = `Invoice-${invoice.invoiceNo || "statement"}`;
-    const bodyHtml = `
-      <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
-        <tr>
-          <td style="border:none;padding:0 0 4px 0;font-size:12px">
-            <strong>Invoice Number:</strong> ${escapeHtml(invoice.invoiceNo || "—")}
-          </td>
-          <td style="border:none;padding:0 0 4px 0;text-align:right;font-size:12px">
-            <strong>Date:</strong> ${escapeHtml(invoice.invoiceDate || "—")}
-          </td>
-        </tr>
-      </table>
-      <p><strong>Billed To:</strong> ${escapeHtml(invoice.billedTo?.name || "Client")}</p>
-      <p>Total: ${escapeHtml(invoice.invoiceTotalLabel || "")} · Final: ${escapeHtml(invoice.finalPayable || "")}</p>
-      <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
-    `;
-    const fullHtml = buildStandalonePrintableHtml(title, bodyHtml, {
-      bodyPaddingPx: 10,
-      bodyFontSizePx: 12,
-      h1FontSizePx: 16,
-      tableCellPaddingPx: 5,
+    const mappedLines = lines.map((line) => {
+      const qtyMatch = String(line.qty || "").match(/[\d.]+/);
+      const qty = qtyMatch ? parseFloat(qtyMatch[0]) : 0;
+      const rate =
+        parseFloat(String(line.rate || "").replace(/[^\d.]/g, "")) || 0;
+      const amount =
+        parseFloat(String(line.amount || "").replace(/[^\d.]/g, "")) || 0;
+      return {
+        name: line.detail || "—",
+        qty,
+        rate,
+        subtotal: amount || qty * rate,
+      };
     });
+
+    const subtotalNum =
+      parseFloat(String(invoice.subtotal || "").replace(/[^\d.]/g, "")) || 0;
+    const taxNum =
+      parseFloat(String(invoice.taxAmount || "").replace(/[^\d.]/g, "")) || 0;
+    const discountNum =
+      parseFloat(String(invoice.discount || "").replace(/[^\d.]/g, "")) || 0;
+    const finalNum =
+      parseFloat(String(invoice.finalPayable || "").replace(/[^\d.]/g, "")) ||
+      subtotalNum + taxNum - discountNum;
+
     try {
-      await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
-      toast.success("PDF downloaded successfully.");
+      await downloadSalesInvoiceEditorPdf({
+        invoiceNo: invoice.invoiceNo,
+        issueDate: invoice.invoiceDate,
+        client: invoice.billedTo?.name,
+        clientAddress: invoice.billedTo?.address,
+        paymentMode: invoice.paymentMode,
+        reference: invoice.reference || invoice.orderId,
+        description: Array.isArray(invoice.terms)
+          ? invoice.terms.join("\n")
+          : String(invoice.terms || ""),
+        lines: mappedLines,
+        subtotal: subtotalNum,
+        tax: taxNum,
+        vatYes: taxNum > 0,
+        taxPct: 10,
+        discount: discountNum,
+        finalPayable: finalNum,
+      });
+      toast.success("Tax invoice PDF downloaded.");
     } catch (err) {
       console.error("PDF generation failed:", err);
-      toast.error("PDF generation failed. Please try again.");
+      toast.error(
+        err?.message || "PDF generation failed. Please try again."
+      );
     }
   };
 
@@ -101,7 +113,7 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                 {invoice.phone && <div>{invoice.phone}</div>}
               </div>
             </div>
-            <div className="rounded-xl border border-light-border bg-white/80 px-3 py-2 text-right text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">
+            <div className="rounded-xl border border-light-border bg-white/80 px-3 py-2 text-right text-xs leading-relaxed whitespace-pre-line text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">
               {invoice.taxAddress || "Business address, City, State, Pin — TAX ID"}
             </div>
           </div>

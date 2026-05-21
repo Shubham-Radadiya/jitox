@@ -25,7 +25,11 @@ import {
   DateInput,
   InputField,
 } from "../../../components/ui/CommanUI";
-import { fmtInr, parseNum } from "./voucherFormConstants";
+import {
+  fmtInr,
+  parseNum,
+  QUOTATION_INVOICE_PREFIX,
+} from "./voucherFormConstants";
 import {
   buildPurchasePayloadShareText,
   downloadPurchasePayloadCsv,
@@ -80,14 +84,15 @@ export default function InvoicePurchaseModalLayout({
   liveNow,
   onClose,
   onSave,
-  partyLabel,
   partyName,
-  setPartyName,
+  onBillPartyChange,
+  onShipPartyChange,
   partyHint,
   billTo,
   setBillTo,
   shipDifferent,
   setShipDifferent,
+  shipToPartyName,
   shipTo,
   setShipTo,
   persistedShipToRef,
@@ -97,6 +102,7 @@ export default function InvoicePurchaseModalLayout({
   setInvoicePrefix,
   invoiceNumber,
   setInvoiceNumber,
+  setVoucherNo,
   originalInvNo,
   setOriginalInvNo,
   ewayBill,
@@ -172,11 +178,6 @@ export default function InvoicePurchaseModalLayout({
     [productRows]
   );
 
-  const shipSummaryPrimary =
-    shipDifferent && String(shipTo || "").trim()
-      ? String(shipTo).trim()
-      : partyLabel;
-
   const totalTax = lineTotals.tax;
   const totalSgst = totalTax / 2;
   const totalCgst = totalTax / 2;
@@ -187,36 +188,50 @@ export default function InvoicePurchaseModalLayout({
 
   const isReturn = formType === "purchase-return";
   const isSales = formType === "sales";
-  const headerEyebrow = isSales
-    ? "Sales invoice"
-    : isReturn
-      ? "Purchase return"
-      : "Purchase invoice";
-  const headerTitle = isSales
-    ? "Create Sales Invoice"
-    : isReturn
-      ? "Create Purchase Return"
-      : "Create Purchase Invoice";
-  const billFromEyebrow = isSales
+  const isQuotation = formType === "quotation";
+  const headerEyebrow = isQuotation
+    ? "Quotation"
+    : isSales
+      ? "Sales invoice"
+      : isReturn
+        ? "Purchase return"
+        : "Purchase invoice";
+  const headerTitle = isQuotation
+    ? "Create Quotation"
+    : isSales
+      ? "Create Sales Invoice"
+      : isReturn
+        ? "Create Purchase Return"
+        : "Create Purchase Invoice";
+  const billFromEyebrow = isSales || isQuotation
     ? "Bill to"
     : isReturn
       ? "Return to"
       : "Bill from";
-  const shipFromEyebrow = isSales
+  const shipFromEyebrow = isSales || isQuotation
     ? "Ship to"
     : isReturn
       ? "Ship from (your end)"
       : "Ship from";
-  const invoiceSectionTitle = isSales
-    ? "Sales details"
-    : isReturn
-      ? "Return details"
-      : "Invoice details";
-  const stockToggleLabel = isSales
-    ? "Decrease stock when this sale is saved"
-    : isReturn
-      ? "Decrease stock when this return is saved"
-      : "Update stock when this voucher is saved";
+  const invoiceSectionTitle = isQuotation
+    ? "Quotation details"
+    : isSales
+      ? "Sales details"
+      : isReturn
+        ? "Return details"
+        : "Invoice details";
+  const stockToggleLabel = isQuotation
+    ? "Show stock quantity on this quote (inventory is not updated)"
+    : isSales
+      ? "Decrease stock when this sale is saved"
+      : isReturn
+        ? "Decrease stock when this return is saved"
+        : "Update stock when this voucher is saved";
+  const shareDocLabel = isQuotation
+    ? "Quotation"
+    : isSales
+      ? "Sales"
+      : "Purchase";
 
   return (
     <div className="flex min-h-0 flex-col bg-gradient-to-b from-slate-100/95 via-slate-50/90 to-slate-100/80 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -324,7 +339,7 @@ export default function InvoicePurchaseModalLayout({
                               }
                               const text = buildPurchasePayloadShareText(snap);
                               const r = await shareOrCopyText(
-                                `Purchase ${snap.voucherNo || ""}`,
+                                `${shareDocLabel} ${snap.voucherNo || ""}`,
                                 text
                               );
                               if (r === "shared") toast.success("Shared");
@@ -420,7 +435,7 @@ export default function InvoicePurchaseModalLayout({
                         }
                         const text = buildPurchasePayloadShareText(snap);
                         const r = await shareOrCopyText(
-                          `Purchase ${snap.voucherNo || ""}`,
+                          `${shareDocLabel} ${snap.voucherNo || ""}`,
                           text
                         );
                         if (r === "shared") toast.success("Shared");
@@ -533,18 +548,10 @@ export default function InvoicePurchaseModalLayout({
                 searchPlaceholder="Search party…"
                 options={dropdownOptions.parties}
                 value={partyName}
-                onChange={setPartyName}
+                onChange={onBillPartyChange}
                 placeholder="Select party (required)"
                 className="w-full"
               />
-              <div className="mt-2 rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/35">
-                <p className="text-[14px] font-semibold leading-snug text-slate-900 sm:text-[13px] dark:text-slate-50">
-                  {partyLabel}
-                </p>
-                <p className="mt-0.5 text-[12px] leading-snug text-slate-500 sm:text-[11px] dark:text-slate-400">
-                  Phone on file when linked in Account master.
-                </p>
-              </div>
               {partyHint ? (
                 <div
                   role="status"
@@ -571,42 +578,38 @@ export default function InvoicePurchaseModalLayout({
                   Change shipping
                 </span>
               </div>
-              <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/35">
-                <p className="whitespace-pre-wrap text-[14px] font-semibold leading-snug text-slate-900 sm:text-[13px] dark:text-slate-50">
-                  {shipSummaryPrimary}
-                </p>
-                <p className="mt-0.5 text-[12px] leading-snug text-slate-500 sm:text-[11px] dark:text-slate-400">
-                  {shipDifferent
-                    ? "Edit ship-to below if needed."
-                    : "Same as billing unless different ship address."}
-                </p>
-              </div>
+              <CommonDropdown
+                hideAdd
+                searchable
+                searchPlaceholder="Search party…"
+                options={dropdownOptions.parties}
+                value={shipDifferent ? shipToPartyName : partyName}
+                onChange={(name) => {
+                  if (shipDifferent) {
+                    onShipPartyChange(name);
+                  } else {
+                    onBillPartyChange(name);
+                  }
+                }}
+                placeholder="Select ship-to party"
+                className="w-full"
+                disabled={!shipDifferent}
+              />
               <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-transparent px-0 py-0.5 hover:border-slate-100 dark:hover:border-slate-800">
                 <input
                   type="checkbox"
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary accent-primary focus:ring-primary"
                   checked={shipDifferent}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    setShipDifferent(on);
-                    if (!on) {
-                      setShipTo(billTo);
-                    } else {
-                      const snap = persistedShipToRef?.current;
-                      setShipTo(
-                        String(snap ?? "").trim() ? snap : billTo
-                      );
-                    }
-                  }}
+                  onChange={(e) => setShipDifferent(e.target.checked)}
                 />
                 <span className="text-[13px] font-medium leading-snug text-slate-700 sm:text-[12px] dark:text-slate-300">
-                  Different ship address
+                  Different ship-to party
                 </span>
               </label>
               {shipDifferent ? (
                 <div className="mt-2">
                   <InputField
-                    label="Ship to"
+                    label="Ship to address"
                     multiline
                     rows={2}
                     value={shipTo}
@@ -631,9 +634,14 @@ export default function InvoicePurchaseModalLayout({
               <div className="min-w-0">
                 <InputField
                   label="Invoice prefix"
-                  value={invoicePrefix}
+                  value={isQuotation ? QUOTATION_INVOICE_PREFIX : invoicePrefix}
+                  readOnly={isQuotation}
                   onChange={(e) => setInvoicePrefix(e.target.value)}
-                  inputClassName="!text-[13px] !leading-tight"
+                  inputClassName={
+                    isQuotation
+                      ? "!text-[13px] !leading-tight bg-slate-50 text-slate-600 dark:bg-slate-800/80 dark:text-slate-300"
+                      : "!text-[13px] !leading-tight"
+                  }
                 />
               </div>
               <div className="min-w-0">
@@ -641,6 +649,25 @@ export default function InvoicePurchaseModalLayout({
                   label="Invoice no."
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}
+                  onBlur={
+                    isQuotation
+                      ? (e) => {
+                          const raw = String(e.target.value || "").replace(
+                            /\D/g,
+                            ""
+                          );
+                          if (!raw) return;
+                          const padded = String(parseInt(raw, 10)).padStart(
+                            3,
+                            "0"
+                          );
+                          setInvoiceNumber(padded);
+                          setInvoicePrefix(QUOTATION_INVOICE_PREFIX);
+                        }
+                      : undefined
+                  }
+                  placeholder={isQuotation ? "001" : undefined}
+                  inputMode={isQuotation ? "numeric" : undefined}
                   inputClassName="!text-[13px] !leading-tight"
                 />
               </div>

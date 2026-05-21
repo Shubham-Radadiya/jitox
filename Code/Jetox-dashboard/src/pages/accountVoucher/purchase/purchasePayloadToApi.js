@@ -85,8 +85,8 @@ export function purchasePayloadToCreateBody(payload) {
     typeof payload.shipDifferent === "boolean"
       ? payload.shipDifferent
       : String(payload.shipDifferent || "").toLowerCase() === "true";
-  /** Persist full billing + shipping lines; legacy single field follows ship when different else bill. */
-  const shipStored = sd ? shipRaw : billTo;
+  /** Legacy combined field: bill address only when ship-to party is same as bill-from. */
+  const shipLine = sd ? shipRaw : billTo;
 
   const paymentStatusRaw = String(payload.paymentStatus || "Pending").trim();
   const normalizedStatus = ["Pending", "Partial", "Paid", "Unpaid"].includes(
@@ -119,9 +119,12 @@ export function purchasePayloadToCreateBody(payload) {
     transportDetails: String(payload.transporter || "").trim(),
     deliveryAt: String(payload.deliveryAt || "").trim(),
     orderby: String(payload.orderBy || "").trim(),
-    shipToAndBillTo: shipStored,
+    shipToAndBillTo: sd ? "" : billTo,
     billTo,
-    shipTo: shipStored,
+    shipTo: shipLine,
+    shipToPartyName: sd
+      ? String(payload.shipToPartyName || "").trim()
+      : String(payload.partyName || "").trim(),
     shipDifferent: sd,
     narration: String(payload.narration || "").trim(),
     termsAndConditions: String(payload.termsText || "").trim(),

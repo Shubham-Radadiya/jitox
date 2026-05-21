@@ -18,7 +18,9 @@ import {
   findAccountByBusinessName,
 } from "../../utils/accountMappers";
 import {
+  purchaseDocToDetailShape,
   purchaseReturnDocToDetailShape,
+  quotationDocToDetailShape,
   salesDocToOrderDetailShape,
   fmtRupee,
 } from "../../utils/voucherRowMappers";
@@ -41,22 +43,57 @@ async function loadPartyAccountForVoucher(doc) {
   }
 }
 
+function isShipDifferentDoc(doc) {
+  if (typeof doc?.shipDifferent === "boolean") return doc.shipDifferent;
+  if (doc?.shipDifferent != null && doc?.shipDifferent !== "") {
+    return String(doc.shipDifferent).toLowerCase() === "true";
+  }
+  return false;
+}
+
+/** Bill-from party + ship-to party accounts for tax invoice / detail views. */
+export async function loadPartyAccountsForVoucherDoc(doc) {
+  const billPartyAccount = await loadPartyAccountForVoucher(doc);
+  let shipPartyAccount = billPartyAccount;
+  if (isShipDifferentDoc(doc)) {
+    const shipName = String(doc?.shipToPartyName || "").trim();
+    if (shipName) {
+      const loaded = await loadPartyAccountForVoucher({ partyName: shipName });
+      if (loaded) shipPartyAccount = loaded;
+    }
+  }
+  return { billPartyAccount, shipPartyAccount };
+}
+
 export async function fetchPurchaseDetail(id) {
   const { data } = await purchaseVouchersApi.getById(id);
-  const partyAccount = await loadPartyAccountForVoucher(data);
-  return purchaseDocToDetailShape(data, partyAccount);
+  const { billPartyAccount, shipPartyAccount } =
+    await loadPartyAccountsForVoucherDoc(data);
+  return purchaseDocToDetailShape(data, billPartyAccount, {
+    shipPartyAccount,
+  });
 }
 
 export async function fetchQuotationDetail(id) {
-  const { data } = await quotationsApi.getById(id);
-  const partyAccount = await loadPartyAccountForVoucher(data);
-  return purchaseDocToDetailShape(data, partyAccount);
+  const res = await quotationsApi.getById(id);
+  const doc = res?.data ?? res;
+  if (!doc || (typeof doc === "object" && !doc.voucherNo && !doc._id)) {
+    return null;
+  }
+  const { billPartyAccount, shipPartyAccount } =
+    await loadPartyAccountsForVoucherDoc(doc);
+  return quotationDocToDetailShape(doc, billPartyAccount, {
+    shipPartyAccount,
+  });
 }
 
 export async function fetchPurchaseReturnDetail(id) {
   const { data } = await purchaseReturnVouchersApi.getById(id);
-  const partyAccount = await loadPartyAccountForVoucher(data);
-  return purchaseReturnDocToDetailShape(data, partyAccount);
+  const { billPartyAccount, shipPartyAccount } =
+    await loadPartyAccountsForVoucherDoc(data);
+  return purchaseReturnDocToDetailShape(data, billPartyAccount, {
+    shipPartyAccount,
+  });
 }
 
 export async function fetchSalesOrderDetail(id) {

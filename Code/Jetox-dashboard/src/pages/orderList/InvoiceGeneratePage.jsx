@@ -1,12 +1,45 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import { Button, InputField, CommonDropdown } from "../../components/ui/CommanUI";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
-import { downloadHtmlDocumentAsPdf, escapeHtml } from "../../utils/printAndExport";
+import { downloadSalesInvoiceEditorPdf } from "../../utils/salesInvoiceDownload";
 import { mergePageAddOutlineButton } from "../../utils/pageAddButton";
+import { buildInvoiceReviewPayload } from "../../utils/voucherRowMappers";
+import { partyAddressFromMap } from "../../utils/voucherPartyAddress";
+import { findAccountByBusinessName } from "../../utils/accountMappers";
+import { usePurchaseFormMeta } from "../../hooks/usePurchaseFormMeta";
+import { accountsApi } from "../../services/api";
+import InvoiceModal from "./InvoiceModal";
+import {
+  invoiceCompanyFields,
+  INVOICE_COMPANY_PROFILE,
+} from "../../constants/invoiceCompanyProfile";
+
+function normalizePartyKey(raw) {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function resolvePartyDropdownValue(parties, businessName) {
+  const target = normalizePartyKey(businessName);
+  if (!target) return "";
+  for (const p of parties) {
+    const value = String(p?.value ?? "").trim();
+    const label = String(p?.label ?? value).trim();
+    if (
+      normalizePartyKey(value) === target ||
+      normalizePartyKey(label) === target
+    ) {
+      return value;
+    }
+  }
+  return "";
+}
 
 const INVOICE_DRAFT_KEY = "jitox_invoice_draft_v1";
 
@@ -37,6 +70,44 @@ const defaultLines = () => [
   { name: "Liquid Pesticide", qty: 10, rate: 200, subtotal: 2000 },
 ];
 
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "Pending", label: "Pending" },
+  { value: "Partial", label: "Partial" },
+  { value: "Paid", label: "Paid" },
+  { value: "Unpaid", label: "Unpaid" },
+];
+
+function normalizeInvoicePaymentMode(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s || s === "—") return "";
+  const key = s.toLowerCase();
+  const map = {
+    credit: "Credit",
+    cash: "Cash",
+    online: "Online",
+    cheque: "Cheque",
+    upi: "UPI",
+    bank: "Bank",
+  };
+  return map[key] || s;
+}
+
+function normalizeInvoicePaymentStatus(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s || s === "—") return "Pending";
+  const hit = PAYMENT_STATUS_OPTIONS.find(
+    (o) => o.value.toLowerCase() === s.toLowerCase()
+  );
+  return hit?.value || s;
+}
+
+function parseInvoicePaidAmount(inv) {
+  const raw = inv?.paidAmount;
+  if (raw == null || raw === "") return 0;
+  const n = Number(String(raw).replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
 /**
  * Full-page invoice editor + preview (JETOX “Invoice Generate” design).
  * Optional `location.state`: { invoice, orderId } from order details.
@@ -51,7 +122,7 @@ export default function InvoiceGeneratePage() {
       return {
         invoiceNo: inv.invoiceNo || "#AB2324-01",
         issueDate: parseSafeInvoiceDate(inv.invoiceDate),
-        client: inv.billedTo?.name || "Mr. Ramesh Mehta",
+        client: String(inv.billedTo?.name || "").trim(),
         paymentMode: inv.paymentMode || "UPI",
         reference: inv.reference || "INV-057",
         description: "",
@@ -76,20 +147,36 @@ export default function InvoiceGeneratePage() {
     return {
       invoiceNo: "#AB2324-01",
       issueDate: dayjs(),
-      client: "Mr. Ramesh Mehta",
-      paymentMode: "UPI",
+      client: "",
+      paymentMode: "",
+      paymentStatus: "Pending",
       reference: "INV-057",
       description: "",
       vatYes: true,
       lines,
     };
-  }, [inv]);
+  }, [inv, state?.paymentStatus]);
+
+  useEffect(() => {
+    if (!inv) return;
+    const mode = normalizeInvoicePaymentMode(inv.paymentMode);
+    if (mode) setPaymentMode(mode);
+    setPaymentStatus(
+      normalizeInvoicePaymentStatus(
+        inv.paymentStatusBadge || state?.paymentStatus
+      )
+    );
+  }, [inv, state?.paymentStatus]);
 
   const [previewHidden, setPreviewHidden] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [invoiceNo, setInvoiceNo] = useState(initial.invoiceNo);
   const [issueDate, setIssueDate] = useState(initial.issueDate);
   const [client, setClient] = useState(initial.client);
   const [paymentMode, setPaymentMode] = useState(initial.paymentMode);
+  const [paymentStatus, setPaymentStatus] = useState(
+    initial.paymentStatus || "Pending"
+  );
   const [reference, setReference] = useState(initial.reference);
   const [description, setDescription] = useState(initial.description);
   const [vatYes, setVatYes] = useState(initial.vatYes);
@@ -97,14 +184,129 @@ export default function InvoiceGeneratePage() {
   const [dueDate, setDueDate] = useState(() => dayjs().add(15, "day"));
   const [extraClients, setExtraClients] = useState([]);
   const previewRef = useRef(null);
+  const autoClientSyncedRef = useRef(false);
+
+  const {
+    data: formMeta,
+    isLoading: partiesLoading,
+    isError: partiesError,
+  } = usePurchaseFormMeta({ enabled: true });
+
+  const partyAddresses = formMeta?.partyAddresses || {};
+  const prefilledPartyName = useMemo(
+    () => String(inv?.billedTo?.name || "").trim(),
+    [inv]
+  );
+
+  useEffect(() => {
+    if (partiesError) {
+      toast.error(
+        "Could not load clients from Account Master. Check your connection or refresh."
+      );
+    }
+  }, [partiesError]);
+
+  useEffect(() => {
+    autoClientSyncedRef.current = false;
+  }, [prefilledPartyName]);
+
+  useEffect(() => {
+    if (autoClientSyncedRef.current || !prefilledPartyName) return;
+
+    const parties = Array.isArray(formMeta?.parties) ? formMeta.parties : [];
+    const fromList = resolvePartyDropdownValue(parties, prefilledPartyName);
+    if (fromList) {
+      setClient(fromList);
+      autoClientSyncedRef.current = true;
+      return;
+    }
+    if (!parties.length) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await accountsApi.getAll({});
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.accounts)
+            ? data.accounts
+            : Array.isArray(data?.data)
+              ? data.data
+              : [];
+        const acc = findAccountByBusinessName(list, prefilledPartyName);
+        const name = String(acc?.businessName || acc?.name || "").trim();
+        if (!name || cancelled) return;
+        const resolved = resolvePartyDropdownValue(parties, name) || name;
+        setClient(resolved);
+        autoClientSyncedRef.current = true;
+      } catch {
+        if (!cancelled) setClient(prefilledPartyName);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [prefilledPartyName, formMeta?.parties]);
 
   const clientOptions = useMemo(() => {
-    const base = [
-      { value: "Mr. Ramesh Mehta", label: "Mr. Ramesh Mehta" },
-      { value: "Alpha Traders", label: "Alpha Traders" },
+    const byValue = new Map();
+    for (const p of Array.isArray(formMeta?.parties) ? formMeta.parties : []) {
+      const value = String(p?.value ?? "").trim();
+      if (!value) continue;
+      byValue.set(value, {
+        value,
+        label: String(p?.label ?? value).trim() || value,
+      });
+    }
+    for (const p of extraClients) {
+      const value = String(p?.value ?? "").trim();
+      if (!value) continue;
+      byValue.set(value, {
+        value,
+        label: String(p?.label ?? value).trim() || value,
+      });
+    }
+    const current = String(client || "").trim();
+    if (current && !byValue.has(current)) {
+      byValue.set(current, { value: current, label: current });
+    }
+    return Array.from(byValue.values());
+  }, [formMeta?.parties, extraClients, client]);
+
+  const selectedClientAddress = useMemo(() => {
+    const fromMaster = partyAddressFromMap(partyAddresses, client);
+    if (fromMaster) return fromMaster;
+    return String(inv?.billedTo?.address || "").trim();
+  }, [partyAddresses, client, inv]);
+
+  const paymentModeOptions = useMemo(() => {
+    const byValue = new Map();
+    for (const t of Array.isArray(formMeta?.terms) ? formMeta.terms : []) {
+      const value = String(t?.value ?? "").trim();
+      if (!value) continue;
+      byValue.set(value, {
+        value,
+        label: String(t?.label ?? value).trim() || value,
+      });
+    }
+    const defaults = [
+      { value: "Credit", label: "Credit" },
+      { value: "Cash", label: "Cash" },
+      { value: "Online", label: "Online" },
+      { value: "Cheque", label: "Cheque" },
+      { value: "UPI", label: "UPI" },
+      { value: "Bank", label: "Bank" },
     ];
-    return [...base, ...extraClients];
-  }, [extraClients]);
+    for (const o of defaults) {
+      if (!byValue.has(o.value)) byValue.set(o.value, o);
+    }
+    const current = normalizeInvoicePaymentMode(paymentMode);
+    if (current && !byValue.has(current)) {
+      byValue.set(current, { value: current, label: current });
+    }
+    return Array.from(byValue.values());
+  }, [formMeta?.terms, paymentMode]);
 
   const recalcLine = (row, idx) => {
     const qty = Number(row.qty) || 0;
@@ -119,26 +321,69 @@ export default function InvoiceGeneratePage() {
   const tax = vatYes ? Math.round(subtotal * (taxPct / 100)) : 0;
   const discount = 500;
   const finalPayable = subtotal + tax - discount;
+  const orderId = state?.orderId || reference || "";
+  const company = useMemo(() => invoiceCompanyFields(), []);
 
-  const buildInvoiceDownloadHtml = () => {
-    const rowHtml = lines
-      .map(
-        (l) =>
-          `<tr><td>${escapeHtml(l.name || "—")}</td><td style="text-align:center">${escapeHtml(String(l.qty))}</td><td style="text-align:right">₹${escapeHtml(String(l.rate))}</td><td style="text-align:right">₹${escapeHtml(String((l.subtotal || 0).toLocaleString("en-IN")))}</td></tr>`
-      )
-      .join("");
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${escapeHtml(invoiceNo)}</title>
-<style>html,body{margin:0;background:#fff;color:#111;height:auto;min-height:0;}body{font-family:system-ui,sans-serif;padding:10px 12px;font-size:14px;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:5px 7px;font-size:14px;} .meta-row{font-size:14px;} .meta-label{font-weight:700;color:#374151;} .meta-value{font-weight:500;color:#111827;}</style></head><body>
-<h1 style="color:#0f766e;margin:0 0 4px;font-size:24px">Jitox Agro</h1>
-<p style="color:#666;font-size:12px;margin:0 0 8px">Sample address — Surat, Gujarat</p>
-<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px">
-<div class="meta-row"><span class="meta-label">Invoice No:</span> <span class="meta-value">${escapeHtml(invoiceNo)}</span></div>
-<div class="meta-row" style="text-align:right"><span class="meta-label">Date:</span> <span class="meta-value">${escapeHtml(formatInvoiceDate(issueDate))}</span></div>
-</div>
-<p><strong>Billed to:</strong> ${escapeHtml(client)}</p>
-<table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rowHtml}</tbody></table>
-<p style="margin:10px 0 0;text-align:right"><strong>Final Payable:</strong> ₹${escapeHtml(String(finalPayable.toLocaleString("en-IN")))}</p>
-</body></html>`;
+  const reviewInvoice = useMemo(
+    () =>
+      buildInvoiceReviewPayload({
+        invoiceNo,
+        issueDateLabel: formatInvoiceDate(issueDate),
+        client,
+        clientAddress: selectedClientAddress,
+        paymentMode,
+        reference,
+        orderId,
+        lines,
+        subtotalNum: subtotal,
+        taxNum: tax,
+        taxPctLabel: vatYes ? `${taxPct}%` : "0%",
+        discountNum: discount,
+        finalPayableNum: finalPayable,
+        paymentStatus,
+        paidAmountNum: parseInvoicePaidAmount(inv),
+        terms: description?.trim()
+          ? description.trim()
+          : inv?.terms,
+      }),
+    [
+      invoiceNo,
+      issueDate,
+      client,
+      paymentMode,
+      paymentStatus,
+      reference,
+      orderId,
+      lines,
+      subtotal,
+      tax,
+      vatYes,
+      taxPct,
+      discount,
+      finalPayable,
+      inv,
+      description,
+      selectedClientAddress,
+    ]
+  );
+
+  const downloadTaxInvoicePdf = async () => {
+    await downloadSalesInvoiceEditorPdf({
+      invoiceNo,
+      issueDate,
+      client,
+      clientAddress: selectedClientAddress,
+      paymentMode,
+      reference,
+      description,
+      lines,
+      subtotal,
+      tax,
+      vatYes,
+      taxPct,
+      discount,
+      finalPayable,
+    });
   };
 
   /* 13px picker text (default .jitox-picker-form), not value-sm */
@@ -168,14 +413,15 @@ export default function InvoiceGeneratePage() {
               variant="primary"
               className="text-white! hover:text-white!"
               onClick={() => {
-                setPreviewHidden(false);
-                requestAnimationFrame(() => {
-                  previewRef.current?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  });
-                });
-                toast.success("Scroll to preview");
+                if (!lines.length || !lines.some((l) => l.name?.trim())) {
+                  toast.error("Add at least one product line before reviewing.");
+                  return;
+                }
+                if (!client?.trim()) {
+                  toast.error("Select a client before reviewing the invoice.");
+                  return;
+                }
+                setReviewModalOpen(true);
               }}
             />
           </div>
@@ -212,13 +458,10 @@ export default function InvoiceGeneratePage() {
                 formCompact
                 label="Payment Mode"
                 addNavigateTo="/dashboard/account"
+                placeholder="Select payment mode"
                 value={paymentMode}
                 onChange={setPaymentMode}
-                options={[
-                  { value: "UPI", label: "UPI" },
-                  { value: "Bank", label: "Bank" },
-                  { value: "Cash", label: "Cash" },
-                ]}
+                options={paymentModeOptions}
               />
               <div className="flex min-w-0 flex-col">
                 <label className={INVOICE_LABEL_STATIC}>Due Date</label>
@@ -237,7 +480,13 @@ export default function InvoiceGeneratePage() {
                       formCompact
                       label="Client Name"
                       addNavigateTo="/dashboard/account"
-                      placeholder="Select client"
+                      placeholder={
+                        partiesLoading
+                          ? "Loading clients…"
+                          : clientOptions.length
+                            ? "Select client"
+                            : "No clients — add in Account Master"
+                      }
                       value={client}
                       onChange={setClient}
                       options={clientOptions}
@@ -270,12 +519,14 @@ export default function InvoiceGeneratePage() {
                       onChange={(e) => setReference(e.target.value)}
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col">
-                    <label className={INVOICE_LABEL_STATIC}>Payment Status</label>
-                    <div className="flex h-9 min-h-9 max-h-9 items-center rounded-md border border-light-border bg-slate-100 px-2.5 text-[13px] leading-snug text-slate-700 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200">
-                      Pending
-                    </div>
-                  </div>
+                  <CommonDropdown
+                    formCompact
+                    label="Payment Status"
+                    placeholder="Select status"
+                    value={paymentStatus}
+                    onChange={setPaymentStatus}
+                    options={PAYMENT_STATUS_OPTIONS}
+                  />
                 </>
               ) : (
                 <>
@@ -285,7 +536,13 @@ export default function InvoiceGeneratePage() {
                         formCompact
                         label="Client Name"
                         addNavigateTo="/dashboard/account"
-                        placeholder="Select client"
+                        placeholder={
+                          partiesLoading
+                            ? "Loading clients…"
+                            : clientOptions.length
+                              ? "Select client"
+                              : "No clients — add in Account Master"
+                        }
                         value={client}
                         onChange={setClient}
                         options={clientOptions}
@@ -315,12 +572,14 @@ export default function InvoiceGeneratePage() {
                     value={reference}
                     onChange={(e) => setReference(e.target.value)}
                   />
-                  <div className="flex min-w-0 flex-col">
-                    <label className={INVOICE_LABEL_STATIC}>Payment Status</label>
-                    <div className="flex h-9 min-h-9 max-h-9 items-center rounded-md border border-light-border bg-slate-100 px-2.5 text-[13px] leading-snug text-slate-700 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200">
-                      Pending
-                    </div>
-                  </div>
+                  <CommonDropdown
+                    formCompact
+                    label="Payment Status"
+                    placeholder="Select status"
+                    value={paymentStatus}
+                    onChange={setPaymentStatus}
+                    options={PAYMENT_STATUS_OPTIONS}
+                  />
                 </>
               )}
               <InputField
@@ -492,6 +751,7 @@ export default function InvoiceGeneratePage() {
                         dueDate: dueDate?.isValid?.() ? dueDate.format("YYYY-MM-DD") : "",
                         client,
                         paymentMode,
+                        paymentStatus,
                         reference,
                         description,
                         vatYes,
@@ -509,13 +769,15 @@ export default function InvoiceGeneratePage() {
                 variant="primary"
                 className="min-h-11 w-full justify-center px-5 text-sm font-semibold text-white! hover:text-white! sm:min-h-9 sm:w-auto sm:shrink-0"
                 onClick={async () => {
-                  const base = `invoice-${String(invoiceNo).replace(/#/g, "")}`;
                   try {
-                    await downloadHtmlDocumentAsPdf(buildInvoiceDownloadHtml(), `${base}.pdf`);
-                    toast.success("Invoice downloaded as PDF.");
+                    await downloadTaxInvoicePdf();
+                    toast.success("Tax invoice PDF downloaded.");
                   } catch (err) {
                     console.error(err);
-                    toast.error("Could not generate PDF. Run npm install in Jetox-dashboard, then try again.");
+                    const msg =
+                      err?.message ||
+                      "Could not generate PDF. Run npm install in Jetox-dashboard, then try again.";
+                    toast.error(msg);
                   }
                 }}
               />
@@ -527,10 +789,21 @@ export default function InvoiceGeneratePage() {
               ref={previewRef}
               className="min-w-0 rounded-xl border border-light-border bg-white p-3 text-sm text-slate-800 shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)] sm:p-4"
             >
-              <div className="mb-0.5 text-base font-bold text-primary sm:text-lg dark:text-emerald-400">
-                Jitox Agro
+              <div className="mb-2 flex flex-wrap items-start justify-between gap-3 border-b border-light-border pb-2 dark:border-slate-600">
+                <div className="min-w-0">
+                  <div className="text-base font-bold text-primary sm:text-lg dark:text-emerald-400">
+                    {company.companyName}
+                  </div>
+                  <div className="mt-0.5 space-y-0.5 text-xs text-light dark:text-slate-400">
+                    {company.website ? <div>{company.website}</div> : null}
+                    {company.email ? <div>{company.email}</div> : null}
+                    {company.phone ? <div>{company.phone}</div> : null}
+                  </div>
+                </div>
+                <div className="max-w-[11rem] shrink-0 text-right text-[11px] leading-snug whitespace-pre-line text-light dark:text-slate-400">
+                  {company.taxAddress}
+                </div>
               </div>
-              <p className="mb-2 text-xs text-light dark:text-slate-400">Sample address — Surat, Gujarat</p>
               <div className="mb-2 flex justify-between gap-3 border-b border-light-border pb-2 dark:border-slate-600">
                 <div className="min-w-0">
                   <div className="text-[11px] text-light dark:text-slate-400">Invoice No</div>
@@ -548,9 +821,11 @@ export default function InvoiceGeneratePage() {
                   Billed to
                 </div>
                 <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{client}</div>
-                <div className="mt-0.5 text-[11px] text-light dark:text-slate-400">
-                  Surat, Gujarat · +91-9876543210
-                </div>
+                {selectedClientAddress ? (
+                  <div className="mt-0.5 text-[11px] leading-snug whitespace-pre-line text-light dark:text-slate-400">
+                    {selectedClientAddress}
+                  </div>
+                ) : null}
               </div>
               <table className="mb-2 w-full text-[11px] text-slate-800 sm:text-xs dark:text-slate-200">
                 <thead>
@@ -609,6 +884,12 @@ export default function InvoiceGeneratePage() {
           )}
         </div>
       </div>
+
+      <InvoiceModal
+        open={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        invoice={reviewInvoice}
+      />
     </DashboardLayout>
   );
 }

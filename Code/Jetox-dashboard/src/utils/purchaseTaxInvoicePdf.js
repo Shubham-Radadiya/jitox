@@ -18,6 +18,24 @@ const PURCHASE_INVOICE_BANK = {
   branchIfsc: "SARKHEJ & BKID00123",
 };
 
+/** Invoice bank block — party account overrides when any field is set. */
+export function resolveInvoiceBankDetails(partyAccount) {
+  const bankName = String(partyAccount?.bankName || "").trim();
+  const accountNo = String(partyAccount?.bankAccountNo || "").trim();
+  const branch = String(partyAccount?.bankBranch || "").trim();
+  const ifsc = String(partyAccount?.bankIfscCode || "").trim();
+  const branchIfsc =
+    branch && ifsc ? `${branch} & ${ifsc}` : branch || ifsc;
+  if (bankName || accountNo || branchIfsc) {
+    return {
+      bankName: bankName || PURCHASE_INVOICE_BANK.bankName,
+      accountNo: accountNo || PURCHASE_INVOICE_BANK.accountNo,
+      branchIfsc: branchIfsc || PURCHASE_INVOICE_BANK.branchIfsc,
+    };
+  }
+  return { ...PURCHASE_INVOICE_BANK };
+}
+
 const COMPANY = {
   ...PAYMENT_RECEIPT_COMPANY,
   legalName: "JETOX AGRO INDUSTRIES",
@@ -70,50 +88,111 @@ function invoiceNoFromDoc(doc) {
   return combined || String(doc?.invoiceNo ?? "").trim() || "";
 }
 
-function billToColumnData(doc, partyAccount) {
-  const name = String(doc?.partyName || "").trim() || "—";
+function addressLinesFromAccount(partyAccount) {
   const addressLines = [];
   const addr =
     String(partyAccount?.addressSummary || "").trim() ||
-    String(partyAccount?.address || "").trim();
+    String(partyAccount?.address || "").trim() ||
+    String(partyAccount?.fullAddress || "").trim();
   if (addr) {
     addr.split(/\n+/).forEach((l) => {
       const t = l.trim();
       if (t) addressLines.push(t);
     });
   }
+  return addressLines;
+}
+
+function addressLinesFromText(text) {
+  return String(text || "")
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+function normalizeInvoicePincode(raw) {
+  return String(raw ?? "")
+    .replace(/\D/g, "")
+    .slice(0, 10);
+}
+
+/** Footer “State & Code” — state name + pincode from Account Master (business fields first). */
+function stateAndCodeFromPartyAccount(partyAccount) {
+  if (!partyAccount || typeof partyAccount !== "object") return "";
+  const state = String(
+    partyAccount.businessState ?? partyAccount.state ?? ""
+  ).trim();
+  const pin = normalizeInvoicePincode(
+    partyAccount.businessPincode ??
+      partyAccount.pincode ??
+      partyAccount.pinCode
+  );
+  if (state && pin) return `${state} - ${pin}`;
+  return state || pin || "";
+}
+
+/** Fallback when footer is embedded in saved multiline address (e.g. `gujarat - 364002`). */
+function stateAndCodeFromAddressLines(addressLines) {
+  for (const line of addressLines) {
+    const t = String(line || "").trim();
+    const m = /^(.+?)\s*-\s*(\d{5,10})\s*$/.exec(t);
+    if (m) return `${m[1].trim()} - ${m[2]}`;
+  }
+  return "";
+}
+
+function billToColumnData(doc, partyAccount) {
+  const name =
+    String(doc?.partyName || "").trim() ||
+    String(partyAccount?.businessName || partyAccount?.name || "").trim() ||
+    "—";
+  const savedBill = addressLinesFromText(doc?.billTo);
+  const addressLines =
+    savedBill.length > 0 ? savedBill : addressLinesFromAccount(partyAccount);
+  const stateCode =
+    stateAndCodeFromPartyAccount(partyAccount) ||
+    stateAndCodeFromAddressLines(addressLines);
   return {
     name,
     addressLines,
     gstin: String(partyAccount?.gstNumber || "").trim(),
-    state: String(partyAccount?.state || "").trim(),
+    state: stateCode,
   };
 }
 
-function shipColumnDataFromText(text, fallbackGst = "", fallbackState = "") {
-  const lines = String(text || "")
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (!lines.length) {
-    return { name: "—", addressLines: [], gstin: fallbackGst, state: fallbackState };
+function isShipDifferentDoc(doc) {
+  if (typeof doc?.shipDifferent === "boolean") return doc.shipDifferent;
+  if (doc?.shipDifferent != null && doc?.shipDifferent !== "") {
+    return String(doc.shipDifferent).toLowerCase() === "true";
   }
-  let gstin = fallbackGst;
-  let state = fallbackState;
-  const body = [];
-  for (const l of lines) {
-    if (/^GSTIN\s*:/i.test(l)) {
-      gstin = l.replace(/^GSTIN\s*:\s*/i, "").trim();
-      continue;
-    }
-    if (/^State\s*&\s*Code\s*:/i.test(l)) {
-      state = l.replace(/^State\s*&\s*Code\s*:/i, "").trim();
-      continue;
-    }
-    body.push(l);
+  return false;
+}
+
+/** Ship To column — uses ship-to party from Account Master when addresses differ. */
+function shipToColumnData(doc, billPartyAccount, shipPartyAccount) {
+  if (!isShipDifferentDoc(doc)) {
+    return billToColumnData(doc, billPartyAccount);
   }
-  const name = body.shift() || "—";
-  return { name, addressLines: body, gstin, state };
+
+  const shipAcct = shipPartyAccount || billPartyAccount;
+  const name =
+    String(doc?.shipToPartyName || "").trim() ||
+    String(shipAcct?.businessName || shipAcct?.name || "").trim() ||
+    "—";
+
+  const savedShip = addressLinesFromText(doc?.shipTo);
+  const addressLines =
+    savedShip.length > 0 ? savedShip : addressLinesFromAccount(shipAcct);
+  const stateCode =
+    stateAndCodeFromPartyAccount(shipAcct) ||
+    stateAndCodeFromAddressLines(addressLines);
+
+  return {
+    name,
+    addressLines,
+    gstin: String(shipAcct?.gstNumber || "").trim(),
+    state: stateCode,
+  };
 }
 
 function renderPartyColumn(title, data) {
@@ -259,30 +338,31 @@ function buildHsnHeaderHtml() {
  * Full A4 tax-invoice HTML (body inner — use buildPurchaseTaxInvoiceFullDocument for PDF).
  * Layout uses CSS Grid / Flex (no HTML tables) for reliable html2canvas alignment.
  */
-export function buildPurchaseTaxInvoiceBodyHtml(doc, partyAccount = null) {
+export function buildPurchaseTaxInvoiceBodyHtml(
+  doc,
+  partyAccount = null,
+  shipPartyAccount = null
+) {
   if (!doc) return "";
 
   const items = Array.isArray(doc.items) ? doc.items : [];
   const basePrice = Number(doc.basePrice) || 0;
   const gstAmount = Number(doc.gstAmount) || 0;
   const totalAmount = Number(doc.totalAmount) || 0;
-  const discountTotal = sumPurchaseLineDiscounts(items);
+  const discountTotal =
+    sumPurchaseLineDiscounts(items) + (Number(doc.headerDiscount) || 0);
   const cgst = gstAmount / 2;
   const sgst = gstAmount / 2;
   const roundOff = totalAmount - (basePrice + gstAmount);
   const roundOffRounded = Math.round(roundOff * 100) / 100;
 
   const billToData = billToColumnData(doc, partyAccount);
-  const shipToText =
-    String(doc.shipTo || "").trim() ||
-    String(doc.billTo || "").trim() ||
-    String(doc.shipToAndBillTo || "").trim() ||
-    [billToData.name, ...billToData.addressLines].filter((x) => x && x !== "—").join("\n");
-  const shipToData = shipColumnDataFromText(
-    shipToText,
-    billToData.gstin,
-    billToData.state
+  const shipToData = shipToColumnData(
+    doc,
+    partyAccount,
+    shipPartyAccount ?? partyAccount
   );
+  const invoiceBank = resolveInvoiceBankDetails(partyAccount);
 
   const paymentTerms =
     String(doc.termsOfPayment || "").trim() ||
@@ -432,9 +512,9 @@ export function buildPurchaseTaxInvoiceBodyHtml(doc, partyAccount = null) {
     <section class="ti-sum-grid">
       <div class="ti-bank-box">
         <div class="ti-bank-h">:: Bank Details ::</div>
-        ${bankRow("Bank Name", PURCHASE_INVOICE_BANK.bankName)}
-        ${bankRow("A/C No.", PURCHASE_INVOICE_BANK.accountNo)}
-        ${bankRow("Branch & Ifs Code", PURCHASE_INVOICE_BANK.branchIfsc)}
+        ${bankRow("Bank Name", invoiceBank.bankName)}
+        ${bankRow("A/C No.", invoiceBank.accountNo)}
+        ${bankRow("Branch & Ifs Code", invoiceBank.branchIfsc)}
         <div class="ti-words">
           <div class="ti-words-label">(Amount In Words) :</div>
           <div class="ti-words-value">${escapeHtml(amountWords)} INR Only.</div>
@@ -839,8 +919,16 @@ body { font-family: Arial, Helvetica, sans-serif; }
 `;
 
 /** Complete HTML document sized for A4 PDF capture */
-export function buildPurchaseTaxInvoiceFullDocument(doc, partyAccount = null) {
-  const body = buildPurchaseTaxInvoiceBodyHtml(doc, partyAccount);
+export function buildPurchaseTaxInvoiceFullDocument(
+  doc,
+  partyAccount = null,
+  shipPartyAccount = null
+) {
+  const body = buildPurchaseTaxInvoiceBodyHtml(
+    doc,
+    partyAccount,
+    shipPartyAccount
+  );
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -903,7 +991,9 @@ export function purchasePayloadToTaxInvoiceDoc(payload) {
     orderby: payload.orderBy,
     billTo: payload.billTo,
     shipTo: payload.shipTo,
-    shipToAndBillTo: payload.shipTo,
+    shipToPartyName: payload.shipToPartyName,
+    shipDifferent: payload.shipDifferent,
+    shipToAndBillTo: payload.shipToAndBillTo,
     termsOfPayment: payload.termsPayment,
     paymentMode: payload.termsPayment,
     termsAndConditions: payload.termsText,
@@ -919,11 +1009,19 @@ export function purchasePayloadToTaxInvoiceDoc(payload) {
 export function buildPurchaseTaxInvoiceBodyFromDetail(detail) {
   const doc = detail?._sourceDoc;
   if (!doc) return "";
-  return buildPurchaseTaxInvoiceBodyHtml(doc, detail.partyAccount);
+  return buildPurchaseTaxInvoiceBodyHtml(
+    doc,
+    detail.partyAccount,
+    detail.shipPartyAccount
+  );
 }
 
 export function buildPurchaseTaxInvoiceFullDocumentFromDetail(detail) {
   const doc = detail?._sourceDoc;
   if (!doc) return "";
-  return buildPurchaseTaxInvoiceFullDocument(doc, detail.partyAccount);
+  return buildPurchaseTaxInvoiceFullDocument(
+    doc,
+    detail.partyAccount,
+    detail.shipPartyAccount
+  );
 }

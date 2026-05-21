@@ -320,6 +320,24 @@ export const quotationsApi = {
   create: (body) => http.post("/quotations/create-quotation", body),
   update: (id, body) =>
     http.put(`/quotations/update-quotation/${encodeURIComponent(id)}`, body),
+  setAddedToOrder: (id, added) =>
+    http.put(`/quotations/update-quotation/${encodeURIComponent(id)}`, {
+      addedToOrder: Boolean(added),
+      orderListDecisionMade: true,
+      ...(added
+        ? {
+            dashboardOrderStatus: "Pending",
+            dashboardTab: "pending",
+          }
+        : {
+            dashboardOrderStatus: "Pending",
+            dashboardTab: "pending",
+          }),
+    }),
+  setOrderStatus: (id, dashboardOrderStatus) =>
+    http.put(`/quotations/update-quotation/${encodeURIComponent(id)}`, {
+      dashboardOrderStatus,
+    }),
   delete: (id) =>
     http.delete(`/quotations/delete-quotation/${encodeURIComponent(id)}`),
 };

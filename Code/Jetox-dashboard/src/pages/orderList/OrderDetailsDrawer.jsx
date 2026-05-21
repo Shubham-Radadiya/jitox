@@ -1,7 +1,18 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { X } from "lucide-react";
-import { Button } from "../../components/ui/CommanUI";
+import { Button, CommonDropdown } from "../../components/ui/CommanUI";
+import {
+  orderStatusBadgeClasses,
+  paymentStatusBadgeClasses,
+} from "../../utils/tableUi";
+import {
+  ORDER_STATUS_OPTIONS,
+  normalizeOrderStatus,
+} from "../../constants/orderStatus";
+import { quotationsApi } from "../../services/api";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 export default function OrderDetailsDrawer({
   open,
@@ -9,9 +20,22 @@ export default function OrderDetailsDrawer({
   row,
   detail,
   invoice,
-  onGenerateInvoice,
+  onOrderStatusUpdated,
 }) {
   const navigate = useNavigate();
+  const [orderStatusValue, setOrderStatusValue] = useState("Pending");
+  const [statusSaving, setStatusSaving] = useState(false);
+
+  const orderId = row?._id || row?.["Order ID"];
+  const displayStatus =
+    normalizeOrderStatus(detail?.orderStatus || row?.["Order Status"]) ||
+    "Pending";
+
+  useEffect(() => {
+    if (!open) return;
+    setOrderStatusValue(displayStatus);
+  }, [open, displayStatus]);
+
   if (!open || !row) return null;
 
   const d = detail || {};
@@ -19,8 +43,27 @@ export default function OrderDetailsDrawer({
   const client = d.client || {};
   const products = d.products || [];
   const pay = d.payment || {};
-  const dispatch = d.dispatch || {};
   const delivery = d.delivery || {};
+
+  const handleOrderStatusChange = async (next) => {
+    const value = normalizeOrderStatus(next);
+    if (!value || !orderId) {
+      toast.error("This order has no id — cannot update status.");
+      return;
+    }
+    if (value === orderStatusValue) return;
+    setStatusSaving(true);
+    try {
+      await quotationsApi.setOrderStatus(String(orderId), value);
+      setOrderStatusValue(value);
+      toast.success(`Order status updated to ${value}`);
+      onOrderStatusUpdated?.(value);
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Could not update order status"));
+    } finally {
+      setStatusSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[1000] flex justify-end">
@@ -51,17 +94,37 @@ export default function OrderDetailsDrawer({
         </header>
 
         <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50/60 px-4 py-4 text-sm dark:bg-slate-950/30">
-          <div className="flex flex-wrap gap-3">
-            {d.paymentStatus && (
-              <span className="rounded-full border border-emerald-300/80 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/35 dark:text-emerald-300">
-                {d.paymentStatus}
+          <div className="flex flex-wrap gap-4 sm:gap-6">
+            {d.paymentStatus ? (
+              <div className="flex min-w-[7.5rem] flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Payment Status
+                </span>
+                <span
+                  className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold ${paymentStatusBadgeClasses(d.paymentStatus)}`}
+                >
+                  {d.paymentStatus}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex min-w-[10rem] flex-1 flex-col gap-1.5 sm:max-w-xs">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                Order Status
               </span>
-            )}
-            {d.orderStatus && (
-              <span className="rounded-full border border-sky-300/80 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-700/60 dark:bg-sky-950/35 dark:text-sky-300">
-                {d.orderStatus}
+              <CommonDropdown
+                formCompact
+                placeholder="Select status"
+                value={orderStatusValue}
+                onChange={handleOrderStatusChange}
+                options={ORDER_STATUS_OPTIONS}
+                disabled={statusSaving}
+              />
+              <span
+                className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold ${orderStatusBadgeClasses(orderStatusValue)}`}
+              >
+                {orderStatusValue}
               </span>
-            )}
+            </div>
           </div>
 
           <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -130,6 +193,7 @@ export default function OrderDetailsDrawer({
                       <th className="px-3 py-2 text-left">Product</th>
                       <th className="px-3 py-2">QTY</th>
                       <th className="px-3 py-2">Rate (₹)</th>
+                      <th className="px-3 py-2">GST (₹)</th>
                       <th className="px-3 py-2">Subtotal (₹)</th>
                     </tr>
                   </thead>
@@ -139,6 +203,7 @@ export default function OrderDetailsDrawer({
                         <td className="px-3 py-2 text-left">{p.name}</td>
                         <td className="px-3 py-2">{p.qty}</td>
                         <td className="px-3 py-2">{p.rate}</td>
+                        <td className="px-3 py-2">{p.gst ?? "—"}</td>
                         <td className="px-3 py-2">{p.subtotal}</td>
                       </tr>
                     ))}
@@ -146,7 +211,7 @@ export default function OrderDetailsDrawer({
                   {d.productsTotal && (
                     <tfoot>
                       <tr className="bg-rowBg font-semibold dark:bg-slate-800/80">
-                        <td colSpan={3} className="px-3 py-2 text-right align-middle">
+                        <td colSpan={4} className="px-3 py-2 text-right align-middle">
                           Total
                         </td>
                         <td className="px-3 py-2 text-right align-middle tabular-nums">
@@ -160,16 +225,7 @@ export default function OrderDetailsDrawer({
             </section>
           )}
 
-          {dispatch.status && (
-            <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <h3 className="mb-1 text-base font-bold text-slate-900 dark:text-slate-100">
-                Dispatch Details
-              </h3>
-              <div className="font-medium text-primary">{dispatch.status}</div>
-            </section>
-          )}
-
-          {delivery.trackingNumber && (
+          {delivery.trackingNumber && delivery.trackingNumber !== "—" ? (
             <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <h3 className="mb-2 text-base font-bold text-slate-900 dark:text-slate-100">
                 Delivery Details
@@ -192,55 +248,76 @@ export default function OrderDetailsDrawer({
                 )}
               </div>
             </section>
-          )}
+          ) : null}
 
-          {pay.grandTotal && (
+          {(pay.grandTotal || pay.totalAmount || pay.termsOfPayment) && (
             <section className="space-y-2 rounded-xl border border-light-border bg-rowBg p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/80">
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                 Payment Details
               </h3>
-              {pay.subTotal && (
-                <div className="flex justify-between dark:text-slate-100">
-                  <span className="text-light dark:text-slate-400">Sub Total</span>
-                  <span>{pay.subTotal}</span>
-                </div>
-              )}
-              {pay.tax && (
-                <div className="flex justify-between dark:text-slate-100">
-                  <span className="text-light dark:text-slate-400">Tax</span>
-                  <span>{pay.tax}</span>
-                </div>
-              )}
-              {pay.discount && (
-                <div className="flex justify-between dark:text-slate-100">
-                  <span className="text-light dark:text-slate-400">Discount</span>
-                  <span>{pay.discount}</span>
-                </div>
-              )}
-              {pay.mode && (
-                <div className="flex justify-between dark:text-slate-100">
-                  <span className="text-light dark:text-slate-400">Payment Mode</span>
-                  <span>{pay.mode}</span>
-                </div>
-              )}
-              {pay.transactionId && (
-                <div className="flex items-center justify-between dark:text-slate-100">
-                  <span className="text-light dark:text-slate-400">Transaction ID</span>
-                  <span className="font-mono text-xs" title={pay.transactionId}>
-                    {pay.transactionId}
+              {pay.termsOfPayment && pay.termsOfPayment !== "—" ? (
+                <div className="flex justify-between gap-4 border-b border-light-border/80 pb-2 dark:border-slate-600">
+                  <span className="text-light dark:text-slate-400">Terms of Payment</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {pay.termsOfPayment}
                   </span>
                 </div>
-              )}
-              <div className="flex justify-between border-t border-light-border pt-2 text-base font-bold dark:border-slate-700 dark:text-slate-100">
-                <span>Grand Total</span>
-                <span>{pay.grandTotal}</span>
-              </div>
+              ) : null}
+              {[
+                { label: "Total Amount", value: pay.totalAmount || pay.grandTotal },
+                { label: pay.taxLabel || "Tax", value: pay.tax },
+                { label: "Discount", value: pay.discount ?? "₹0" },
+                { label: "Paid Amount", value: pay.paid },
+                { label: "Outstanding Due", value: pay.due },
+                { label: "Payment Mode", value: pay.mode || pay.paymentMode },
+                pay.dueDate
+                  ? { label: "Due Date", value: pay.dueDate }
+                  : null,
+                {
+                  label: "Transaction ID",
+                  value: pay.transactionId,
+                  mono: true,
+                },
+                {
+                  label: "Final Payable",
+                  value: pay.finalPayable || pay.grandTotal,
+                  bold: true,
+                },
+              ]
+                .filter(
+                  (item) =>
+                    item &&
+                    item.value != null &&
+                    String(item.value).trim() !== "" &&
+                    item.value !== "—"
+                )
+                .map((item) => (
+                  <div
+                    key={item.label}
+                    className={`flex justify-between gap-4 dark:text-slate-100 ${
+                      item.bold
+                        ? "border-t border-light-border pt-2 text-base font-bold dark:border-slate-700"
+                        : "border-b border-light-border/80 pb-2 last:border-0 dark:border-slate-600/80"
+                    }`}
+                  >
+                    <span className="text-light dark:text-slate-400">{item.label}</span>
+                    <span
+                      className={
+                        item.mono
+                          ? "max-w-[55%] truncate font-mono text-xs font-semibold tabular-nums"
+                          : "font-semibold tabular-nums"
+                      }
+                      title={item.mono ? String(item.value) : undefined}
+                    >
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
             </section>
           )}
         </div>
 
         <footer className="shrink-0 border-t border-light-border bg-headBg/70 p-4 shadow-[0_-4px_12px_rgba(15,23,42,0.05)] dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-[0_-4px_14px_rgba(0,0,0,0.35)]">
-          <div className="flex flex-col gap-2">
           <div className="flex gap-3">
             <Button
               label="Edit"
@@ -248,7 +325,12 @@ export default function OrderDetailsDrawer({
               className="flex-1"
               onClick={() => {
                 navigate("/dashboard/order-list/invoice", {
-                  state: { invoice, orderId: row?.["Order ID"] },
+                  state: {
+                    invoice,
+                    orderId: row?.["Order ID"],
+                    paymentStatus: d.paymentStatus,
+                    paymentMode: pay?.paymentMode || pay?.mode || invoice?.paymentMode,
+                  },
                 });
                 onClose?.();
               }}
@@ -256,22 +338,24 @@ export default function OrderDetailsDrawer({
             <button
               type="button"
               className="flex-1 rounded-lg border border-primary bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-              onClick={onGenerateInvoice}
+              onClick={() => {
+                if (!invoice) {
+                  toast.error("No invoice data for this order");
+                  return;
+                }
+                navigate("/dashboard/order-list/invoice", {
+                  state: {
+                    invoice,
+                    orderId: row?.["Order ID"],
+                    paymentStatus: d.paymentStatus,
+                    paymentMode: pay?.paymentMode || pay?.mode || invoice?.paymentMode,
+                  },
+                });
+                onClose?.();
+              }}
             >
               Generate Invoice
             </button>
-          </div>
-          <Button
-            label="Open invoice workspace"
-            variant="ghost"
-            className="w-full text-xs"
-            onClick={() => {
-              navigate("/dashboard/order-list/invoice", {
-                state: { invoice, orderId: row?.["Order ID"] },
-              });
-              onClose?.();
-            }}
-          />
           </div>
         </footer>
       </aside>

@@ -17,7 +17,7 @@ export function useSalesFormMeta(enabled = true) {
           ? body.data
           : body;
       if (!payload || typeof payload !== "object") {
-        return { nextSalesVoucherNo: null, parties: [] };
+        return { nextSalesVoucherNo: null, parties: [], partyAddresses: {} };
       }
       return {
         nextSalesVoucherNo:
@@ -25,6 +25,10 @@ export function useSalesFormMeta(enabled = true) {
             ? payload.nextSalesVoucherNo
             : null,
         parties: Array.isArray(payload.parties) ? payload.parties : [],
+        partyAddresses:
+          payload.partyAddresses && typeof payload.partyAddresses === "object"
+            ? payload.partyAddresses
+            : {},
       };
     },
     enabled,

@@ -72,11 +72,20 @@ type QuotationLean = {
     rateParUnit?: number;
     subtotal?: number;
     unit?: string;
+    discountPct?: number;
+    discountAmt?: number;
+    hsn?: string;
     product?: { productName?: string } | mongoose.Types.ObjectId | null;
   }>;
   totalAmount?: number;
   paidAmount?: number;
+  paymentStatus?: string;
+  receiptRequestId?: mongoose.Types.ObjectId;
   paymentMode?: string;
+  termsOfPayment?: string;
+  termsAndConditions?: string;
+  dueDate?: Date;
+  addedToOrder?: boolean;
   dashboardTab?: string;
   dashboardOrderStatus?: string;
   shipToAndBillTo?: string;
@@ -110,6 +119,39 @@ function quotationProductsSummary(q: QuotationLean): string {
     .join(", ");
 }
 
+function quotationLineDiscount(
+  it: {
+    quantity?: number;
+    rateParUnit?: number;
+    discountPct?: number;
+    discountAmt?: number;
+    subtotal?: number;
+  } | null
+  | undefined
+): number {
+  if (!it || typeof it !== "object") return 0;
+  const row = it;
+  const qty = Number(row.quantity) || 0;
+  const rate = Number(row.rateParUnit) || 0;
+  const base = qty * rate;
+  const dAmt = Number(row.discountAmt);
+  const dPct = Number(row.discountPct);
+  if (Number.isFinite(dAmt) && dAmt > 0) return dAmt;
+  if (Number.isFinite(dPct) && dPct > 0) return (base * dPct) / 100;
+  const sub = Number(row.subtotal);
+  if (base > 0 && Number.isFinite(sub)) return Math.max(0, base - sub);
+  return 0;
+}
+
+function sumQuotationLineDiscounts(
+  items: QuotationLean["items"]
+): number {
+  const list = Array.isArray(items) ? items : [];
+  return Math.round(
+    list.reduce((s, it) => s + quotationLineDiscount(it), 0)
+  );
+}
+
 function paymentLabels(q: QuotationLean): {
   paymentStatus: string;
   paid: string;
@@ -118,10 +160,20 @@ function paymentLabels(q: QuotationLean): {
   const total = Number(q.totalAmount) || 0;
   const paidNum = Number(q.paidAmount) || 0;
   const dueNum = Math.max(0, total - paidNum);
-  let paymentStatus = "Pending";
-  if (total > 0 && paidNum >= total) paymentStatus = "Paid";
-  else if (paidNum > 0) paymentStatus = "Pending";
-  else paymentStatus = "Unpaid";
+  const stored = String(q.paymentStatus || "").trim();
+  const paymentStatus =
+    stored === "Paid" ||
+    stored === "Partial" ||
+    stored === "Unpaid" ||
+    stored === "Pending"
+      ? stored
+      : paidNum >= total && total > 0
+        ? "Paid"
+        : paidNum > 0
+          ? "Partial"
+          : total > 0
+            ? "Unpaid"
+            : "Pending";
   return {
     paymentStatus,
     paid: formatInr(paidNum),
@@ -137,6 +189,7 @@ export function formatOrderRowFromQuotation(q: QuotationLean) {
   const totalStr = formatInr(Number(q.totalAmount) || 0);
   return {
     _id: String(q._id),
+    _receiptRecorded: q.receiptRequestId ? "yes" : "",
     "Order ID": q.voucherNo || String(q._id),
     "Client Name": q.partyName || "—",
     Date: dateStr,
@@ -146,12 +199,12 @@ export function formatOrderRowFromQuotation(q: QuotationLean) {
     Due: due,
     "Payment Status": paymentStatus,
     "Total Amount": totalStr,
-    "Order Status": q.dashboardOrderStatus || "Processing",
+    "Order Status": q.dashboardOrderStatus || "Pending",
   };
 }
 
 export async function fetchOrdersSummary() {
-  const rows = (await Quotation.find()
+  const rows = (await Quotation.find({ addedToOrder: true })
     .select("dashboardTab paidAmount totalAmount paymentMode")
     .lean()) as unknown as Array<{
     dashboardTab?: string;
@@ -202,7 +255,7 @@ export async function fetchOrdersFiltered(reqQuery: Record<string, unknown>) {
   const dateFrom = String(reqQuery.dateFrom || "");
   const dateTo = String(reqQuery.dateTo || "");
 
-  const docs = (await Quotation.find()
+  const docs = (await Quotation.find({ addedToOrder: true })
     .populate("items.product", "productName")
     .sort({ voucherDate: -1, createdAt: -1 })
     .lean()) as unknown as QuotationLean[];
@@ -278,6 +331,18 @@ export async function fetchQuotationOrderPayload(id: string) {
   const total = Number(q.totalAmount) || 0;
   const paidNum = Number(q.paidAmount) || 0;
   const labels = paymentLabels(q);
+  const basePrice = Number(q.basePrice) || 0;
+  const gstAmount = Number(q.gstAmount) || 0;
+  const gstPctLabel =
+    basePrice > 0 && gstAmount >= 0
+      ? Math.round((gstAmount / basePrice) * 100)
+      : null;
+  const discountNum = sumQuotationLineDiscounts(q.items);
+  const termsOfPayment =
+    String(q.termsOfPayment || "").trim() ||
+    String(q.paymentMode || "").trim() ||
+    "—";
+  const dueNum = Math.max(0, total - paidNum);
   const created = q.createdAt
     ? new Date(q.createdAt).toLocaleString("en-IN", {
         dateStyle: "medium",
@@ -287,7 +352,7 @@ export async function fetchQuotationOrderPayload(id: string) {
   const detail = {
     createdAt: created,
     paymentStatus: labels.paymentStatus,
-    orderStatus: q.dashboardOrderStatus || "Processing",
+    orderStatus: q.dashboardOrderStatus || "Pending",
     manager: {
       fullName: q.orderby || row["Manager Name"],
       region: "",
@@ -303,25 +368,52 @@ export async function fetchQuotationOrderPayload(id: string) {
     productsTotal: formatInr(
       items.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
     ),
-    dispatch: { status: q.dashboardTab === "dispatched" ? "Dispatched" : "—" },
+    dispatch: {
+      status:
+        q.dashboardTab === "dispatched"
+          ? "Dispatched"
+          : q.dashboardTab === "partSupply"
+            ? "Part Supply"
+            : q.dashboardTab === "cancelled"
+              ? "Cancelled"
+              : q.dashboardTab === "pending"
+                ? "Pending"
+                : "—",
+    },
     delivery: {
       trackingNumber: q.transportDetails || "—",
       courier: q.deliveryAt || "—",
     },
     payment: {
-      subTotal: formatInr(Number(q.basePrice) || 0),
-      tax: formatInr(Number(q.gstAmount) || 0),
-      discount: "₹0",
+      termsOfPayment,
+      paymentMode: q.paymentMode || "—",
+      subTotal: formatInr(basePrice),
+      totalAmount: formatInr(total),
+      tax: formatInr(gstAmount),
+      taxLabel: gstPctLabel != null ? `Tax (${gstPctLabel}%)` : "Tax",
+      discount: formatInr(discountNum),
+      paid: formatInr(paidNum),
+      due: formatInr(dueNum),
+      finalPayable: formatInr(total),
       mode: q.paymentMode || "—",
       transactionId: "—",
       grandTotal: formatInr(total),
+      dueDate: q.dueDate
+        ? new Date(q.dueDate).toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+        : "",
+      paymentStatus: labels.paymentStatus,
     },
     invoice: {
-      companyName: "Jitox Agro",
-      website: "",
-      email: "",
-      phone: "",
-      taxAddress: "",
+      companyName: "Jitox Algo",
+      website: "www.jitoxagro.com",
+      email: "jitoxagro@email.com",
+      phone: "+91 00000 00000",
+      taxAddress:
+        "Business address\nCity, State, IN - 000 000\nTAX ID 00XXXXX1234X0XX",
       billedTo: {
         name: q.partyName,
         address: q.shipToAndBillTo || "",
@@ -367,7 +459,7 @@ export async function fetchQuotationOrderPayload(id: string) {
     due: row.Due,
     paymentStatus: labels.paymentStatus,
     totalAmount: row["Total Amount"],
-    orderStatus: q.dashboardOrderStatus || "Processing",
+    orderStatus: q.dashboardOrderStatus || "Pending",
     tab: q.dashboardTab || "pending",
     detail,
   };
@@ -385,7 +477,7 @@ export async function markQuotationPaid(idOrVoucher: string) {
   const total = Number(q.totalAmount) || 0;
   const updated = await Quotation.findByIdAndUpdate(
     q._id,
-    { $set: { paidAmount: total } },
+    { $set: { paidAmount: total, paymentStatus: "Paid" } },
     { new: true }
   )
     .populate("items.product", "productName")
@@ -1333,7 +1425,7 @@ function mapTrackingDay(d: EmployeeSeed["tracking"][0]) {
 }
 
 export async function ordersReceivableFromQuotations(): Promise<number> {
-  const rows = (await Quotation.find().lean()) as unknown as QuotationLean[];
+  const rows = (await Quotation.find({ addedToOrder: true }).lean()) as unknown as QuotationLean[];
   let receivable = 0;
   for (const o of rows) {
     const q = o;
@@ -1348,7 +1440,7 @@ export async function ordersReceivableFromQuotations(): Promise<number> {
 }
 
 export async function recentOrdersFormatted(limit: number) {
-  const docs = (await Quotation.find()
+  const docs = (await Quotation.find({ addedToOrder: true })
     .populate("items.product", "productName")
     .sort({ voucherDate: -1, createdAt: -1 })
     .limit(limit)

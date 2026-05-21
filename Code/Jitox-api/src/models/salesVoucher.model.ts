@@ -31,6 +31,7 @@ const SalesVoucherSchema = new Schema<ISalesVoucher>(
     shipToAndBillTo: { type: String, trim: true },
     billTo: { type: String, trim: true },
     shipTo: { type: String, trim: true },
+    shipToPartyName: { type: String, trim: true },
     shipDifferent: { type: Boolean, default: false },
     narration: { type: String, trim: true },
     termsAndConditions: { type: String, trim: true },
@@ -51,6 +52,16 @@ const SalesVoucherSchema = new Schema<ISalesVoucher>(
     paymentRequestId: {
       type: Schema.Types.ObjectId,
       ref: "PaymentVoucher",
+    },
+    /** Order list quotation this sale was created from (syncs paid amount on receipt). */
+    sourceQuotationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Quotation",
+    },
+    /** Receipt voucher that collected payment for this sale — blocks duplicate receipts. */
+    receiptRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: "ReceiptVoucher",
     },
     /** "Pending" until a Receipt voucher reconciles it; flips to "Paid" after. */
     paymentStatus: {

@@ -15,6 +15,7 @@ import * as Dyn from "../services/dashboardDynamic.service";
 import { uploadDocumentFile } from "../middleware/multerDocuments.middleware";
 import { sendSuccess } from "../utils/apiResponse";
 import { productLineAmount, resolveProductUnit } from "../utils/productUnit";
+import { buildPartyAddressesMap } from "../utils/partyVoucherAddress.util";
 
 function parseRupeeAmount(s: string): number {
   const n = Number(
@@ -75,11 +76,13 @@ async function computeNextPurchaseVoucherNo(): Promise<string> {
 
 /** Next quotation voucher no. in `QT-001` form (also scans demo-prefixed codes). */
 async function computeNextQuotationVoucherNo(): Promise<string> {
-  const docs = await Quotation.find().select("voucherNo").lean();
+  const docs = await Quotation.find()
+    .select("voucherNo invoiceNo")
+    .lean();
   let max = 0;
   const patterns = [/^QT-(\d+)$/i, /^JITOX-DEMO-QT-(\d+)$/i];
-  for (const d of docs) {
-    const v = String(d?.voucherNo ?? "").trim();
+  const bump = (raw: string) => {
+    const v = String(raw ?? "").trim();
     for (const re of patterns) {
       const m = re.exec(v);
       if (m) {
@@ -87,6 +90,10 @@ async function computeNextQuotationVoucherNo(): Promise<string> {
         if (Number.isFinite(n)) max = Math.max(max, n);
       }
     }
+  };
+  for (const d of docs) {
+    bump(String(d?.voucherNo ?? ""));
+    bump(String(d?.invoiceNo ?? ""));
   }
   const next = max + 1;
   return `QT-${String(next).padStart(3, "0")}`;
@@ -416,14 +423,16 @@ export const getPurchaseFormMeta = async (
   res: Response
 ): Promise<void> => {
   try {
-    const accounts = await Account.find({
+    const accounts = (await Account.find({
       customerStatus: { $ne: "Inactive" },
     })
       .select(
-        "businessName name amount balenceType creditLimit paymentTerm deliveryAt transportMode city"
+        "businessName name amount balenceType creditLimit paymentTerm deliveryAt transportMode city address residentialAddress businessStreetAddress businessArea businessCity businessTaluka businessDistrict businessState businessPincode businessCountry streetAddress street area taluka district state country pincode pinCode"
       )
       .sort({ businessName: 1 })
-      .lean();
+      .lean()) as unknown as Array<Record<string, unknown>>;
+
+    const partyAddresses = buildPartyAddressesMap(accounts);
 
     const seenParty = new Set<string>();
     const parties: { value: string; label: string }[] = [];
@@ -559,6 +568,7 @@ export const getPurchaseFormMeta = async (
 
     sendSuccess(res, {
       parties,
+      partyAddresses,
       partyCreditHints,
       products,
       groups,
@@ -619,7 +629,7 @@ export const getDashboardOverview = async (_req: Request, res: Response) => {
     const payData = await Dyn.fetchPayablesList({});
     const payablesListedTotal = Number(payData.totalPayables) || 0;
 
-    const quotations = await Quotation.find().lean();
+    const quotations = await Quotation.find({ addedToOrder: true }).lean();
     const salesFromOrders = quotations.reduce(
       (s, o) => s + (Number(o.totalAmount) || 0),
       0

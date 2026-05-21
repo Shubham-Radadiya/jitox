@@ -73,7 +73,7 @@ export function salesPayloadToCreateBody(payload) {
     typeof payload.shipDifferent === "boolean"
       ? payload.shipDifferent
       : String(payload.shipDifferent || "").toLowerCase() === "true";
-  const shipStored = sd ? shipRaw : billTo;
+  const shipLine = sd ? shipRaw : billTo;
 
   return {
     partyName: String(payload.partyName || "").trim(),
@@ -82,9 +82,12 @@ export function salesPayloadToCreateBody(payload) {
     transportDetails: String(payload.transporter || "").trim(),
     deliveryAt: String(payload.deliveryAt || "").trim(),
     orderby: String(payload.orderBy || "").trim(),
-    shipToAndBillTo: shipStored,
+    shipToAndBillTo: sd ? "" : billTo,
     billTo,
-    shipTo: shipStored,
+    shipTo: shipLine,
+    shipToPartyName: sd
+      ? String(payload.shipToPartyName || "").trim()
+      : String(payload.partyName || "").trim(),
     shipDifferent: sd,
     narration: String(payload.narration || "").trim(),
     termsAndConditions: String(payload.termsText || "").trim(),
@@ -99,5 +102,8 @@ export function salesPayloadToCreateBody(payload) {
       generetePurchaseBill: false,
       updateStockAfterOrderPlaced: false,
     },
+    ...(payload.sourceQuotationId
+      ? { sourceQuotationId: String(payload.sourceQuotationId).trim() }
+      : {}),
   };
 }

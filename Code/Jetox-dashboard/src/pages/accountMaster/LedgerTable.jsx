@@ -78,6 +78,7 @@ const LedgerTable = () => {
   } = useQuery({
     queryKey: ["account-ledger", accountId],
     enabled: Boolean(accountId),
+    staleTime: 0,
     queryFn: async () => {
       try {
         const [
@@ -114,7 +115,20 @@ const LedgerTable = () => {
           salesReturns: [],
         };
       } catch (e) {
-        if (isEmptyListNotFound(e)) return [];
+        if (isEmptyListNotFound(e)) {
+          return {
+            account: {},
+            payments: [],
+            receipts: [],
+            journals: [],
+            expenses: [],
+            cashVouchers: [],
+            purchases: [],
+            purchaseReturns: [],
+            sales: [],
+            salesReturns: [],
+          };
+        }
         throw e;
       }
     },

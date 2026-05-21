@@ -165,12 +165,18 @@ export const createPaymentVoucher = async (
     let linkedSalesId: mongoose.Types.ObjectId | null = null;
     if (sourceSalesId && mongoose.isValidObjectId(sourceSalesId)) {
       const sale = await SalesVoucher.findById(sourceSalesId).select(
-        "paymentRequestId"
+        "paymentRequestId receiptRequestId"
       );
       if (!sale) {
         throw new AppError(
           HttpStatusCode.NOT_FOUND,
           "Linked sales voucher not found."
+        );
+      }
+      if (sale.receiptRequestId) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "Payment was already recorded with a receipt voucher for this sale."
         );
       }
       if (sale.paymentRequestId) {

@@ -47,6 +47,12 @@ export interface IAccount extends Document {
   transportMode?: string;
   deliveryAt?: string;
   customerStatus?: "Active" | "Inactive";
+  /** Optional — shown on invoice bank block when set */
+  bankName?: string;
+  bankAccountNo?: string;
+  bankBranch?: string;
+  bankIfscCode?: string;
+  partyNameAliases?: string[];
   lastBillingAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;

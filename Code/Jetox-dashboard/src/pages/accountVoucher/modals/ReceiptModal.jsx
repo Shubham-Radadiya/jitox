@@ -66,6 +66,9 @@ const ReceiptModal = ({
   const linkedPurchaseReturnId = String(
     draft?.sourcePurchaseReturnId || receipt?.sourcePurchaseReturnId || ""
   ).trim();
+  const linkedQuotationId = String(
+    draft?.sourceQuotationId || receipt?.sourceQuotationId || ""
+  ).trim();
 
   const {
     data: purchaseMeta,
@@ -107,7 +110,8 @@ const ReceiptModal = ({
             ? String(draft.amount).replace(/,/g, "")
             : "",
         remarks: String(draft.remarks || ""),
-        status: String(draft.status || "Paid") === "Paid" ? "Paid" : "Pending",
+        status:
+          String(draft.status || "Pending") === "Paid" ? "Paid" : "Pending",
       });
       setSaving(false);
       return;
@@ -221,6 +225,9 @@ const ReceiptModal = ({
       if (linkedPurchaseReturnId) {
         body.sourcePurchaseReturnId = linkedPurchaseReturnId;
       }
+      if (linkedQuotationId) {
+        body.sourceQuotationId = linkedQuotationId;
+      }
     }
 
     try {
@@ -245,12 +252,22 @@ const ReceiptModal = ({
           ? queryClient.invalidateQueries({ queryKey: ["accounts"] })
           : Promise.resolve(),
         linkedSalesId || receipt?.sourceSalesId
-          ? queryClient.invalidateQueries({ queryKey: ["voucher-list", "sales"] })
+          ? Promise.all([
+              queryClient.invalidateQueries({
+                queryKey: ["voucher-list", "sales"],
+              }),
+              queryClient.invalidateQueries({
+                queryKey: ["dashboard", "orders"],
+              }),
+            ])
           : Promise.resolve(),
         linkedPurchaseReturnId || receipt?.sourcePurchaseReturnId
           ? queryClient.invalidateQueries({
               queryKey: ["voucher-list", "purchase-return"],
             })
+          : Promise.resolve(),
+        linkedQuotationId || receipt?.sourceQuotationId
+          ? queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] })
           : Promise.resolve(),
         body.status === "Paid"
           ? queryClient.invalidateQueries({ queryKey: ["account-ledger"] })

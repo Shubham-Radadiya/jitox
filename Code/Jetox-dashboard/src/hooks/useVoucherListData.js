@@ -104,6 +104,6 @@ export function useVoucherListData(voucherSlug) {
     queryKey: ["voucher-list", voucherSlug],
     queryFn: () => loadVoucherRows(voucherSlug),
     enabled: Boolean(voucherSlug),
-    staleTime: 30_000,
+    staleTime: 0,
   });
 }

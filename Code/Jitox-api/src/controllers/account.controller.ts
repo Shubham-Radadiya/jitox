@@ -250,6 +250,23 @@ const ACCOUNT_ADDR_KEYS = [
   "residentialAddress",
 ];
 
+function mergePartyNameAliasesOnRename(
+  existing: Record<string, unknown>,
+  body: Record<string, unknown>
+): void {
+  const prev = String(existing.businessName ?? "").trim();
+  const next = String(body.businessName ?? prev).trim();
+  if (!prev || !next || prev === next) return;
+
+  const aliases = new Set<string>(
+    Array.isArray(existing.partyNameAliases)
+      ? (existing.partyNameAliases as string[]).map((s) => String(s).trim()).filter(Boolean)
+      : []
+  );
+  aliases.add(prev);
+  body.partyNameAliases = [...aliases];
+}
+
 export const updateAccount = async (
   req: Request,
   res: Response
@@ -258,12 +275,18 @@ export const updateAccount = async (
     const { id } = req.params;
     const body = { ...(req.body as Record<string, unknown>) };
 
+    const existing = await Account.findById(id).lean();
+    if (!existing) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "No accounts found.");
+    }
+
+    mergePartyNameAliasesOnRename(
+      existing as Record<string, unknown>,
+      body
+    );
+
     const touching = ACCOUNT_ADDR_KEYS.some((k) => body[k] !== undefined);
     if (touching) {
-      const existing = await Account.findById(id).lean();
-      if (!existing) {
-        throw new AppError(HttpStatusCode.NOT_FOUND, "No accounts found.");
-      }
       const merged = { ...existing, ...body } as Record<string, unknown>;
       const { addr, legacyResidential } =
         parseAccountStructuredAddress(merged);

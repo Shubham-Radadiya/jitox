@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { Types } from "mongoose";
 import { Account, Product, User } from "../models/index";
 import SalesVoucher from "../models/salesVoucher.model";
+import Quotation from "../models/quotation.model";
+import { syncQuotationPaymentFromSale } from "../utils/receiptQuotationLedger";
 import type { AuthRequest } from "../middleware/authonticated.middleware";
 import { buildSalesScopeFilter, isTerritoryScopedRole } from "../services/territory.service";
 import { Role } from "../constants/roles";
@@ -16,6 +18,7 @@ import {
   reconcilePartyLedgerCreditOnVoucherChange,
 } from "../utils/applyPaymentToAccountBalance";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
+import { buildPartyAddressesMap } from "../utils/partyVoucherAddress.util";
 
 /** Fields accepted from PUT body when updating a sales voucher. */
 const SALES_VOUCHER_PATCH_KEYS = [
@@ -28,6 +31,7 @@ const SALES_VOUCHER_PATCH_KEYS = [
   "shipToAndBillTo",
   "billTo",
   "shipTo",
+  "shipToPartyName",
   "shipDifferent",
   "narration",
   "termsAndConditions",
@@ -39,6 +43,7 @@ const SALES_VOUCHER_PATCH_KEYS = [
   "paymentMode",
   "basePrice",
   "paymentStatus",
+  "paidAmount",
   "orderStatus",
   "stockDetails",
 ] as const;
@@ -101,6 +106,7 @@ export const createSalesVoucher = async (
       shipToAndBillTo,
       billTo,
       shipTo,
+      shipToPartyName,
       shipDifferent,
       narration,
       termsAndConditions,
@@ -114,6 +120,7 @@ export const createSalesVoucher = async (
       paymentStatus,
       orderStatus,
       stockDetails,
+      sourceQuotationId,
     } = req.body;
 
     const requiredFields = ["partyName", "voucherDate", "items"] as const;
@@ -129,6 +136,20 @@ export const createSalesVoucher = async (
     }
 
     const resolvedVoucherNo = await resolveUniqueSalesVoucherNo(voucherNo);
+
+    let linkedQuotationId: Types.ObjectId | undefined;
+    if (sourceQuotationId && Types.ObjectId.isValid(String(sourceQuotationId))) {
+      const quotation = await Quotation.findById(sourceQuotationId).select(
+        "_id addedToOrder"
+      );
+      if (!quotation) {
+        throw new AppError(
+          HttpStatusCode.NOT_FOUND,
+          "Linked order (quotation) not found."
+        );
+      }
+      linkedQuotationId = quotation._id as Types.ObjectId;
+    }
 
     let orderbyFinal = String(orderby || "").trim();
     let createdByUserId: Types.ObjectId | undefined;
@@ -164,6 +185,7 @@ export const createSalesVoucher = async (
       shipToAndBillTo,
       billTo,
       shipTo,
+      shipToPartyName,
       shipDifferent,
       narration,
       termsAndConditions,
@@ -180,6 +202,7 @@ export const createSalesVoucher = async (
       ...(createdByUserId ? { createdByUserId } : {}),
       ...(territoryId ? { territoryId } : {}),
       ...(managerUserId ? { managerUserId } : {}),
+      ...(linkedQuotationId ? { sourceQuotationId: linkedQuotationId } : {}),
     });
 
     const savedVoucher = await newVoucher.save();
@@ -274,6 +297,8 @@ export const getAllSalesVouchers = async (
           gstAmount: 1,
           paymentMode: 1,
           paymentStatus: 1,
+          paidAmount: 1,
+          receiptRequestId: 1,
           orderStatus: 1,
           basePrice: 1,
           items: 1,
@@ -370,8 +395,17 @@ export const updateSalesVoucher = async (
       }
     }
 
+    const hadPaymentPatch =
+      Object.prototype.hasOwnProperty.call(patch, "paymentStatus") ||
+      Object.prototype.hasOwnProperty.call(patch, "paidAmount");
+
     voucher.set(patch);
     await voucher.save();
+
+    if (hadPaymentPatch) {
+      await syncQuotationPaymentFromSale(voucher._id);
+    }
+
     await voucher.populate({
       path: "items.product",
       select: "productName category group",
@@ -464,12 +498,14 @@ export const getSalesFormMeta = async (
   res: Response
 ): Promise<void> => {
   try {
-    const accounts = await Account.find({
+    const accounts = (await Account.find({
       customerStatus: { $ne: "Inactive" },
     })
-      .select("businessName")
+      .select(
+        "businessName name address residentialAddress businessStreetAddress businessArea businessCity businessTaluka businessDistrict businessState businessPincode businessCountry streetAddress street area taluka district state country pincode pinCode"
+      )
       .sort({ businessName: 1 })
-      .lean();
+      .lean()) as unknown as Array<Record<string, unknown>>;
 
     const seen = new Set<string>();
     const parties: { value: string; label: string }[] = [];
@@ -487,7 +523,9 @@ export const getSalesFormMeta = async (
       console.error("computeNextSalesVoucherNo", e);
     }
 
-    sendSuccess(res, { nextSalesVoucherNo, parties });
+    const partyAddresses = buildPartyAddressesMap(accounts);
+
+    sendSuccess(res, { nextSalesVoucherNo, parties, partyAddresses });
   } catch (error) {
     console.error("getSalesFormMeta", error);
     res.status(500).json({ message: "Failed to load sales voucher form meta." });

@@ -68,15 +68,52 @@ export function compareLedgerEntries(a, b) {
   return String(a?._id ?? "").localeCompare(String(b?._id ?? ""));
 }
 
+function normalizePartyKey(raw) {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+/** All names that should match vouchers for this account (current + previous business names). */
+export function collectPartyMatchKeysFromAccount(account) {
+  const keys = new Set();
+  const add = (v) => {
+    const k = normalizePartyKey(v);
+    if (k) keys.add(k);
+  };
+  if (!account || typeof account !== "object") return keys;
+  add(account.businessName);
+  add(account.name);
+  const aliases = account.partyNameAliases;
+  if (Array.isArray(aliases)) {
+    for (const a of aliases) add(a);
+  }
+  return keys;
+}
+
+export function matchesPartyForAccount(account, rawPartyLabel) {
+  const n = normalizePartyKey(rawPartyLabel);
+  if (!n) return false;
+  return collectPartyMatchKeysFromAccount(account).has(n);
+}
+
 function partyNamesFromAccount(account) {
+  const keys = collectPartyMatchKeysFromAccount(account);
+  const list = [...keys];
   return {
-    accountName: String(account.businessName || "").trim().toLowerCase(),
-    personName: String(account.name || "").trim().toLowerCase(),
+    accountName: normalizePartyKey(account?.businessName),
+    personName: normalizePartyKey(account?.name),
+    matchKeys: keys,
+    /** @deprecated use matchKeys — first key for legacy callers */
+    legacyList: list,
   };
 }
 
-function matchesPartyName(accountName, personName, raw) {
-  const n = String(raw || "").trim().toLowerCase();
+function matchesPartyName(accountName, personName, raw, matchKeys = null) {
+  const n = normalizePartyKey(raw);
+  if (!n) return false;
+  if (matchKeys && matchKeys.size > 0) return matchKeys.has(n);
   return n && (n === accountName || n === personName);
 }
 
@@ -93,25 +130,25 @@ function cashVoucherDisplayType(cv) {
   return "Cash";
 }
 
-function mapCashAndBankVoucherRows(cashVouchers, accountName, personName) {
+function mapCashAndBankVoucherRows(cashVouchers, matchKeys, accountName, personName) {
   return (cashVouchers || [])
     .filter((cv) => {
-      const df = String(cv.debitFrom || "").trim().toLowerCase();
-      const ct = String(cv.creditTo || "").trim().toLowerCase();
+      const df = String(cv.debitFrom || "").trim();
+      const ct = String(cv.creditTo || "").trim();
       return (
-        (df && (df === accountName || df === personName)) ||
-        (ct && (ct === accountName || ct === personName))
+        matchesPartyName(accountName, personName, df, matchKeys) ||
+        matchesPartyName(accountName, personName, ct, matchKeys)
       );
     })
     .map((cv) => {
-      const df = String(cv.debitFrom || "").trim().toLowerCase();
-      const ct = String(cv.creditTo || "").trim().toLowerCase();
+      const df = String(cv.debitFrom || "").trim();
+      const ct = String(cv.creditTo || "").trim();
       const amt = parseRupeeCell(cv.amount);
       let debit = 0;
       let credit = 0;
       /** Tally-style: debitFrom = money out → Cr; creditTo = money in → Dr */
-      if (df === accountName || df === personName) credit = amt;
-      else if (ct === accountName || ct === personName) debit = amt;
+      if (matchesPartyName(accountName, personName, df, matchKeys)) credit = amt;
+      else if (matchesPartyName(accountName, personName, ct, matchKeys)) debit = amt;
       const voucherType = cashVoucherDisplayType(cv);
       const rowDate = cv.voucherDate || cv.createdAt;
       return {
@@ -137,25 +174,25 @@ function mapCashAndBankVoucherRows(cashVouchers, accountName, personName) {
  * @returns {Array<{ kind: string, _id: any, raw: any, date: any, dateIso: string, voucherType: string, voucherNo: string, particulars: string, debit: number, credit: number }>}
  */
 export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
-  const { accountName, personName } = partyNamesFromAccount(account);
+  const { accountName, personName, matchKeys } = partyNamesFromAccount(account);
 
   const payRows = (ledgerSource.payments || [])
     .filter((p) => {
       if (!isSettledMoneyVoucher(p)) return false;
-      const to = String(p.paymentTo || "").trim().toLowerCase();
-      const from = String(p.paymentFrom || "").trim().toLowerCase();
+      const to = String(p.paymentTo || "").trim();
+      const from = String(p.paymentFrom || "").trim();
       return (
-        (to && (to === accountName || to === personName)) ||
-        (from && (from === accountName || from === personName))
+        matchesPartyName(accountName, personName, to, matchKeys) ||
+        matchesPartyName(accountName, personName, from, matchKeys)
       );
     })
     .map((p) => {
-      const to = String(p.paymentTo || "").trim().toLowerCase();
-      const from = String(p.paymentFrom || "").trim().toLowerCase();
+      const to = String(p.paymentTo || "").trim();
+      const from = String(p.paymentFrom || "").trim();
       const isPaidFrom =
         from &&
-        (from === accountName || from === personName) &&
-        !(to === accountName || to === personName);
+        matchesPartyName(accountName, personName, from, matchKeys) &&
+        !matchesPartyName(accountName, personName, to, matchKeys);
       const amt = parseRupeeCell(p.amount);
       const fromLabel = String(p.paymentFrom || "").trim();
       const rowDate = p.date || p.createdAt;
@@ -181,20 +218,20 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
   const receiptRows = (ledgerSource.receipts || [])
     .filter((r) => {
       if (!isSettledMoneyVoucher(r)) return false;
-      const from = String(r.receiptFrom || "").trim().toLowerCase();
-      const into = String(r.receivedIn || "").trim().toLowerCase();
+      const from = String(r.receiptFrom || "").trim();
+      const into = String(r.receivedIn || "").trim();
       return (
-        (from && (from === accountName || from === personName)) ||
-        (into && (into === accountName || into === personName))
+        matchesPartyName(accountName, personName, from, matchKeys) ||
+        matchesPartyName(accountName, personName, into, matchKeys)
       );
     })
     .map((r) => {
-      const from = String(r.receiptFrom || "").trim().toLowerCase();
-      const into = String(r.receivedIn || "").trim().toLowerCase();
+      const from = String(r.receiptFrom || "").trim();
+      const into = String(r.receivedIn || "").trim();
       const isReceivedIn =
         into &&
-        (into === accountName || into === personName) &&
-        !(from === accountName || from === personName);
+        matchesPartyName(accountName, personName, into, matchKeys) &&
+        !matchesPartyName(accountName, personName, from, matchKeys);
       const amt = parseRupeeCell(r.amount);
       const intoLabel = String(r.receivedIn || "").trim();
       const rowDate = r.date || r.createdAt;
@@ -244,7 +281,9 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
     });
 
   const purchaseRows = (ledgerSource.purchases || [])
-    .filter((pv) => matchesPartyName(accountName, personName, pv.partyName))
+    .filter((pv) =>
+      matchesPartyName(accountName, personName, pv.partyName, matchKeys)
+    )
     .map((pv) => {
       const rowDate = pv.voucherDate || pv.createdAt;
       return {
@@ -265,7 +304,9 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
     });
 
   const purchaseReturnRows = (ledgerSource.purchaseReturns || [])
-    .filter((pv) => matchesPartyName(accountName, personName, pv.partyName))
+    .filter((pv) =>
+      matchesPartyName(accountName, personName, pv.partyName, matchKeys)
+    )
     .map((pv) => {
       const rowDate = pv.voucherDate || pv.createdAt;
       return {
@@ -286,7 +327,9 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
     });
 
   const salesRows = (ledgerSource.sales || [])
-    .filter((sv) => matchesPartyName(accountName, personName, sv.partyName))
+    .filter((sv) =>
+      matchesPartyName(accountName, personName, sv.partyName, matchKeys)
+    )
     .map((sv) => {
       const rowDate = sv.voucherDate || sv.createdAt;
       return {
@@ -307,7 +350,9 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
     });
 
   const salesReturnRows = (ledgerSource.salesReturns || [])
-    .filter((sv) => matchesPartyName(accountName, personName, sv.partyName))
+    .filter((sv) =>
+      matchesPartyName(accountName, personName, sv.partyName, matchKeys)
+    )
     .map((sv) => {
       const rowDate = sv.voucherDate || sv.createdAt;
       return {
@@ -328,7 +373,9 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
     });
 
   const expenseRows = (ledgerSource.expenses || [])
-    .filter((ex) => matchesPartyName(accountName, personName, ex.paidTo))
+    .filter((ex) =>
+      matchesPartyName(accountName, personName, ex.paidTo, matchKeys)
+    )
     .map((ex) => {
       const rowDate = ex.startDate || ex.createdAt;
       return {
@@ -350,6 +397,7 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
 
   const cashAndBankRows = mapCashAndBankVoucherRows(
     ledgerSource.cashVouchers,
+    matchKeys,
     accountName,
     personName
   );

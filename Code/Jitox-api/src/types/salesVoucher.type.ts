@@ -26,6 +26,7 @@ export interface ISalesVoucher extends Document {
   shipToAndBillTo?: string;
   billTo?: string;
   shipTo?: string;
+  shipToPartyName?: string;
   shipDifferent?: boolean;
   narration?: string;
   termsAndConditions?: string;
@@ -42,6 +43,9 @@ export interface ISalesVoucher extends Document {
   paidAmount?: number;
   /** Payment Voucher created from this sale (used to gate the Pay-Request button). */
   paymentRequestId?: mongoose.Schema.Types.ObjectId;
+  /** Order list quotation this sale was created from. */
+  sourceQuotationId?: mongoose.Schema.Types.ObjectId;
+  receiptRequestId?: mongoose.Schema.Types.ObjectId;
   stockDetails: {
     stockQuantity: boolean;
     productStatus?: boolean;

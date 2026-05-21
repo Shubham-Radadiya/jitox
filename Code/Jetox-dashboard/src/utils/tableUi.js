@@ -331,9 +331,18 @@ export function orderStatusBadgeClasses(value, options = {}) {
     dispatched: `${B} border-purple-200/90 bg-purple-100 text-purple-900 dark:border-violet-400/45 dark:bg-violet-500/18 dark:text-violet-50`,
     cancelled: `${B} border-red-200/90 bg-red-100 text-red-900 dark:border-rose-400/45 dark:bg-rose-500/18 dark:text-rose-50`,
     processing: `${B} border-blue-200/90 bg-blue-100 text-blue-900 dark:border-sky-400/45 dark:bg-sky-500/18 dark:text-sky-50`,
+    quotation: `${B} border-slate-200/80 bg-gray-100 text-gray-700 dark:border-slate-500/35 dark:bg-slate-500/15 dark:text-slate-200`,
+    notonorderlist: `${B} border-red-200/90 bg-red-100 text-red-800 dark:border-red-400/45 dark:bg-red-500/18 dark:text-red-50`,
+    onorderlist: `${B} border-emerald-200/90 bg-emerald-100 text-emerald-900 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50`,
     partsupply: `${B} border-orange-200/90 bg-amber-100 text-amber-900 dark:border-orange-400/45 dark:bg-orange-500/16 dark:text-orange-50`,
     "part-supply": `${B} border-orange-200/90 bg-amber-100 text-amber-900 dark:border-orange-400/45 dark:bg-orange-500/16 dark:text-orange-50`,
   };
+  if (s.includes("notonorder")) {
+    return map.notonorderlist;
+  }
+  if (s.includes("onorderlist")) {
+    return map.onorderlist;
+  }
   return (
     map[s] ||
     `${B} border-slate-200/80 bg-gray-100 text-gray-700 dark:border-slate-500/35 dark:bg-slate-500/15 dark:text-slate-200`

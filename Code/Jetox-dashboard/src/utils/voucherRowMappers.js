@@ -1,5 +1,12 @@
 import dayjs from "dayjs";
 import {
+  displayOrderStatus,
+  displayQuotationListStatus,
+  hasOrderListDecisionMade,
+  isQuotationOnOrderList,
+} from "../constants/orderStatus";
+import { invoiceCompanyFields } from "../constants/invoiceCompanyProfile";
+import {
   resolvePurchasePaymentStatusDisplay,
   resolvePurchaseReturnRefundStatusDisplay,
 } from "./purchasePaymentStatus";
@@ -272,18 +279,40 @@ export function mapJournalRow(v) {
   };
 }
 
+/** Mongo id from a voucher list row (aggregate or mapper). */
+export function resolveVoucherRowId(row) {
+  const raw = row?._raw;
+  const id = row?._id ?? raw?._id;
+  if (id == null || id === "") return null;
+  return String(id);
+}
+
 export function mapQuotationRow(q) {
+  const addedToOrder = isQuotationOnOrderList(q);
+  const orderListDecisionMade = hasOrderListDecisionMade(q);
+  const orderListStatus = displayQuotationListStatus(q);
   return {
     _id: q._id,
     _raw: q,
+    addedToOrder,
+    orderListDecisionMade,
     "Quote No": q.voucherNo || "—",
     Date: q.voucherDate
       ? dayjs(q.voucherDate).format("YYYY-MM-DD")
       : "—",
     Client: q.partyName || "—",
     Amount: q.totalAmount != null ? fmtRupee(q.totalAmount) : "—",
-    Status: "—",
+    "Quotation status": orderListStatus,
+    Status: orderListStatus,
   };
+}
+
+/** Detail drawer shape for quotation vouchers (reuses purchase layout). */
+export function quotationDocToDetailShape(doc, partyAccount = null, options = {}) {
+  return purchaseDocToDetailShape(doc, partyAccount, {
+    isQuotation: true,
+    ...options,
+  });
 }
 
 function pushDetailRow(rows, label, value) {
@@ -295,8 +324,11 @@ function pushDetailRow(rows, label, value) {
 
 /** Shape expected by PurchaseDetails drawer */
 /** Purchase return view drawer — refund received = paid amount, status Received/Partial/Pending. */
-export function purchaseReturnDocToDetailShape(doc, partyAccount = null) {
-  return purchaseDocToDetailShape(doc, partyAccount, { isPurchaseReturn: true });
+export function purchaseReturnDocToDetailShape(doc, partyAccount = null, options = {}) {
+  return purchaseDocToDetailShape(doc, partyAccount, {
+    isPurchaseReturn: true,
+    ...options,
+  });
 }
 
 export function purchaseDocToDetailShape(
@@ -307,6 +339,7 @@ export function purchaseDocToDetailShape(
   const d = doc;
   if (!d) return null;
   const isPurchaseReturn = options.isPurchaseReturn === true;
+  const isQuotation = options.isQuotation === true;
 
   const basePriceNum = Number(d.basePrice);
   const gstAmountNum = Number(d.gstAmount);
@@ -332,6 +365,7 @@ export function purchaseDocToDetailShape(
     }
     return {
       name,
+      hsn: String(it.hsn ?? "").trim() || "—",
       qty: String(it.quantity ?? ""),
       rate: fmtRupee(it.rateParUnit),
       gst: lineGst,
@@ -348,8 +382,11 @@ export function purchaseDocToDetailShape(
   /** Supplier side — for the “Party Details” card. Keep it to the two slots used by the design. */
   const party = [];
   pushDetailRow(party, "Full Name", d.partyName);
-  const shippingAddress =
-    String(d.shipTo ?? "").trim() || String(d.billTo ?? "").trim();
+  const shippingAddress = isQuotation
+    ? String(d.shipToAndBillTo ?? "").trim() ||
+      String(d.shipTo ?? "").trim() ||
+      String(d.billTo ?? "").trim()
+    : String(d.shipTo ?? "").trim() || String(d.billTo ?? "").trim();
   pushDetailRow(party, "Shipping Address", shippingAddress);
 
   if (party.length === 0) {
@@ -361,6 +398,9 @@ export function purchaseDocToDetailShape(
   const paymentStatus = isPurchaseReturn
     ? resolvePurchaseReturnRefundStatusDisplay(d)
     : resolvePurchasePaymentStatusDisplay(d);
+  const quotationListStatus = isQuotation
+    ? displayQuotationListStatus(d)
+    : null;
   const totalNum = Number(d.totalAmount) || 0;
   let paidNum = isPurchaseReturn
     ? Number(d.refundedAmount)
@@ -384,13 +424,19 @@ export function purchaseDocToDetailShape(
 
   return {
     voucherNo: d.voucherNo || "—",
-    status: paymentStatus,
+    status: isQuotation ? quotationListStatus : paymentStatus,
+    quotationListStatus,
     isPurchaseReturn,
-    paymentTerms: d.termsOfPayment
-      ? String(d.termsOfPayment)
-      : d.paymentMode
+    isQuotation,
+    paymentTerms: isQuotation
+      ? d.paymentMode
         ? String(d.paymentMode)
-        : "—",
+        : "—"
+      : d.termsOfPayment
+        ? String(d.termsOfPayment)
+        : d.paymentMode
+          ? String(d.paymentMode)
+          : "—",
     invoiceNo: d.invoiceNo ? String(d.invoiceNo) : "—",
     purchaseDate: d.voucherDate
       ? dayjs(d.voucherDate).format("DD MMM YYYY")
@@ -405,6 +451,7 @@ export function purchaseDocToDetailShape(
         : [
             {
               name: "—",
+              hsn: "—",
               qty: "—",
               rate: "—",
               gst: "—",
@@ -423,6 +470,7 @@ export function purchaseDocToDetailShape(
     },
     _sourceDoc: d,
     partyAccount: partyAccount || null,
+    shipPartyAccount: options.shipPartyAccount ?? partyAccount ?? null,
   };
 }
 
@@ -434,6 +482,63 @@ function fmtInr(n) {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
   return `₹${Math.round(x).toLocaleString("en-IN")}`;
+}
+
+/** Payment block for Order Details / Sales drawer (matches PurchaseDetails totals). */
+export function buildOrderDrawerPaymentDetail(d) {
+  if (!d || typeof d !== "object") return {};
+
+  const basePriceNum = Number(d.basePrice) || 0;
+  const gstAmountNum = Number(d.gstAmount) || 0;
+  const totalNum = Number(d.totalAmount) || 0;
+  const hasSplitGst =
+    basePriceNum > 0 && Number.isFinite(gstAmountNum) && gstAmountNum >= 0;
+  const gstPctLabel =
+    hasSplitGst && basePriceNum > 0
+      ? Math.round((gstAmountNum / basePriceNum) * 100)
+      : null;
+
+  const paymentStatus = resolvePurchasePaymentStatusDisplay(d);
+  let paidNum = Number(d.paidAmount);
+  if (!Number.isFinite(paidNum)) {
+    if (paymentStatus === "Paid") paidNum = totalNum;
+    else if (paymentStatus === "Unpaid") paidNum = 0;
+    else paidNum = 0;
+  }
+  paidNum = Math.max(0, Math.min(totalNum, paidNum));
+  const dueNum = Math.max(0, totalNum - paidNum);
+  const discountNum = Math.round(sumPurchaseLineDiscounts(d.items));
+  const termsOfPayment =
+    String(d.termsOfPayment || "").trim() ||
+    String(d.paymentMode || "").trim() ||
+    "—";
+
+  return {
+    termsOfPayment,
+    paymentMode: String(d.paymentMode || "").trim() || "—",
+    subTotal: fmtInr(basePriceNum),
+    totalAmount: fmtInr(totalNum),
+    tax: fmtInr(gstAmountNum),
+    taxLabel: gstPctLabel != null ? `Tax (${gstPctLabel}%)` : "Tax",
+    discount: fmtInr(discountNum),
+    paid: fmtInr(paidNum),
+    due: fmtInr(dueNum),
+    finalPayable: fmtInr(totalNum),
+    grandTotal: fmtInr(totalNum),
+    mode: String(d.paymentMode || "").trim() || "—",
+    transactionId: String(d.transactionId || "").trim() || "—",
+    dueDate: d.dueDate ? dayjs(d.dueDate).format("DD MMM YYYY") : "",
+    paymentStatus,
+  };
+}
+
+function dispatchLabelFromDashboardTab(tab) {
+  const t = String(tab || "").trim();
+  if (t === "dispatched") return "Dispatched";
+  if (t === "partSupply") return "Part Supply";
+  if (t === "cancelled") return "Cancelled";
+  if (t === "pending") return "Pending";
+  return "";
 }
 
 /**
@@ -457,6 +562,13 @@ export function salesDocToOrderDetailShape(doc) {
       })
     : "";
 
+  const basePriceNum = Number(d.basePrice) || 0;
+  const gstAmountNum = Number(d.gstAmount) || 0;
+  const hasSplitGst =
+    basePriceNum > 0 &&
+    Number.isFinite(gstAmountNum) &&
+    gstAmountNum >= 0;
+
   const products = (d.items || []).map((it, i) => {
     const p = it.product;
     const name =
@@ -469,10 +581,20 @@ export function salesDocToOrderDetailShape(doc) {
     const subNum =
       Number(it.subtotal) ||
       (Number.isFinite(qtyNum) ? qtyNum * rateNum : 0);
+    let lineGst = "—";
+    if (hasSplitGst) {
+      const taxable = Number(it.subtotal);
+      if (Number.isFinite(taxable) && taxable >= 0) {
+        const share = (taxable / basePriceNum) * gstAmountNum;
+        lineGst = fmtInr(share);
+      }
+    }
     return {
       name,
+      hsn: String(it.hsn ?? "").trim() || "—",
       qty: qty || "—",
       rate: fmtInr(rateNum),
+      gst: lineGst,
       subtotal: fmtInr(subNum),
     };
   });
@@ -499,17 +621,19 @@ export function salesDocToOrderDetailShape(doc) {
     shippingAddress,
   };
 
-  const payment = {
-    subTotal: fmtInr(Number(d.basePrice) || 0),
-    tax: fmtInr(Number(d.gstAmount) || 0),
-    discount: d.discount != null ? fmtInr(d.discount) : "₹0",
-    mode: d.paymentMode || "—",
-    transactionId: d.transactionId || "—",
-    grandTotal: fmtInr(Number(d.totalAmount) || 0),
-  };
-
+  const payment = buildOrderDrawerPaymentDetail(d);
+  const paymentStatus =
+    payment.paymentStatus || resolvePurchasePaymentStatusDisplay(d);
+  const orderStatus = displayOrderStatus(
+    d.dashboardOrderStatus || d.orderStatus,
+    { isQuotation: !d.addedToOrder }
+  );
+  const dispatchTabLabel = dispatchLabelFromDashboardTab(d.dashboardTab);
   const dispatch = {
-    status: d.dispatchStatus || "—",
+    status:
+      dispatchTabLabel ||
+      d.dispatchStatus ||
+      (d.dashboardTab === "dispatched" ? "Dispatched" : "—"),
   };
 
   const delivery = {
@@ -534,11 +658,12 @@ export function salesDocToOrderDetailShape(doc) {
     : "";
 
   const invoice = {
-    companyName: d.companyName || "Jitox Agro",
-    website: d.companyWebsite || "",
-    email: d.companyEmail || "",
-    phone: d.companyPhone || "",
-    taxAddress: d.companyAddress || "",
+    ...invoiceCompanyFields(),
+    companyName: d.companyName || invoiceCompanyFields().companyName,
+    website: d.companyWebsite || invoiceCompanyFields().website,
+    email: d.companyEmail || invoiceCompanyFields().email,
+    phone: d.companyPhone || invoiceCompanyFields().phone,
+    taxAddress: d.companyAddress || invoiceCompanyFields().taxAddress,
     billedTo: {
       name: d.partyName || "—",
       address: shippingAddress,
@@ -549,8 +674,8 @@ export function salesDocToOrderDetailShape(doc) {
     orderId: d.voucherNo || "",
     invoiceDate,
     invoiceTotalLabel: fmtInr(totalAmount),
-    paymentMode: d.paymentMode || "—",
-    paymentStatusBadge: d.paymentStatus || "Pending",
+    paymentMode: payment.paymentMode || d.paymentMode || "—",
+    paymentStatusBadge: paymentStatus || "Pending",
     lines: products.map((p) => ({
       detail: p.name,
       qty: p.qty,
@@ -560,19 +685,21 @@ export function salesDocToOrderDetailShape(doc) {
     subtotal: fmtInr(Number(d.basePrice) || 0),
     taxPct: "",
     taxAmount: fmtInr(Number(d.gstAmount) || 0),
-    discount: d.discount != null ? fmtInr(d.discount) : "₹0",
-    paidAmount: fmtInr(paidAmount),
-    outstanding: fmtInr(outstanding),
-    finalPayable: fmtInr(totalAmount),
-    terms: d.termsAndConditions || "Please pay within the agreed credit period.",
+    discount: payment.discount || "₹0",
+    paidAmount: payment.paid || fmtInr(paidAmount),
+    outstanding: payment.due || fmtInr(outstanding),
+    finalPayable: payment.finalPayable || fmtInr(totalAmount),
+    terms:
+      d.termsAndConditions ||
+      "Please pay within the agreed credit period.",
   };
 
   return {
     voucherNo: d.voucherNo || "",
     invoiceNo: d.invoiceNo || "",
     createdAt,
-    paymentStatus: d.paymentStatus || "",
-    orderStatus: d.orderStatus || "",
+    paymentStatus,
+    orderStatus,
     manager,
     client,
     products,
@@ -582,6 +709,64 @@ export function salesDocToOrderDetailShape(doc) {
     delivery,
     invoice,
     narration: d.narration || d.remarks || "",
+  };
+}
+
+/**
+ * Build `InvoiceModal` payload from the Invoice Generate page editor state.
+ */
+export function buildInvoiceReviewPayload({
+  invoiceNo,
+  issueDateLabel,
+  client,
+  clientAddress = "",
+  paymentMode,
+  reference,
+  orderId = "",
+  lines = [],
+  subtotalNum = 0,
+  taxNum = 0,
+  taxPctLabel = "10%",
+  discountNum = 0,
+  finalPayableNum = 0,
+  paymentStatus = "Pending",
+  paidAmountNum = 0,
+  terms,
+}) {
+  const total = Number(finalPayableNum) || 0;
+  const paid = Math.max(0, Number(paidAmountNum) || 0);
+  const outstanding = Math.max(0, total - paid);
+
+  return {
+    ...invoiceCompanyFields(),
+    billedTo: {
+      name: client || "—",
+      address: clientAddress || "—",
+      phone: "",
+    },
+    invoiceNo: invoiceNo || "—",
+    reference: reference || "—",
+    orderId: orderId || reference || "—",
+    invoiceDate: issueDateLabel || "—",
+    invoiceTotalLabel: fmtRupee(total),
+    paymentMode: paymentMode || "—",
+    paymentStatusBadge: paymentStatus || "Pending",
+    lines: (lines || []).map((l) => ({
+      detail: l.name || "—",
+      qty: l.qty != null ? String(l.qty) : "—",
+      rate: fmtRupee(Number(l.rate) || 0),
+      amount: fmtRupee(Number(l.subtotal) || 0),
+    })),
+    subtotal: fmtRupee(subtotalNum),
+    taxPct: taxPctLabel,
+    taxAmount: fmtRupee(taxNum),
+    discount: fmtRupee(discountNum),
+    paidAmount: fmtRupee(paid),
+    outstanding: fmtRupee(outstanding),
+    finalPayable: fmtRupee(total),
+    terms:
+      terms ||
+      "Please pay within 15 days of receiving this invoice.",
   };
 }
 

@@ -16,6 +16,7 @@ import {
 import { parseRupeeCell, fmtRupee } from "../../utils/voucherRowMappers";
 import {
   STATUS_CELL_INNER,
+  orderStatusBadgeClasses,
   paymentStatusBadgeClasses,
   tableFooterTdClasses,
   tableTdClasses,
@@ -27,6 +28,7 @@ import {
   shareOrCopyText,
 } from "../../utils/voucherShare";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { hasOrderListDecisionMade } from "../../constants/orderStatus";
 import {
   purchaseRowHasParty,
   purchaseRowIsFullyPaid,
@@ -49,6 +51,9 @@ import {
   CircleCheck,
   Pause,
   Square,
+  ShoppingCart,
+  ListX,
+  Receipt,
 } from "lucide-react";
 import PaymentModal from "./modals/PaymentModal";
 import ReceiptModal from "./modals/ReceiptModal";
@@ -265,7 +270,7 @@ const quotationColumns = [
   "Date",
   "Client",
   "Amount",
-  "Status",
+  "Quotation status",
   "Actions",
 ];
 
@@ -313,6 +318,11 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
     purchaseReturnRefund: "Refund money — create receipt",
     receiptReceive: "Record refund — bank/cash and Received",
     receiptReceived: "Already received",
+    saleReceipt: "Create receipt voucher — record payment received",
+    saleReceiptPaid: "Sales invoice already fully received",
+    addToOrder: "Add to order list (quotation stays saved)",
+    removeFromOrderList:
+      "Remove from order list only (quotation is not deleted)",
   };
 
   /** Named group so tooltips only react to this wrapper, not the `<tr class="group">` in TableContent */
@@ -441,6 +451,58 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
                 Re-voucher
               </button>,
               action.tooltip || tooltipLabels.revoucher,
+              index
+            );
+          }
+          if (action.type === "addToOrder") {
+            const disabled =
+              typeof action.isDisabled === "function" &&
+              !!action.isDisabled(row);
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => {
+                  if (disabled) return;
+                  action.onClick?.(row);
+                }}
+                disabled={disabled}
+                className={
+                  disabled
+                    ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                    : "hover:text-primary transition dark:hover:text-emerald-400"
+                }
+                aria-label="Add to order"
+                aria-disabled={disabled || undefined}
+              >
+                <ShoppingCart size={18} strokeWidth={2} />
+              </button>,
+              action.tooltip || tooltipLabels.addToOrder,
+              index
+            );
+          }
+          if (action.type === "cancelOrder" || action.type === "removeFromOrderList") {
+            const disabled =
+              typeof action.isDisabled === "function" &&
+              !!action.isDisabled(row);
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => {
+                  if (disabled) return;
+                  action.onClick?.(row);
+                }}
+                disabled={disabled}
+                className={
+                  disabled
+                    ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                    : "hover:text-amber-700 transition dark:hover:text-amber-400"
+                }
+                aria-label="Remove from order list"
+                aria-disabled={disabled || undefined}
+              >
+                <ListX size={18} strokeWidth={2} />
+              </button>,
+              action.tooltip || tooltipLabels.removeFromOrderList,
               index
             );
           }
@@ -642,6 +704,41 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
                 aria-disabled={disabled || undefined}
               >
                 <Banknote size={18} />
+              </button>,
+              tooltip,
+              index
+            );
+          }
+          if (action.type === "saleReceipt") {
+            const isPaid = String(row["Payment Status"] || "").trim() === "Paid";
+            const disabled =
+              isPaid ||
+              (typeof action.isDisabled === "function" && !!action.isDisabled(row));
+            let tooltip = action.tooltip || tooltipLabels.saleReceipt;
+            if (disabled) {
+              if (isPaid) {
+                tooltip = action.paidTooltip || tooltipLabels.saleReceiptPaid;
+              } else if (action.disabledTooltip) {
+                tooltip = action.disabledTooltip;
+              }
+            }
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => {
+                  if (disabled) return;
+                  action.onClick?.(row);
+                }}
+                disabled={disabled}
+                className={
+                  disabled
+                    ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                    : "hover:text-blue transition"
+                }
+                aria-label="Create receipt voucher"
+                aria-disabled={disabled || undefined}
+              >
+                <Receipt size={18} />
               </button>,
               tooltip,
               index
@@ -866,6 +963,24 @@ function manufacturingStatusBadgeClasses(status) {
   return "inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600";
 }
 
+const quotationListStatusBadgeClasses = (value) =>
+  orderStatusBadgeClasses(value);
+
+const quotationTableRenderer = (key, value, defaultRenderer) => {
+  if (key === "Quotation status" || key === "Status") {
+    return (
+      <td className={tableTdClasses(key)}>
+        <div className={STATUS_CELL_INNER}>
+          <span className={quotationListStatusBadgeClasses(value)}>
+            {value ?? "—"}
+          </span>
+        </div>
+      </td>
+    );
+  }
+  return defaultRenderer(key, value);
+};
+
 const manufacturingTableRenderer = (key, value, defaultRenderer) => {
   if (key === "Date" && value && /^\d{4}-\d{2}-\d{2}/.test(String(value))) {
     return (
@@ -1063,6 +1178,7 @@ export const voucherConfigs = {
     rowId: "Invoice No.",
     fetchDetail: fetchSalesOrderDetail,
     detailsComponent: SalesDetailsDrawer,
+    modals: [{ key: "receipt-modal", component: ReceiptModal }],
     enableColumnPicker: true,
     filterFields: [
       voucherAddButton({
@@ -1077,24 +1193,17 @@ export const voucherConfigs = {
         openDetails,
         openSalesModal,
         deleteSalesVoucher,
-        createPaymentRequestForSale,
+        createReceiptForSale,
       }) =>
       (row) =>
         createActionButtons(
           [
             { type: "eye" },
             {
-              type: "payReqSend",
-              showCondition: false,
-              tooltip: "Send payment request — adds a row to Payment Voucher",
-              /**
-               * Disable when this sale already has a linked Payment Voucher
-               * (created via this same button). Backend also rejects a
-               * duplicate request server-side as a defence in depth.
-               */
-              isDisabled: (r) => Boolean(r?._raw?.paymentRequestId),
-              disabledTooltip: "Payment request already sent",
-              onClick: (r) => createPaymentRequestForSale?.(r),
+              type: "saleReceipt",
+              isDisabled: (r) =>
+                String(r?.["Payment Status"] || "").trim() === "Paid",
+              onClick: (r) => createReceiptForSale?.(r),
             },
             {
               type: "revoucher",
@@ -1502,39 +1611,57 @@ export const voucherConfigs = {
     title: "Quotation Voucher",
     columns: quotationColumns,
     rowId: "Quote No",
+    renderRowCell: quotationTableRenderer,
     fetchDetail: fetchQuotationDetail,
     detailsComponent: PurchaseDetails,
     emptyState: {
       title: "No quotations yet",
       description:
-        "Use Add voucher to create a quotation. Filters apply once you have records.",
+        "Use Add voucher to open the quotation form (same layout as sales invoice).",
     },
     filterFields: [
       voucherAddButton({
         key: "addQuotation",
-        action: "navigate",
-        path: "/dashboard/accounting-voucher/add-quotation",
+        action: "quotation-open",
       }),
     ],
     buildTableAction:
-      ({ openDetails, navigate, deleteQuotationVoucher }) =>
-      (row) =>
-        createActionButtons(
+      ({
+        openDetails,
+        navigate,
+        openQuotationModal,
+        deleteQuotationVoucher,
+        setQuotationAddedToOrder,
+        quotationOrderBusyId,
+      }) =>
+      (row) => {
+        const rowId = row?._id ?? row?._raw?._id;
+        const busy =
+          quotationOrderBusyId != null &&
+          String(quotationOrderBusyId) === String(rowId);
+        const showOrderListChoice = !hasOrderListDecisionMade(row._raw ?? row);
+        const orderActions = showOrderListChoice
+          ? [
+              {
+                type: "addToOrder",
+                isDisabled: () => busy,
+                onClick: (r) => setQuotationAddedToOrder?.(r, true),
+              },
+              {
+                type: "cancelOrder",
+                isDisabled: () => busy,
+                onClick: (r) => setQuotationAddedToOrder?.(r, false),
+              },
+            ]
+          : [];
+        return createActionButtons(
           [
             { type: "eye" },
             {
               type: "edit",
-              onClick: (r) => {
-                const id = r?._id;
-                if (!id) {
-                  toast.error("Cannot edit this row (missing id).");
-                  return;
-                }
-                navigate(
-                  `/dashboard/accounting-voucher/add-quotation?editId=${encodeURIComponent(id)}`
-                );
-              },
+              onClick: (r) => openQuotationModal?.(r, "edit"),
             },
+            ...orderActions,
             {
               type: "delete",
               onClick: async (r) => {
@@ -1560,7 +1687,8 @@ export const voucherConfigs = {
             },
           ],
           { openDetails, navigate, row }
-        ),
+        );
+      },
   },
 };
 

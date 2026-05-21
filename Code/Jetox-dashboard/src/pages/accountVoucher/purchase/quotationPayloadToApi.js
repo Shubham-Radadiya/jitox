@@ -1,4 +1,12 @@
-import { parseNum } from "./voucherFormConstants";
+import {
+  hasOrderListDecisionMade,
+  isQuotationOnOrderList,
+} from "../../../constants/orderStatus";
+import {
+  parseNum,
+  QUOTATION_INVOICE_PREFIX,
+  quotationInvoiceFieldsFromNo,
+} from "./voucherFormConstants";
 import {
   composeInvoiceNo,
   purchasePayloadToCreateBody,
@@ -24,7 +32,8 @@ function mapPaymentMode(termsPayment) {
  */
 export function quotationPayloadToCreateBody(payload) {
   const purchaseShape = purchasePayloadToCreateBody(payload);
-  const items = (purchaseShape.items || []).map((row) => ({
+  const uiRows = (payload.productRows || []).filter((r) => r.product);
+  const items = (purchaseShape.items || []).map((row, idx) => ({
     product: row.product,
     quantity: row.quantity,
     rateParUnit: row.rateParUnit,
@@ -32,25 +41,53 @@ export function quotationPayloadToCreateBody(payload) {
     category: row.category || "",
     unit: row.unit || "Nos",
     subtotal: row.subtotal,
+    discountPct: row.discountPct ?? 0,
+    discountAmt: row.discountAmt ?? 0,
+    description: String(uiRows[idx]?.description ?? "").trim(),
+    hsn: String(row.hsn ?? "").trim(),
+    batch: String(row.batch ?? "").trim(),
+    expDate: String(row.expDate ?? "").trim(),
+    mfgDate: String(row.mfgDate ?? "").trim(),
+    mrp: String(row.mrp ?? "").trim(),
   }));
 
   const voucherNo = String(payload.voucherNo || purchaseShape.voucherNo || "").trim();
-  const invoiceNo = composeInvoiceNo(payload);
+  const defaultInv = quotationInvoiceFieldsFromNo(voucherNo);
+  let invoicePrefix =
+    String(payload.invoicePrefix ?? "").trim() || QUOTATION_INVOICE_PREFIX;
+  let invoiceNumber = String(payload.invoiceNumber ?? "").trim();
+  if (!invoiceNumber) {
+    invoiceNumber = defaultInv.invoiceNumber;
+  } else {
+    const n = parseInt(String(invoiceNumber).replace(/\D/g, ""), 10);
+    if (Number.isFinite(n)) invoiceNumber = String(n).padStart(3, "0");
+  }
+  const invoiceNo =
+    composeInvoiceNo({ ...payload, invoicePrefix, invoiceNumber }) ||
+    `${invoicePrefix}${invoiceNumber}`.trim() ||
+    defaultInv.invoiceNo;
 
   const body = {
     partyName: purchaseShape.partyName,
     voucherNo,
     voucherDate: payload.purchaseDate || purchaseShape.voucherDate,
-    invoiceNo: invoiceNo || (voucherNo ? `${voucherNo}-INV` : ""),
+    invoiceNo,
     transportDetails: purchaseShape.transportDetails || "",
     deliveryAt: purchaseShape.deliveryAt || "",
     orderby: purchaseShape.orderby || "",
     shipToAndBillTo: purchaseShape.shipToAndBillTo || "",
+    billTo: purchaseShape.billTo || "",
+    shipTo: purchaseShape.shipTo || "",
+    shipToPartyName: purchaseShape.shipToPartyName || "",
+    shipDifferent: Boolean(purchaseShape.shipDifferent),
     items,
+    termsOfPayment: purchaseShape.termsOfPayment || "",
+    narration: purchaseShape.narration || "",
+    termsAndConditions: purchaseShape.termsAndConditions || "",
     gstAmount: purchaseShape.gstAmount,
     basePrice: purchaseShape.basePrice,
     totalAmount: purchaseShape.totalAmount,
-    paymentMode: mapPaymentMode(payload.termsPayment),
+    paymentMode: purchaseShape.paymentMode || mapPaymentMode(payload.termsPayment),
     stockDetails: {
       stockQuantity: Boolean(payload.stockToggle),
       generetePurchaseBill: false,
@@ -65,5 +102,26 @@ export function quotationPayloadToCreateBody(payload) {
     }
   }
 
+  return body;
+}
+
+/** Preserve order-list flag when saving quotation edits (form does not send this field). */
+export function quotationPayloadToUpdateBody(payload, existingDoc) {
+  const body = quotationPayloadToCreateBody(payload);
+  if (!existingDoc || typeof existingDoc !== "object") return body;
+  if (hasOrderListDecisionMade(existingDoc)) {
+    body.orderListDecisionMade = true;
+    if (isQuotationOnOrderList(existingDoc)) {
+      body.addedToOrder = true;
+      const st = String(existingDoc.dashboardOrderStatus || "").trim();
+      body.dashboardOrderStatus =
+        st && st !== "Quotation" ? st : "Pending";
+      body.dashboardTab = existingDoc.dashboardTab || "pending";
+    } else {
+      body.addedToOrder = false;
+      body.dashboardOrderStatus = "Pending";
+      body.dashboardTab = "pending";
+    }
+  }
   return body;
 }

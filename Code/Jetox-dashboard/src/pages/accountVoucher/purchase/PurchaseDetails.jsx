@@ -8,11 +8,16 @@ import {
   downloadPurchaseDetailBillPdf,
   shareOrCopyText,
 } from "../../../utils/voucherShare";
-import { paymentStatusBadgeClasses } from "../../../utils/tableUi";
+import {
+  orderStatusBadgeClasses,
+  paymentStatusBadgeClasses,
+} from "../../../utils/tableUi";
 
 const PurchaseDetails = ({ open, onClose, data }) => {
   const { pathname = "" } = useLocation();
   if (!open || !data) return null;
+  const isQuotation =
+    data.isQuotation === true || String(pathname).includes("quotation");
   const isPurchaseReturn =
     data.isPurchaseReturn === true ||
     String(pathname).includes("purchase-return");
@@ -40,7 +45,11 @@ const PurchaseDetails = ({ open, onClose, data }) => {
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-white px-4 py-3.5 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary dark:text-emerald-400">
-              {isPurchaseReturn ? "Purchase Return Details" : "Purchase Details"}
+              {isQuotation
+                ? "Quotation Details"
+                : isPurchaseReturn
+                  ? "Purchase Return Details"
+                  : "Purchase Details"}
             </p>
             <div className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">
               {voucherNo}
@@ -62,7 +71,7 @@ const PurchaseDetails = ({ open, onClose, data }) => {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Purchase Date
+                  {isQuotation ? "Quote Date" : "Purchase Date"}
                 </div>
                 <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {purchaseDate}
@@ -70,14 +79,25 @@ const PurchaseDetails = ({ open, onClose, data }) => {
               </div>
               <div className="flex flex-col gap-1">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  {isPurchaseReturn ? "Refund / Received Status" : "Payment Status"}
+                  {isQuotation
+                    ? "Quotation status"
+                    : isPurchaseReturn
+                      ? "Refund / Received Status"
+                      : "Payment Status"}
                 </div>
-                <span className={paymentStatusBadgeClasses(status)}>
+                <span
+                  className={
+                    isQuotation
+                      ? orderStatusBadgeClasses(status)
+                      : paymentStatusBadgeClasses(status)
+                  }
+                >
                   {status}
                 </span>
               </div>
               {(pathname === "/dashboard/accounting-voucher/sales" ||
-                pathname === "/sales-return") && (
+                pathname === "/sales-return") &&
+              !isQuotation ? (
                 <div className="flex flex-col gap-1">
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Status
@@ -86,7 +106,7 @@ const PurchaseDetails = ({ open, onClose, data }) => {
                     {status}
                   </span>
                 </div>
-              )}
+              ) : null}
             </div>
           </section>
 
@@ -110,6 +130,11 @@ const PurchaseDetails = ({ open, onClose, data }) => {
                       <th className="px-3 py-2.5 text-left font-semibold text-slate-700 dark:text-slate-200">
                         Product Name ({products.length})
                       </th>
+                      {isQuotation ? (
+                        <th className="px-3 py-2.5 text-left font-semibold text-slate-700 dark:text-slate-200">
+                          HSN
+                        </th>
+                      ) : null}
                       <th className="px-3 py-2.5 text-right font-semibold text-slate-700 dark:text-slate-200">
                         Qty
                       </th>
@@ -133,6 +158,11 @@ const PurchaseDetails = ({ open, onClose, data }) => {
                         <td className="border-r border-slate-100 px-3 py-2 text-slate-800 dark:border-slate-700 dark:text-slate-200">
                           {item.name}
                         </td>
+                        {isQuotation ? (
+                          <td className="border-r border-slate-100 px-3 py-2 tabular-nums text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                            {item.hsn ?? "—"}
+                          </td>
+                        ) : null}
                         <td className="border-r border-slate-100 px-3 py-2 text-right tabular-nums text-slate-700 dark:border-slate-700 dark:text-slate-300">
                           {item.qty}
                         </td>
@@ -153,6 +183,7 @@ const PurchaseDetails = ({ open, onClose, data }) => {
                       <td className="px-3 py-2.5 align-middle text-left text-sm font-bold text-slate-900 dark:text-slate-50">
                         Total
                       </td>
+                      {isQuotation ? <td className="px-3 py-2.5" /> : null}
                       <td className="px-3 py-2.5" />
                       <td className="px-3 py-2.5" />
                       <td className="px-3 py-2.5" />
@@ -170,7 +201,7 @@ const PurchaseDetails = ({ open, onClose, data }) => {
           <section className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/40">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                Payment Details
+                {isQuotation ? "Quote Summary" : "Payment Details"}
               </div>
               {totals.reference && (
                 <a
@@ -187,7 +218,7 @@ const PurchaseDetails = ({ open, onClose, data }) => {
               {paymentTerms && paymentTerms !== "—" ? (
                 <div className="flex items-center justify-between gap-4 border-b border-slate-200/70 pb-2 text-sm dark:border-slate-600/80">
                   <span className="font-medium text-slate-600 dark:text-slate-400">
-                    Terms of Payment
+                    {isQuotation ? "Payment Mode" : "Terms of Payment"}
                   </span>
                   <span className="font-semibold text-slate-900 dark:text-slate-100">
                     {paymentTerms}
@@ -201,14 +232,22 @@ const PurchaseDetails = ({ open, onClose, data }) => {
                   value: totals.tax,
                 },
                 { label: "Discount", value: totals.discount ?? "₹0" },
-                {
-                  label: isPurchaseReturn ? "Received Amount" : "Paid Amount",
-                  value: totals.paid,
-                },
-                {
-                  label: isPurchaseReturn ? "Refund Due" : "Outstanding Due",
-                  value: totals.due,
-                },
+                ...(isQuotation
+                  ? []
+                  : [
+                      {
+                        label: isPurchaseReturn
+                          ? "Received Amount"
+                          : "Paid Amount",
+                        value: totals.paid,
+                      },
+                      {
+                        label: isPurchaseReturn
+                          ? "Refund Due"
+                          : "Outstanding Due",
+                        value: totals.due,
+                      },
+                    ]),
                 { label: "Final Payable", value: totals.finalPayable },
               ].map((item) => (
                 <div
@@ -234,7 +273,10 @@ const PurchaseDetails = ({ open, onClose, data }) => {
             className="flex flex-col items-center justify-center gap-1 py-3 text-xs font-semibold text-slate-800 transition hover:bg-slate-200/80 dark:text-slate-200 dark:hover:bg-slate-700 md:py-3.5 md:text-sm"
             onClick={async () => {
               const text = buildPurchaseDetailShareText(data);
-              const r = await shareOrCopyText(`Purchase ${voucherNo}`, text);
+              const r = await shareOrCopyText(
+                `${isQuotation ? "Quotation" : "Purchase"} ${voucherNo}`,
+                text
+              );
               if (r === "shared") toast.success("Shared");
               else if (r === "copied") toast.success("Summary copied");
               else toast.error("Could not share or copy");

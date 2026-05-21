@@ -56,6 +56,13 @@ const accountSchema = new Schema<IAccount>(
       enum: ["Active", "Inactive"],
       default: "Active",
     },
+    /** Optional — printed on tax invoices when this party is billed. */
+    bankName: { type: String, trim: true },
+    bankAccountNo: { type: String, trim: true },
+    bankBranch: { type: String, trim: true },
+    bankIfscCode: { type: String, trim: true },
+    /** Prior business names — keeps ledger/vouchers linked after rename. */
+    partyNameAliases: { type: [String], default: [] },
     lastBillingAt: { type: Date },
   },
   {

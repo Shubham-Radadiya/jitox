@@ -11,6 +11,7 @@ import {
   reconcilePartyLedgerDebitOnVoucherChange,
 } from "../utils/applyPaymentToAccountBalance";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
+import { buildPartyAddressesMap } from "../utils/partyVoucherAddress.util";
 
 /** Fields accepted from PUT body when updating a purchase return voucher */
 const PURCHASE_RETURN_PATCH_KEYS = [
@@ -21,6 +22,10 @@ const PURCHASE_RETURN_PATCH_KEYS = [
   "deliveryAt",
   "orderby",
   "shipToAndBillTo",
+  "billTo",
+  "shipTo",
+  "shipToPartyName",
+  "shipDifferent",
   "voucherNo",
   "voucherDate",
   "items",
@@ -87,6 +92,10 @@ export const createPurchaseReturnVoucher = async (
       deliveryAt,
       orderby,
       shipToAndBillTo,
+      billTo,
+      shipTo,
+      shipToPartyName,
+      shipDifferent,
       voucherNo,
       voucherDate,
       items,
@@ -122,6 +131,10 @@ export const createPurchaseReturnVoucher = async (
       deliveryAt,
       orderby,
       shipToAndBillTo,
+      billTo,
+      shipTo,
+      shipToPartyName,
+      shipDifferent,
       voucherNo: resolvedVoucherNo,
       voucherDate,
       items,
@@ -422,12 +435,14 @@ export const getPurchaseReturnFormMeta = async (
   res: Response
 ): Promise<void> => {
   try {
-    const accounts = await Account.find({
+    const accounts = (await Account.find({
       customerStatus: { $ne: "Inactive" },
     })
-      .select("businessName")
+      .select(
+        "businessName name address residentialAddress businessStreetAddress businessArea businessCity businessTaluka businessDistrict businessState businessPincode businessCountry streetAddress street area taluka district state country pincode pinCode"
+      )
       .sort({ businessName: 1 })
-      .lean();
+      .lean()) as unknown as Array<Record<string, unknown>>;
 
     const seen = new Set<string>();
     const parties: { value: string; label: string }[] = [];
@@ -445,7 +460,13 @@ export const getPurchaseReturnFormMeta = async (
       console.error("computeNextPurchaseReturnVoucherNo", e);
     }
 
-    sendSuccess(res, { nextPurchaseReturnVoucherNo, parties });
+    const partyAddresses = buildPartyAddressesMap(accounts);
+
+    sendSuccess(res, {
+      nextPurchaseReturnVoucherNo,
+      parties,
+      partyAddresses,
+    });
   } catch (error) {
     console.error("getPurchaseReturnFormMeta", error);
     res

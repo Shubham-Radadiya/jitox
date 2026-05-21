@@ -38,6 +38,7 @@ import { mergePageAddButton } from "../../utils/pageAddButton";
 import {
   accountOpeningMeta,
   buildPartyTransactionEntries,
+  matchesPartyForAccount,
   computePartyLedgerClosingBalance,
   normalizeList,
 } from "../../utils/partyLedgerTx";
@@ -164,6 +165,7 @@ const AccountIndex = () => {
       return [
         "Party Name",
         "Account Type",
+        "Category",
         "Credit (₹)",
         "Debit (₹)",
         "Actions",
@@ -190,6 +192,7 @@ const AccountIndex = () => {
       "Contact Person",
       "Territory",
       "Account Type",
+      "Category",
       "Credit (₹)",
       "Debit (₹)",
       "Status",
@@ -419,18 +422,7 @@ const AccountIndex = () => {
 
       if (isDetail) {
         const accountEarly = accountData || row?._raw || {};
-        const partyNameEarly = String(
-          accountEarly.businessName || row["Party Name"] || ""
-        ).trim();
-        const contactEarly = String(
-          accountEarly.name || row["Contact Person"] || ""
-        ).trim();
-        const mA = partyNameEarly.toLowerCase();
-        const mB = contactEarly.toLowerCase();
-        const matchParty = (pn) => {
-          const x = String(pn || "").trim().toLowerCase();
-          return x && (x === mA || x === mB);
-        };
+        const matchParty = (pn) => matchesPartyForAccount(accountEarly, pn);
         const purchaseMatchedSummaries = dedupeVouchersById(
           ledgerSource.purchases.filter((v) => matchParty(v.partyName))
         );
@@ -1080,9 +1072,10 @@ const AccountIndex = () => {
             setIsAddAccOpen(false);
             setEditAccountId(null);
           }}
-          onSaved={() =>
-            queryClient.invalidateQueries({ queryKey: ["accounts"] })
-          }
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ["accounts"] });
+            queryClient.invalidateQueries({ queryKey: ["account-ledger"] });
+          }}
         />
       </div>
     </DashboardLayout>

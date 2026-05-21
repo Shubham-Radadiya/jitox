@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import {
   Account,
   PurchaseReturnVoucher,
+  Quotation,
   ReceiptVoucher,
   SalesVoucher,
 } from "../models/index";
@@ -18,6 +19,14 @@ import {
   resolveReceiptThroughFields,
 } from "../utils/receiptVoucherLedger";
 import { recomputeLinkedPurchaseReturnRefund } from "../utils/purchaseReturnRefundStatus";
+import {
+  assertCollectionNotFullyPaid,
+  clearReceiptLinksAfterDelete,
+  recomputeLinkedQuotationReceipt,
+  setReceiptLinksAfterCreate,
+  syncQuotationPaymentFromSale,
+  syncSalePaymentFromQuotation,
+} from "../utils/receiptQuotationLedger";
 
 const RECEIPT_VOUCHER_PATCH_KEYS = [
   "voucherNo",
@@ -103,6 +112,7 @@ async function applyReceiptToLinkedSale(
     direction
   );
   await sale.save();
+  await syncQuotationPaymentFromSale(sale._id);
 }
 
 export const createReceiptVoucher = async (
@@ -121,6 +131,7 @@ export const createReceiptVoucher = async (
       status,
       sourceSalesId,
       sourcePurchaseReturnId,
+      sourceQuotationId,
     } = req.body;
 
     const requiredFields = ["date", "receiptFrom", "amount"] as const;
@@ -139,25 +150,56 @@ export const createReceiptVoucher = async (
       receiptThrough
     );
 
-    if (
-      sourceSalesId &&
+    const hasSales =
+      sourceSalesId && mongoose.isValidObjectId(sourceSalesId);
+    const hasQuotation =
+      sourceQuotationId && mongoose.isValidObjectId(sourceQuotationId);
+    const hasPurchaseReturn =
       sourcePurchaseReturnId &&
-      mongoose.isValidObjectId(sourceSalesId) &&
-      mongoose.isValidObjectId(sourcePurchaseReturnId)
-    ) {
+      mongoose.isValidObjectId(sourcePurchaseReturnId);
+
+    if (hasPurchaseReturn && (hasSales || hasQuotation)) {
       throw new AppError(
         HttpStatusCode.BAD_REQUEST,
-        "Link receipt to either a sales or a purchase return voucher, not both."
+        "Link receipt to only one source voucher (sales, purchase return, or order)."
       );
+    }
+    if (hasSales && hasQuotation) {
+      const saleForPair = await SalesVoucher.findById(sourceSalesId).select(
+        "sourceQuotationId"
+      );
+      if (
+        !saleForPair?.sourceQuotationId ||
+        String(saleForPair.sourceQuotationId) !== String(sourceQuotationId)
+      ) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "Sales and order links do not match."
+        );
+      }
     }
 
     let linkedSalesId: mongoose.Types.ObjectId | null = null;
-    if (sourceSalesId && mongoose.isValidObjectId(sourceSalesId)) {
-      const sale = await SalesVoucher.findById(sourceSalesId).select("_id");
+    if (hasSales) {
+      const sale = await SalesVoucher.findById(sourceSalesId).select(
+        "_id sourceQuotationId paidAmount totalAmount paymentStatus"
+      );
       if (!sale) {
         throw new AppError(
           HttpStatusCode.NOT_FOUND,
           "Linked sales voucher not found."
+        );
+      }
+      const saleTotal = Number(sale.totalAmount) || 0;
+      const salePaid = Number(sale.paidAmount) || 0;
+      if (
+        saleTotal > 0 &&
+        (salePaid >= saleTotal ||
+          String(sale.paymentStatus || "").trim() === "Paid")
+      ) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "This sales invoice is already fully paid."
         );
       }
       linkedSalesId = sale._id as mongoose.Types.ObjectId;
@@ -186,6 +228,45 @@ export const createReceiptVoucher = async (
       linkedPurchaseReturnId = pr._id as mongoose.Types.ObjectId;
     }
 
+    let linkedQuotationId: mongoose.Types.ObjectId | null = null;
+    if (hasQuotation) {
+      const quotation = await Quotation.findById(sourceQuotationId).select(
+        "paidAmount totalAmount partyName receiptRequestId"
+      );
+      if (!quotation) {
+        throw new AppError(
+          HttpStatusCode.NOT_FOUND,
+          "Linked order (quotation) not found."
+        );
+      }
+      const total = Number(quotation.totalAmount) || 0;
+      const paid = Number(quotation.paidAmount) || 0;
+      if (total > 0 && paid >= total) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "This order is already fully paid."
+        );
+      }
+      linkedQuotationId = quotation._id as mongoose.Types.ObjectId;
+    } else if (linkedSalesId) {
+      const sale = await SalesVoucher.findById(linkedSalesId).select(
+        "sourceQuotationId"
+      );
+      if (
+        sale?.sourceQuotationId &&
+        mongoose.isValidObjectId(sale.sourceQuotationId)
+      ) {
+        linkedQuotationId = new mongoose.Types.ObjectId(
+          String(sale.sourceQuotationId)
+        );
+      }
+    }
+
+    await assertCollectionNotFullyPaid({
+      sourceSalesId: linkedSalesId,
+      sourceQuotationId: linkedQuotationId,
+    });
+
     const resolvedVoucherNo = await resolveUniqueReceiptVoucherNo(voucherNo);
 
     const newVoucher = new ReceiptVoucher({
@@ -199,6 +280,7 @@ export const createReceiptVoucher = async (
       status: nextStatus,
       sourceSalesId: linkedSalesId,
       sourcePurchaseReturnId: linkedPurchaseReturnId,
+      sourceQuotationId: linkedQuotationId,
     });
 
     const savedVoucher = await newVoucher.save();
@@ -217,9 +299,18 @@ export const createReceiptVoucher = async (
       );
     }
 
-    if (linkedSalesId && nextStatus === "Paid") {
-      await applyReceiptToLinkedSale(savedVoucher, "apply");
+    if (nextStatus === "Paid") {
+      if (linkedSalesId) {
+        await applyReceiptToLinkedSale(savedVoucher, "apply");
+      } else if (linkedQuotationId) {
+        await recomputeLinkedQuotationReceipt(linkedQuotationId);
+      }
     }
+
+    await setReceiptLinksAfterCreate(savedVoucher._id, {
+      sourceSalesId: linkedSalesId,
+      sourceQuotationId: linkedQuotationId,
+    });
 
     const intoLabel = throughFields.receivedIn
       ? ` into ${throughFields.receivedIn}`
@@ -397,16 +488,22 @@ export const updateReceiptVoucher = async (
 
     const previousStatus = previousSnap.status;
     const nextStatusAfter = String(voucher.status || "");
+
+    if (voucher.sourcePurchaseReturnId) {
+      await recomputeLinkedPurchaseReturnRefund(voucher.sourcePurchaseReturnId);
+    }
+
     if (voucher.sourceSalesId && previousStatus !== nextStatusAfter) {
       if (nextStatusAfter === "Paid" && previousStatus !== "Paid") {
         await applyReceiptToLinkedSale(voucher, "apply");
       } else if (previousStatus === "Paid" && nextStatusAfter !== "Paid") {
         await applyReceiptToLinkedSale(voucher, "reverse");
       }
-    }
-
-    if (voucher.sourcePurchaseReturnId) {
-      await recomputeLinkedPurchaseReturnRefund(voucher.sourcePurchaseReturnId);
+    } else if (
+      voucher.sourceQuotationId &&
+      previousStatus !== nextStatusAfter
+    ) {
+      await recomputeLinkedQuotationReceipt(voucher.sourceQuotationId);
     }
 
     const intoLabel = String(voucher.receivedIn || "").trim()
@@ -454,18 +551,14 @@ export const deleteReceiptVoucher = async (
       );
     }
 
-    if (
-      (deleted as InstanceType<typeof ReceiptVoucher>).sourceSalesId &&
-      String((deleted as InstanceType<typeof ReceiptVoucher>).status || "") ===
-        "Paid"
-    ) {
-      await applyReceiptToLinkedSale(
-        deleted as InstanceType<typeof ReceiptVoucher>,
-        "reverse"
-      );
+    const deletedReceipt = deleted as InstanceType<typeof ReceiptVoucher>;
+    const wasPaid = String(deletedReceipt.status || "") === "Paid";
+
+    if (deletedReceipt.sourceSalesId && wasPaid) {
+      await applyReceiptToLinkedSale(deletedReceipt, "reverse");
     }
 
-    if ((deleted as InstanceType<typeof ReceiptVoucher>).sourcePurchaseReturnId) {
+    if (deletedReceipt.sourcePurchaseReturnId) {
       const prId = (deleted as InstanceType<typeof ReceiptVoucher>)
         .sourcePurchaseReturnId;
       const pr = await PurchaseReturnVoucher.findById(prId).select(
@@ -482,7 +575,13 @@ export const deleteReceiptVoucher = async (
       await recomputeLinkedPurchaseReturnRefund(prId);
     }
 
-    await removeDayBookEntry((deleted as InstanceType<typeof ReceiptVoucher>).voucherNo as unknown as string);
+    if (deletedReceipt.sourceQuotationId && wasPaid && !deletedReceipt.sourceSalesId) {
+      await recomputeLinkedQuotationReceipt(deletedReceipt.sourceQuotationId);
+    }
+
+    await clearReceiptLinksAfterDelete(deletedReceipt);
+
+    await removeDayBookEntry(deletedReceipt.voucherNo as unknown as string);
 
     sendSuccess(res, null, "Receipt voucher deleted successfully.");
   } catch (error) {

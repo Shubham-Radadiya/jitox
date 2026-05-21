@@ -18,7 +18,11 @@ export function usePurchaseReturnFormMeta(enabled = true) {
           ? body.data
           : body;
       if (!payload || typeof payload !== "object") {
-        return { nextPurchaseReturnVoucherNo: null, parties: [] };
+        return {
+          nextPurchaseReturnVoucherNo: null,
+          parties: [],
+          partyAddresses: {},
+        };
       }
       return {
         nextPurchaseReturnVoucherNo:
@@ -26,6 +30,10 @@ export function usePurchaseReturnFormMeta(enabled = true) {
             ? payload.nextPurchaseReturnVoucherNo
             : null,
         parties: Array.isArray(payload.parties) ? payload.parties : [],
+        partyAddresses:
+          payload.partyAddresses && typeof payload.partyAddresses === "object"
+            ? payload.partyAddresses
+            : {},
       };
     },
     enabled,

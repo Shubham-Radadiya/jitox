@@ -77,8 +77,8 @@ export function purchaseReturnPayloadToCreateBody(payload) {
     typeof payload.shipDifferent === "boolean"
       ? payload.shipDifferent
       : String(payload.shipDifferent || "").toLowerCase() === "true";
-  /** Returns use the single legacy address field — prefer ship when different else bill. */
-  const shipToAndBillTo = sd && shipRaw ? shipRaw : billTo || shipRaw;
+  /** Legacy combined field: bill address only when ship-to is not a separate party. */
+  const shipLine = sd ? shipRaw : billTo;
 
   return {
     partyName: String(payload.partyName || "").trim(),
@@ -87,7 +87,13 @@ export function purchaseReturnPayloadToCreateBody(payload) {
     transportDetails: String(payload.transporter || "").trim(),
     deliveryAt: String(payload.deliveryAt || "").trim(),
     orderby: String(payload.orderBy || "").trim(),
-    shipToAndBillTo,
+    shipToAndBillTo: sd ? "" : billTo,
+    billTo,
+    shipTo: shipLine,
+    shipToPartyName: sd
+      ? String(payload.shipToPartyName || "").trim()
+      : String(payload.partyName || "").trim(),
+    shipDifferent: sd,
     items,
     gstAmount,
     totalAmount,

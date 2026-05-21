@@ -9,6 +9,14 @@ export interface IProductItem {
   unit: string;
   category: string;
   subtotal: number;
+  discountPct?: number;
+  discountAmt?: number;
+  description?: string;
+  hsn?: string;
+  batch?: string;
+  expDate?: string;
+  mfgDate?: string;
+  mrp?: string;
 }
 
 export interface IQuatationVoucher extends Document {
@@ -17,6 +25,10 @@ export interface IQuatationVoucher extends Document {
   deliveryAt?: string;
   orderby?: string;
   shipToAndBillTo?: string;
+  billTo?: string;
+  shipTo?: string;
+  shipToPartyName?: string;
+  shipDifferent?: boolean;
   voucherNo: string;
   invoiceNo: string;
   voucherDate: Date;
@@ -24,6 +36,9 @@ export interface IQuatationVoucher extends Document {
   supplierAddress?: string;
   supplierGstNo?: string;
   items: IProductItem[];
+  termsOfPayment?: string;
+  narration?: string;
+  termsAndConditions?: string;
   gstAmount: number;
   totalAmount: number;
   paymentMode?: string;
@@ -37,9 +52,19 @@ export interface IQuatationVoucher extends Document {
     openingStock: Number;
     minimumReOrderLevel: Number;
   };
+  addedToOrder?: boolean;
+  orderListDecisionMade?: boolean;
   paidAmount?: number;
+  paymentStatus?: "Pending" | "Partial" | "Paid" | "Unpaid";
+  receiptRequestId?: mongoose.Schema.Types.ObjectId;
   dashboardTab?: "pending" | "dispatched" | "partSupply" | "cancelled";
-  dashboardOrderStatus?: string;
+  dashboardOrderStatus?:
+    | "Pending"
+    | "Dispatched"
+    | "Processing"
+    | "Cancelled"
+    | "Approved"
+    | "Quotation";
   createdAt?: Date;
   updatedAt?: Date;
 }

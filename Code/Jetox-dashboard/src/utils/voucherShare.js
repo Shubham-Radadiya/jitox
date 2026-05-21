@@ -10,6 +10,7 @@ import {
   purchasePayloadToTaxInvoiceDoc,
   PURCHASE_TAX_INVOICE_PAGE_W_PX,
 } from "./purchaseTaxInvoicePdf";
+import { loadPartyAccountsForVoucherDoc } from "../pages/accountVoucher/voucherDetailFetchers";
 
 function csvEscape(value) {
   const s = String(value ?? "");
@@ -164,13 +165,19 @@ export async function downloadPurchaseDetailBillPdf(detail) {
 export async function downloadPurchasePayloadTaxInvoicePdf(payload) {
   const doc = purchasePayloadToTaxInvoiceDoc(payload);
   if (!doc) return;
+  const { billPartyAccount, shipPartyAccount } =
+    await loadPartyAccountsForVoucherDoc(doc);
   const inv =
     `${payload.invoicePrefix || ""}${payload.invoiceNumber || ""}`.trim() ||
     payload.invoiceNo ||
     payload.voucherNo ||
     "draft";
   const title = `Tax-Invoice-${String(inv).replace(/[/\\?%*:|"<>]/g, "-")}`;
-  const fullHtml = buildPurchaseTaxInvoiceFullDocument(doc, null);
+  const fullHtml = buildPurchaseTaxInvoiceFullDocument(
+    doc,
+    billPartyAccount,
+    shipPartyAccount
+  );
   await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`, {
     captureWidthPx: PURCHASE_TAX_INVOICE_PAGE_W_PX,
   });
@@ -311,16 +318,22 @@ export function downloadPurchasePayloadCsv(p) {
   downloadCsv(`${name}-lines.csv`, header, rows);
 }
 
-export function printPurchasePayloadBill(p) {
+export async function printPurchasePayloadBill(p) {
   if (!p) return false;
   const doc = purchasePayloadToTaxInvoiceDoc(p);
   if (!doc) return false;
+  const { billPartyAccount, shipPartyAccount } =
+    await loadPartyAccountsForVoucherDoc(doc);
   const inv =
     `${p.invoicePrefix || ""}${p.invoiceNumber || ""}`.trim() ||
     p.invoiceNo ||
     p.voucherNo ||
     "draft";
-  const fullHtml = buildPurchaseTaxInvoiceFullDocument(doc, null);
+  const fullHtml = buildPurchaseTaxInvoiceFullDocument(
+    doc,
+    billPartyAccount,
+    shipPartyAccount
+  );
   downloadHtmlFile(`${String(inv).replace(/[/\\?%*:|"<>]/g, "-")}-tax-invoice.html`, fullHtml);
   return true;
 }

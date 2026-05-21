@@ -3,12 +3,17 @@ import toast from "react-hot-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommonModal } from "../../../components/ui/CommanUI";
 import PurchaseVoucherForm from "./PurchaseVoucherForm";
-import { mapPurchaseApiDocToPrefill } from "./voucherFormConstants";
-import { quotationsApi, salesVouchersApi } from "../../../services/api";
+import {
+  mapPurchaseApiDocToPrefill,
+  quotationInvoiceFieldsFromNo,
+} from "./voucherFormConstants";
+import { quotationsApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
-import { invalidateProductAndStockQueries } from "../../../utils/invalidateStockQueries";
-import { salesPayloadToCreateBody } from "./salesPayloadToApi";
-import { useSalesFormMeta } from "../../../hooks/useSalesFormMeta";
+import {
+  quotationPayloadToCreateBody,
+  quotationPayloadToUpdateBody,
+} from "./quotationPayloadToApi";
+import { usePurchaseFormMeta } from "../../../hooks/usePurchaseFormMeta";
 
 function savedVoucherNoFromResponse(res, fallbackNo) {
   const d = res?.data;
@@ -24,17 +29,13 @@ function savedVoucherNoFromResponse(res, fallbackNo) {
 }
 
 /**
- * Wide sales-invoice modal — reuses PurchaseVoucherForm with `formType="sales"`
- * so the UI stays identical to purchase invoicing. Save calls `salesVouchersApi`,
- * and stock decrement is handled server-side based on the stock toggle.
+ * Wide quotation modal — same invoice UI as sales (`layout="invoice"`).
  */
-export default function SalesVoucherModal({
+export default function QuotationVoucherModal({
   open,
   onClose,
   sourceRow = null,
   mode = "create",
-  /** `"sales"` (default) or `"quotation"` when opening from Order List. */
-  sourceKind = "sales",
 }) {
   const formRef = useRef(null);
   const queryClient = useQueryClient();
@@ -44,14 +45,8 @@ export default function SalesVoucherModal({
 
   const voucherId =
     sourceRow && typeof sourceRow === "object" ? sourceRow._id : null;
-  const fromOrder =
-    sourceKind === "quotation" && mode === "fromOrder";
   const needsDetail =
-    Boolean(
-      open &&
-        voucherId &&
-        (fromOrder || mode === "edit" || mode === "revoucher")
-    ) && !continuingAsNew;
+    Boolean(open && voucherId && mode === "edit" && !continuingAsNew);
 
   const {
     data: voucherDoc,
@@ -59,24 +54,17 @@ export default function SalesVoucherModal({
     isError: detailError,
     error: detailErrObj,
   } = useQuery({
-    queryKey: [
-      fromOrder ? "quotation-voucher-detail" : "sales-voucher-detail",
-      voucherId,
-    ],
+    queryKey: ["quotation-voucher-detail", voucherId],
     queryFn: async () => {
-      if (fromOrder) {
-        const res = await quotationsApi.getById(voucherId);
-        return res?.data;
-      }
-      const res = await salesVouchersApi.getById(voucherId);
+      const res = await quotationsApi.getById(voucherId);
       return res?.data;
     },
     enabled: needsDetail,
     staleTime: 0,
   });
 
-  const { data: salesMeta } = useSalesFormMeta(open);
-  const nextSalesVoucherNo = salesMeta?.nextSalesVoucherNo || "";
+  const { data: purchaseMeta } = usePurchaseFormMeta(open);
+  const nextQuotationVoucherNo = purchaseMeta?.nextQuotationVoucherNo || "";
 
   useEffect(() => {
     if (!open) {
@@ -94,50 +82,30 @@ export default function SalesVoucherModal({
 
   useEffect(() => {
     if (!detailError || !open) return;
-    toast.error(
-      getApiErrorMessage(
-        detailErrObj,
-        fromOrder
-          ? "Could not load order for sales voucher"
-          : "Could not load sales voucher"
-      )
-    );
-  }, [detailError, detailErrObj, open, fromOrder]);
+    toast.error(getApiErrorMessage(detailErrObj, "Could not load quotation"));
+  }, [detailError, detailErrObj, open]);
 
   const prefill = useMemo(() => {
     if (!open) return null;
     if (mode === "create" || continuingAsNew) {
-      return nextSalesVoucherNo
-        ? { voucherNo: nextSalesVoucherNo, stockToggle: true }
-        : { stockToggle: true };
+      if (nextQuotationVoucherNo) {
+        return {
+          stockToggle: false,
+          voucherNo: nextQuotationVoucherNo,
+          ...quotationInvoiceFieldsFromNo(nextQuotationVoucherNo),
+        };
+      }
+      return { stockToggle: false };
     }
     if (!voucherDoc) return null;
-    const base = mapPurchaseApiDocToPrefill(voucherDoc);
-    if (!base) return null;
-    if ((mode === "revoucher" || mode === "fromOrder") && nextSalesVoucherNo) {
-      return {
-        ...base,
-        voucherNo: nextSalesVoucherNo,
-        stockToggle: true,
-        ...(fromOrder && voucherId ? { sourceQuotationId: voucherId } : {}),
-      };
-    }
-    if (mode === "fromOrder") {
-      return {
-        ...base,
-        stockToggle: true,
-        ...(voucherId ? { sourceQuotationId: voucherId } : {}),
-      };
-    }
-    return base;
-  }, [open, mode, voucherDoc, continuingAsNew, nextSalesVoucherNo]);
+    return mapPurchaseApiDocToPrefill(voucherDoc);
+  }, [open, mode, voucherDoc, continuingAsNew, nextQuotationVoucherNo]);
 
   const showForm =
-    open &&
-    (!needsDetail || (!detailLoading && !detailError && voucherDoc));
+    open && (!needsDetail || (!detailLoading && !detailError && voucherDoc));
 
   const handleInvoiceAction = async (payload, kind) => {
-    const body = salesPayloadToCreateBody(payload);
+    const body = quotationPayloadToCreateBody(payload);
     if (!body.items?.length) {
       toast.error("Add at least one line with a product, quantity, and rate.");
       return;
@@ -146,35 +114,33 @@ export default function SalesVoucherModal({
       toast.error("Select a party (customer account).");
       return;
     }
-    const isEdit =
-      mode === "edit" && Boolean(voucherId) && !continuingAsNew;
-    if (fromOrder && voucherId && !isEdit) {
-      body.sourceQuotationId = String(voucherId);
-    }
+    const isEdit = mode === "edit" && Boolean(voucherId) && !continuingAsNew;
+    const saveBody = isEdit
+      ? quotationPayloadToUpdateBody(payload, voucherDoc)
+      : body;
     try {
       const res = isEdit
-        ? await salesVouchersApi.update(voucherId, body)
-        : await salesVouchersApi.create(body);
-      if (fromOrder && !isEdit) {
-        await queryClient.invalidateQueries({
-          queryKey: ["dashboard", "orders"],
-        });
-      }
+        ? await quotationsApi.update(voucherId, saveBody)
+        : await quotationsApi.create(body);
       const savedNo = savedVoucherNoFromResponse(res, body.voucherNo);
-      await queryClient.invalidateQueries({
-        queryKey: ["voucher-list", "sales"],
-      });
-      await queryClient.invalidateQueries({ queryKey: ["sales-form-meta"] });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "quotation"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["purchase-form-meta"] }),
+      ]);
       if (voucherId) {
         await queryClient.invalidateQueries({
-          queryKey: ["sales-voucher-detail", voucherId],
+          queryKey: ["quotation-voucher-detail", voucherId],
         });
       }
-      invalidateProductAndStockQueries(queryClient);
       toast.success(
         kind === "new"
-          ? `Saved ${savedNo}. Form cleared for a new sale.`
-          : `Saved ${savedNo}.`
+          ? `Quotation ${savedNo} saved. Form cleared for a new quote.`
+          : isEdit
+            ? `Quotation ${savedNo} updated.`
+            : `Quotation ${savedNo} saved.`
       );
       if (kind === "close") {
         onClose();
@@ -183,7 +149,12 @@ export default function SalesVoucherModal({
         setMountId((k) => k + 1);
       }
     } catch (e) {
-      toast.error(getApiErrorMessage(e, "Could not save sales voucher"));
+      toast.error(
+        getApiErrorMessage(
+          e,
+          isEdit ? "Could not update quotation" : "Could not save quotation"
+        )
+      );
     }
   };
 
@@ -202,20 +173,21 @@ export default function SalesVoucherModal({
     >
       {needsDetail && detailLoading && (
         <div className="flex min-h-[240px] flex-1 items-center justify-center px-6 text-sm text-slate-500 dark:text-slate-400">
-          {fromOrder ? "Loading order…" : "Loading sales invoice…"}
+          Loading quotation…
         </div>
       )}
       {needsDetail && !detailLoading && detailError && (
         <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-red-600 dark:text-red-400">
-          Could not load this sale. Close and try again.
+          Could not load this quotation. Close and try again.
         </div>
       )}
       {showForm && (
         <PurchaseVoucherForm
           key={mountId}
           ref={formRef}
-          formType="sales"
+          formType="quotation"
           prefill={prefill}
+          editMode={mode === "edit" && !continuingAsNew}
           showPageHeader={false}
           layout="invoice"
           liveNow={now}

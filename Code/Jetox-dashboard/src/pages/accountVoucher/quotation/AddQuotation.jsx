@@ -1,16 +1,25 @@
-import React from "react";
-import AddPurchase from "../purchase/AddPurchase";
+import React, { useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
+/**
+ * Legacy route — redirects to the quotation list and opens the same
+ * wide invoice modal used for sales vouchers.
+ */
 const AddQuotation = () => {
-  return <AddPurchase formType="quotation" />;
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = String(searchParams.get("editId") || "").trim();
+
+  useEffect(() => {
+    navigate("/dashboard/accounting-voucher/quotation", {
+      replace: true,
+      state: editId
+        ? { openQuotationEditId: editId }
+        : { openQuotationCreate: true },
+    });
+  }, [editId, navigate]);
+
+  return null;
 };
 
 export default AddQuotation;
-
-
-
-
-
-
-
-

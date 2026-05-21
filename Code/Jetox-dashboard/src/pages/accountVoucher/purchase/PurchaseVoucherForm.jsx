@@ -29,6 +29,7 @@ import {
   calcLineDiscountAmtFromPct,
   fmtInr,
   parseNum,
+  quotationInvoiceFieldsFromNo,
 } from "./voucherFormConstants";
 import { PURCHASE_PAYMENT_STATUS_OPTIONS } from "../../../utils/purchasePaymentStatus";
 import InvoicePurchaseModalLayout from "./InvoicePurchaseModalLayout";
@@ -36,6 +37,10 @@ import {
   emptyMeta,
   usePurchaseFormMeta,
 } from "../../../hooks/usePurchaseFormMeta";
+import {
+  partyAddressFromMap,
+  resolveShipToPartyNameFromDoc,
+} from "../../../utils/voucherPartyAddress";
 import toast from "react-hot-toast";
 import {
   mergeDefaultAndStoredExtras,
@@ -108,6 +113,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   const [orderBy, setOrderBy] = useState("");
   const [billTo, setBillTo] = useState("");
   const [shipDifferent, setShipDifferent] = useState(false);
+  const [shipToPartyName, setShipToPartyName] = useState("");
   const [shipTo, setShipTo] = useState("");
   const [termsPayment, setTermsPayment] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("Pending");
@@ -137,8 +143,6 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
    * so Save after toggling the checkbox cannot snapshot stale shipDifferent=false.
    */
   const shipDifferentLiveRef = useRef(false);
-  /** After applying API prefill, skip one passive run of “sync ship to bill” so it cannot wipe ship-to from DB. */
-  const suppressShipToBillSyncRef = useRef(false);
 
   const setShipDifferentLive = useCallback((next) => {
     setShipDifferent((prev) => {
@@ -181,7 +185,14 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
         : meta?.nextPurchaseVoucherNo;
     if (typeof next !== "string" || !next.trim()) return;
     if (nextVoucherAppliedRef.current) return;
-    setVoucherNo(next.trim());
+    const nextNo = next.trim();
+    setVoucherNo(nextNo);
+    if (formType === "quotation") {
+      const inv = quotationInvoiceFieldsFromNo(nextNo);
+      setInvoicePrefix(inv.invoicePrefix);
+      setInvoiceNumber(inv.invoiceNumber);
+      setInvoiceNo(inv.invoiceNo);
+    }
     nextVoucherAppliedRef.current = true;
   }, [meta?.nextPurchaseVoucherNo, meta?.nextQuotationVoucherNo, formType, prefill]);
 
@@ -201,6 +212,10 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     }
     return {
       parties: meta.parties?.length ? meta.parties : emptyMeta.parties,
+      partyAddresses:
+        meta.partyAddresses && typeof meta.partyAddresses === "object"
+          ? meta.partyAddresses
+          : emptyMeta.partyAddresses,
       partyCreditHints:
         meta.partyCreditHints && typeof meta.partyCreditHints === "object"
           ? meta.partyCreditHints
@@ -219,6 +234,55 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   }, [meta, invoiceDropdownExtrasVersion]);
 
   const partyCreditHints = dropdownOptions.partyCreditHints || {};
+  const partyAddresses = dropdownOptions.partyAddresses || {};
+
+  const handleBillPartyChange = useCallback(
+    (name) => {
+      const n = String(name || "").trim();
+      setPartyName(n);
+      const addr = partyAddressFromMap(partyAddresses, n);
+      setBillTo(addr);
+      if (!shipDifferentLiveRef.current) {
+        setShipToPartyName(n);
+        setShipTo(addr);
+        persistedShipToRef.current = addr;
+      }
+    },
+    [partyAddresses]
+  );
+
+  const handleShipPartyChange = useCallback(
+    (name) => {
+      const n = String(name || "").trim();
+      setShipToPartyName(n);
+      const addr = partyAddressFromMap(partyAddresses, n);
+      setShipTo(addr);
+      persistedShipToRef.current = addr;
+    },
+    [partyAddresses]
+  );
+
+  const handleShipDifferentToggle = useCallback(
+    (on) => {
+      setShipDifferentLive(on);
+      if (!on) {
+        const n = String(partyName || "").trim();
+        setShipToPartyName(n);
+        const addr =
+          partyAddressFromMap(partyAddresses, n) || String(billTo || "");
+        setShipTo(addr);
+        persistedShipToRef.current = addr;
+      } else {
+        const shipParty =
+          String(shipToPartyName || "").trim() || String(partyName || "").trim();
+        setShipToPartyName(shipParty);
+        const addr = partyAddressFromMap(partyAddresses, shipParty);
+        setShipTo(addr);
+        persistedShipToRef.current = addr;
+      }
+    },
+    [partyName, shipToPartyName, partyAddresses, billTo, setShipDifferentLive]
+  );
 
   const productMetaById = useMemo(() => {
     const m = new Map();
@@ -249,7 +313,10 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       setBillTo(String(prefill.billTo ?? ""));
       setShipTo(String(prefill.shipTo ?? ""));
       persistedShipToRef.current = String(prefill.shipTo ?? "");
-      suppressShipToBillSyncRef.current = true;
+      setShipToPartyName(
+        String(prefill.shipToPartyName ?? "").trim() ||
+          (sd ? "" : String(prefill.partyName ?? ""))
+      );
     }
     if (prefill.termsPayment != null) setTermsPayment(prefill.termsPayment);
     if (prefill.paymentStatus != null) setPaymentStatus(prefill.paymentStatus);
@@ -279,15 +346,13 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     }
   }, [shipTo, shipDifferent]);
 
+  /** Edit: resolve ship-to party from saved doc once addresses meta is loaded. */
   useEffect(() => {
-    if (suppressShipToBillSyncRef.current) {
-      suppressShipToBillSyncRef.current = false;
-      return;
-    }
-    if (!shipDifferent) {
-      setShipTo(billTo);
-    }
-  }, [billTo, shipDifferent]);
+    if (!prefill || !Object.keys(partyAddresses).length) return;
+    if (String(prefill.shipToPartyName || "").trim()) return;
+    const resolved = resolveShipToPartyNameFromDoc(prefill, partyAddresses);
+    if (resolved) setShipToPartyName(resolved);
+  }, [prefill, partyAddresses]);
 
   const handleDateChange = ({ target }) => {
     const v = target?.value;
@@ -584,13 +649,6 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
 
   const partyHint = partyName ? partyCreditHints[partyName] : null;
 
-  const partyLabel = useMemo(() => {
-    const p = dropdownOptions.parties.find(
-      (x) => x.value === partyName || x.label === partyName
-    );
-    return p?.label || partyName || "Select party";
-  }, [dropdownOptions.parties, partyName]);
-
   const gatherPayload = useCallback(() => {
     return {
       formType,
@@ -610,6 +668,9 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       orderBy,
       billTo,
       shipTo,
+      shipToPartyName: shipDifferentLiveRef.current
+        ? String(shipToPartyName || "").trim()
+        : String(partyName || "").trim(),
       shipDifferent: shipDifferentLiveRef.current,
       termsPayment,
       paymentStatus: isPurchase ? paymentStatus : undefined,
@@ -636,6 +697,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     orderBy,
     billTo,
     shipTo,
+    shipToPartyName,
     termsPayment,
     isPurchase,
     paymentStatus,
@@ -662,7 +724,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     [gatherPayload, onInvoiceAction]
   );
 
-  if (layout === "invoice" && !isQuotation) {
+  if (layout === "invoice") {
     return (
       <InvoicePurchaseModalLayout
         formType={formType}
@@ -670,14 +732,15 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
         liveNow={liveNow}
         onClose={onClose}
         onSave={runInvoiceSave}
-        partyLabel={partyLabel}
         partyName={partyName}
-        setPartyName={setPartyName}
+        onBillPartyChange={handleBillPartyChange}
+        onShipPartyChange={handleShipPartyChange}
         partyHint={partyHint}
         billTo={billTo}
         setBillTo={setBillTo}
         shipDifferent={shipDifferent}
-        setShipDifferent={setShipDifferentLive}
+        setShipDifferent={handleShipDifferentToggle}
+        shipToPartyName={shipToPartyName}
         shipTo={shipTo}
         setShipTo={setShipTo}
         persistedShipToRef={persistedShipToRef}
@@ -687,6 +750,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
         setInvoicePrefix={setInvoicePrefix}
         invoiceNumber={invoiceNumber}
         setInvoiceNumber={setInvoiceNumber}
+        setVoucherNo={setVoucherNo}
         originalInvNo={originalInvNo}
         setOriginalInvNo={setOriginalInvNo}
         ewayBill={ewayBill}
@@ -751,7 +815,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
                 label="Party Name"
                 options={dropdownOptions.parties}
                 value={partyName}
-                onChange={setPartyName}
+                onChange={handleBillPartyChange}
                 placeholder="Select party (required)"
                 addNavigateTo="/dashboard/account"
               />
@@ -847,38 +911,45 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
                 type="checkbox"
                 className="accent-primary h-4 w-4 rounded"
                 checked={shipDifferent}
-                onChange={(e) => {
-                  const on = e.target.checked;
-                  setShipDifferentLive(on);
-                  if (!on) {
-                    setShipTo(billTo);
-                  } else {
-                    const snap = persistedShipToRef.current;
-                    setShipTo(
-                      String(snap ?? "").trim() ? snap : billTo
-                    );
-                  }
-                }}
+                onChange={(e) =>
+                  handleShipDifferentToggle(e.target.checked)
+                }
               />
               Ship to is different from bill to
             </label>
             {shipDifferent ? (
-              <InputField
-                label="Ship to"
-                placeholder="Shipping address (multi-line)"
-                multiline
-                rows={3}
-                value={shipTo}
-                onChange={(e) => setShipTo(e.target.value)}
-                inputClassName="min-h-[5.25rem] resize-y"
-              />
+              <>
+                <CommonDropdown
+                  label="Ship to party"
+                  searchable
+                  searchPlaceholder="Search party…"
+                  options={dropdownOptions.parties}
+                  value={shipToPartyName}
+                  onChange={handleShipPartyChange}
+                  placeholder="Select ship-to party"
+                  addNavigateTo="/dashboard/account"
+                />
+                <InputField
+                  label="Ship to address"
+                  placeholder="Shipping address (multi-line)"
+                  multiline
+                  rows={3}
+                  value={shipTo}
+                  onChange={(e) => setShipTo(e.target.value)}
+                  inputClassName="min-h-[5.25rem] resize-y"
+                />
+              </>
             ) : null}
           </div>
         </Card>
 
         <Card
           title="Line items"
-          description="Add one row per product. Auto fields update when product data is linked."
+          description={
+            isQuotation
+              ? "Add one row per product. HSN fills from product master; you can edit it."
+              : "Add one row per product. Auto fields update when product data is linked."
+          }
           actionLabel="+ Add row"
           onAction={addProductRow}
         >
@@ -936,13 +1007,35 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end sm:gap-x-4">
+                  <div
+                    className={`grid grid-cols-1 gap-4 sm:items-end sm:gap-x-4 ${
+                      isQuotation ? "sm:grid-cols-4" : "sm:grid-cols-3"
+                    }`}
+                  >
+                    {isQuotation ? (
+                      <InputField
+                        label="HSN"
+                        placeholder="From product or enter"
+                        value={row.hsn}
+                        onChange={(e) =>
+                          updateProductRow(row.id, "hsn", e.target.value)
+                        }
+                        inputMode="numeric"
+                      />
+                    ) : null}
                     <InputField
                       label="Qty"
-                      placeholder="—"
-                      readOnly
+                      placeholder={isQuotation ? "Enter qty" : "—"}
+                      readOnly={!isQuotation}
                       value={row.qty}
-                      inputClassName={autoFieldInputClass}
+                      onChange={
+                        isQuotation
+                          ? (e) =>
+                              updateProductRow(row.id, "qty", e.target.value)
+                          : undefined
+                      }
+                      inputClassName={isQuotation ? undefined : autoFieldInputClass}
+                      inputMode="decimal"
                     />
                     <InputField
                       label="Rate per unit (₹)"

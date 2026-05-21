@@ -10,6 +10,14 @@ const ProductItemSchema = new Schema<IProductItem>(
     category: { type: String, trim: true },
     unit: { type: String, trim: true },
     subtotal: { type: Number, trim: true },
+    discountPct: { type: Number, default: 0 },
+    discountAmt: { type: Number, default: 0 },
+    description: { type: String, trim: true },
+    hsn: { type: String, trim: true },
+    batch: { type: String, trim: true },
+    expDate: { type: String, trim: true },
+    mfgDate: { type: String, trim: true },
+    mrp: { type: String, trim: true },
   },
   { _id: false }
 );
@@ -26,7 +34,14 @@ const quotationSchema = new Schema<IQuatationVoucher>(
     deliveryAt: { type: String, trim: true },
     orderby: { type: String, trim: true },
     shipToAndBillTo: { type: String, trim: true },
+    billTo: { type: String, trim: true },
+    shipTo: { type: String, trim: true },
+    shipToPartyName: { type: String, trim: true },
+    shipDifferent: { type: Boolean, default: false },
     items: [ProductItemSchema],
+    termsOfPayment: { type: String, trim: true },
+    narration: { type: String, trim: true },
+    termsAndConditions: { type: String, trim: true },
     paymentMode: {
       type: String,
       trim: true,
@@ -44,8 +59,23 @@ const quotationSchema = new Schema<IQuatationVoucher>(
       openingStock: { type: Number, trim: true },
       minimumReOrderLevel: { type: Number, trim: true },
     },
+    /** When true, quotation appears on Dashboard → Order List. */
+    addedToOrder: { type: Boolean, default: false },
+    /** After user picks add/remove once, hide both action buttons. */
+    orderListDecisionMade: { type: Boolean, default: false },
     /** Dashboard order list / tabs (sales quotations as orders). */
     paidAmount: { type: Number, default: 0 },
+    paymentStatus: {
+      type: String,
+      trim: true,
+      default: "Pending",
+      enum: ["Pending", "Partial", "Paid", "Unpaid"],
+    },
+    /** Receipt voucher that collected payment for this order. */
+    receiptRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: "ReceiptVoucher",
+    },
     dashboardTab: {
       type: String,
       enum: ["pending", "dispatched", "partSupply", "cancelled"],
@@ -53,7 +83,15 @@ const quotationSchema = new Schema<IQuatationVoucher>(
     },
     dashboardOrderStatus: {
       type: String,
-      default: "Processing",
+      enum: [
+        "Pending",
+        "Dispatched",
+        "Processing",
+        "Cancelled",
+        "Approved",
+        "Quotation",
+      ],
+      default: "Pending",
       trim: true,
     },
   },

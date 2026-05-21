@@ -27,6 +27,11 @@ const receiptVoucherSchema = new Schema<IReceiptVoucher>(
       type: Schema.Types.ObjectId,
       ref: "PurchaseReturnVoucher",
     },
+    /** Order list quotation this receipt collects against. */
+    sourceQuotationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Quotation",
+    },
   },
   {
     timestamps: true,

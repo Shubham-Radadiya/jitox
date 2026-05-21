@@ -40,15 +40,61 @@ export function accountRegionAndArea(account) {
 }
 
 /** Match purchase/sales party dropdown value to an Account Master row. */
+function normalizePartyKey(raw) {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+export function accountMatchesBusinessName(account, businessName) {
+  const target = normalizePartyKey(businessName);
+  if (!target || !account) return false;
+  if (normalizePartyKey(account.businessName) === target) return true;
+  if (normalizePartyKey(account.name) === target) return true;
+  const aliases = account.partyNameAliases;
+  if (Array.isArray(aliases)) {
+    return aliases.some((a) => normalizePartyKey(a) === target);
+  }
+  return false;
+}
+
 export function findAccountByBusinessName(accounts, businessName) {
-  const target = String(businessName || "").trim().toLowerCase();
+  const target = normalizePartyKey(businessName);
   if (!target) return null;
   const list = Array.isArray(accounts) ? accounts : [];
   return (
-    list.find(
-      (a) => String(a?.businessName || "").trim().toLowerCase() === target
-    ) || null
+    list.find((a) => accountMatchesBusinessName(a, target)) || null
   );
+}
+
+/** Labels for Account Master `accountType` (Tally-style groups). */
+const ACCOUNT_TYPE_LABELS = {
+  CapitalAccount: "Capital Account",
+  BankAccounts: "Bank Accounts",
+  CashInHand: "Cash In Hand",
+  DepositAsset: "Deposit Asset",
+  LoansAdvances: "Loans & Advances",
+  DebittersGoods: "Debitter s-Goods",
+  CreditorsGoods: "Creditors-Goods",
+  DebittersExpenses: "Debitters-Expenses",
+  CreditorsExpenses: "Creditors-Expenses",
+  DutiesTaxes: "Duties & Taxes",
+  Assets: "Assets",
+  Incomes: "Incomes",
+  Expenses: "Expenses",
+};
+
+export function formatAccountTypeLabel(value) {
+  const s = String(value || "").trim();
+  if (!s) return "—";
+  return ACCOUNT_TYPE_LABELS[s] || s.replace(/_/g, " ");
+}
+
+export function formatCategoryLabel(value) {
+  const s = String(value || "").trim();
+  if (!s) return "—";
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function mapAccountToRow(a, options = {}) {
@@ -70,10 +116,6 @@ export function mapAccountToRow(a, options = {}) {
     creditCell = isCredit ? fmt(amt) : "—";
     debitCell = !isCredit ? fmt(amt) : "—";
   }
-  const cat = a.category
-    ? String(a.category).replace(/_/g, " ")
-    : a.accountType || "—";
-
   let status = a.customerStatus || "Active";
   if (a.billActivityStatus === "active") {
     status = "Active";
@@ -99,7 +141,8 @@ export function mapAccountToRow(a, options = {}) {
     "Party Name": a.businessName || "—",
     "Contact Person": a.name || "—",
     Territory: a.areaAssigment || "—",
-    "Account Type": cat,
+    "Account Type": formatAccountTypeLabel(a.accountType),
+    Category: formatCategoryLabel(a.category),
     "Credit (₹)": creditCell,
     "Debit (₹)": debitCell,
     Status: status,
