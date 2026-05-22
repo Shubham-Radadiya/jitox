@@ -4,8 +4,10 @@ import {
   Account,
   PaymentVoucher,
   PurchaseVoucher,
+  SalesReturnVoucher,
   SalesVoucher,
 } from "../models/index";
+import { recomputeLinkedSalesReturnRefund } from "../utils/salesReturnRefundStatus";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
@@ -126,6 +128,7 @@ export const createPaymentVoucher = async (
       status,
       sourceSalesId,
       sourcePurchaseId,
+      sourceSalesReturnId,
     } = req.body;
 
     /** voucherNo is generated server-side, so it's not in the required list. */
@@ -145,15 +148,15 @@ export const createPaymentVoucher = async (
       paymentThrough
     );
 
-    if (
-      sourceSalesId &&
-      sourcePurchaseId &&
-      mongoose.isValidObjectId(sourceSalesId) &&
-      mongoose.isValidObjectId(sourcePurchaseId)
-    ) {
+    const linkCount = [
+      sourceSalesId,
+      sourcePurchaseId,
+      sourceSalesReturnId,
+    ].filter((id) => id && mongoose.isValidObjectId(id)).length;
+    if (linkCount > 1) {
       throw new AppError(
         HttpStatusCode.BAD_REQUEST,
-        "Link payment to either a sales or a purchase voucher, not both."
+        "Link payment to only one source (sales, purchase, or sales return)."
       );
     }
 
@@ -208,6 +211,35 @@ export const createPaymentVoucher = async (
       linkedPurchaseId = purchase._id as mongoose.Types.ObjectId;
     }
 
+    let linkedSalesReturnId: mongoose.Types.ObjectId | null = null;
+    if (
+      sourceSalesReturnId &&
+      mongoose.isValidObjectId(sourceSalesReturnId)
+    ) {
+      const sr = await SalesReturnVoucher.findById(sourceSalesReturnId).select(
+        "approvalStatus refundRequestId partyName"
+      );
+      if (!sr) {
+        throw new AppError(
+          HttpStatusCode.NOT_FOUND,
+          "Linked sales return voucher not found."
+        );
+      }
+      if (String(sr.approvalStatus || "") !== "Approved") {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "Approve the sales return before recording a refund payment."
+        );
+      }
+      if (sr.refundRequestId) {
+        throw new AppError(
+          HttpStatusCode.BAD_REQUEST,
+          "A payment voucher already exists for this sales return."
+        );
+      }
+      linkedSalesReturnId = sr._id as mongoose.Types.ObjectId;
+    }
+
     const resolvedVoucherNo = await resolveUniquePaymentVoucherNo(voucherNo);
 
     const newVoucher = new PaymentVoucher({
@@ -221,9 +253,17 @@ export const createPaymentVoucher = async (
       status: status || "Pending",
       sourceSalesId: linkedSalesId,
       sourcePurchaseId: linkedPurchaseId,
+      sourceSalesReturnId: linkedSalesReturnId,
     });
 
     const savedVoucher = await newVoucher.save();
+
+    if (linkedSalesReturnId) {
+      await SalesReturnVoucher.findByIdAndUpdate(linkedSalesReturnId, {
+        $set: { refundRequestId: savedVoucher._id },
+      });
+      await recomputeLinkedSalesReturnRefund(linkedSalesReturnId);
+    }
 
     /** Back-link so the sales row button gates itself on the next fetch. */
     if (linkedSalesId) {
@@ -251,6 +291,9 @@ export const createPaymentVoucher = async (
 
     if (linkedPurchaseId) {
       await recomputeLinkedPurchasePayment(linkedPurchaseId);
+    }
+    if (linkedSalesReturnId) {
+      await recomputeLinkedSalesReturnRefund(linkedSalesReturnId);
     }
 
     const particularsFrom = throughFields.paymentFrom
@@ -443,6 +486,9 @@ export const updatePaymentVoucher = async (
     if (voucher.sourcePurchaseId) {
       await recomputeLinkedPurchasePayment(voucher.sourcePurchaseId);
     }
+    if (voucher.sourceSalesReturnId) {
+      await recomputeLinkedSalesReturnRefund(voucher.sourceSalesReturnId);
+    }
 
     const particularsFrom = String(voucher.paymentFrom || "").trim()
       ? ` from ${voucher.paymentFrom}`
@@ -522,6 +568,22 @@ export const deletePaymentVoucher = async (
         }
         await recomputeLinkedPurchasePayment((deleted as any).sourcePurchaseId);
       }
+    }
+
+    if ((deleted as any).sourceSalesReturnId) {
+      const srId = (deleted as any).sourceSalesReturnId;
+      const sr = await SalesReturnVoucher.findById(srId).select(
+        "refundRequestId"
+      );
+      if (
+        sr &&
+        sr.refundRequestId &&
+        String(sr.refundRequestId) === String((deleted as any)._id)
+      ) {
+        sr.refundRequestId = undefined;
+        await sr.save();
+      }
+      await recomputeLinkedSalesReturnRefund(srId);
     }
 
     await removeDayBookEntry((deleted as any).voucherNo);

@@ -27,18 +27,25 @@ const emptyForm = () => ({
   voucherNo: "",
   sourcePurchaseId: "",
   sourceSalesId: "",
+  sourceSalesReturnId: "",
 });
 
-/** Prefill from purchase/sales row — Payment To is always left for manual pick. */
+/** Prefill from purchase/sales/sales-return row. */
 function draftToForm(draft) {
   if (!draft) return emptyForm();
+  const linkedRefund = Boolean(
+    String(draft.sourceSalesReturnId || "").trim() ||
+      String(draft.sourcePurchaseId || "").trim()
+  );
   return {
     ...emptyForm(),
     date: draft.date
       ? dayjs(draft.date).format("YYYY-MM-DD")
       : dayjs().format("YYYY-MM-DD"),
     paymentFrom: String(draft.paymentFrom || "").trim(),
-    paymentTo: "",
+    paymentTo: linkedRefund
+      ? String(draft.paymentTo || "").trim()
+      : "",
     amount:
       draft.amount != null && draft.amount !== ""
         ? String(draft.amount).replace(/,/g, "")
@@ -47,6 +54,7 @@ function draftToForm(draft) {
     status: String(draft.status || "Pending") === "Paid" ? "Paid" : "Pending",
     sourcePurchaseId: String(draft.sourcePurchaseId || "").trim(),
     sourceSalesId: String(draft.sourceSalesId || "").trim(),
+    sourceSalesReturnId: String(draft.sourceSalesReturnId || "").trim(),
   };
 }
 
@@ -75,6 +83,9 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const isEdit = Boolean(payment?._id);
+  const isSalesReturnRefund = Boolean(
+    String(form.sourceSalesReturnId || "").trim()
+  );
 
   const {
     data: purchaseMeta,
@@ -199,6 +210,9 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
     if (form.sourceSalesId) {
       body.sourceSalesId = form.sourceSalesId;
     }
+    if (form.sourceSalesReturnId) {
+      body.sourceSalesReturnId = form.sourceSalesReturnId;
+    }
     try {
       setSaving(true);
       if (isEdit) {
@@ -212,6 +226,9 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
           }),
           queryClient.invalidateQueries({
             queryKey: ["voucher-list", "sales"],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["voucher-list", "sales-return"],
           }),
           queryClient.invalidateQueries({ queryKey: ["accounts"] }),
           queryClient.invalidateQueries({ queryKey: ["account-ledger"] }),
@@ -245,6 +262,13 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
             ? [
                 queryClient.invalidateQueries({
                   queryKey: ["voucher-list", "sales"],
+                }),
+              ]
+            : []),
+          ...(body.sourceSalesReturnId
+            ? [
+                queryClient.invalidateQueries({
+                  queryKey: ["voucher-list", "sales-return"],
                 }),
               ]
             : []),
@@ -291,11 +315,24 @@ const PaymentModal = ({ open, onClose, payment = null, draft = null }) => {
     <CommonModal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Payment" : "Add Payment"}
+      title={
+        isEdit
+          ? "Edit Payment"
+          : isSalesReturnRefund
+            ? "Refund to customer"
+            : "Add Payment"
+      }
       width="720px"
       footer={footer}
     >
       <div className="flex flex-col gap-4">
+        {isSalesReturnRefund && !isEdit ? (
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Set status to <strong>Paid</strong> and choose <strong>Paid from</strong>{" "}
+            (bank/cash) so <strong>Refund Payment Status</strong> updates on the sales
+            return list.
+          </p>
+        ) : null}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <InputField
             label="Voucher Number"

@@ -186,52 +186,66 @@ export default function InvoicePurchaseModalLayout({
   const displayGrand = Math.round(rawGrand);
   const roundDelta = roundOff ? displayGrand - rawGrand : 0;
 
-  const isReturn = formType === "purchase-return";
+  const isPurchaseReturn = formType === "purchase-return";
+  const isSalesReturn = formType === "sales-return";
+  const isReturn = isPurchaseReturn;
   const isSales = formType === "sales";
   const isQuotation = formType === "quotation";
   const headerEyebrow = isQuotation
     ? "Quotation"
-    : isSales
-      ? "Sales invoice"
-      : isReturn
-        ? "Purchase return"
-        : "Purchase invoice";
+    : isSalesReturn
+      ? "Sales return"
+      : isSales
+        ? "Sales invoice"
+        : isReturn
+          ? "Purchase return"
+          : "Purchase invoice";
   const headerTitle = isQuotation
     ? "Create Quotation"
-    : isSales
-      ? "Create Sales Invoice"
+    : isSalesReturn
+      ? "Review & approve sales return"
+      : isSales
+        ? "Create Sales Invoice"
+        : isReturn
+          ? "Create Purchase Return"
+          : "Create Purchase Invoice";
+  const billFromEyebrow =
+    isSales || isSalesReturn || isQuotation
+      ? "Bill to"
       : isReturn
-        ? "Create Purchase Return"
-        : "Create Purchase Invoice";
-  const billFromEyebrow = isSales || isQuotation
-    ? "Bill to"
-    : isReturn
-      ? "Return to"
-      : "Bill from";
-  const shipFromEyebrow = isSales || isQuotation
-    ? "Ship to"
-    : isReturn
-      ? "Ship from (your end)"
-      : "Ship from";
+        ? "Return to"
+        : "Bill from";
+  const shipFromEyebrow =
+    isSales || isSalesReturn || isQuotation
+      ? "Ship to"
+      : isReturn
+        ? "Ship from (your end)"
+        : "Ship from";
   const invoiceSectionTitle = isQuotation
     ? "Quotation details"
-    : isSales
-      ? "Sales details"
-      : isReturn
-        ? "Return details"
-        : "Invoice details";
+    : isSalesReturn
+      ? "Return details"
+      : isSales
+        ? "Sales details"
+        : isReturn
+          ? "Return details"
+          : "Invoice details";
   const stockToggleLabel = isQuotation
     ? "Show stock quantity on this quote (inventory is not updated)"
-    : isSales
-      ? "Decrease stock when this sale is saved"
-      : isReturn
-        ? "Decrease stock when this return is saved"
-        : "Update stock when this voucher is saved";
+    : isSalesReturn
+      ? "Increase stock when this return is approved (not on save)"
+      : isSales
+        ? "Decrease stock when this sale is saved"
+        : isReturn
+          ? "Decrease stock when this return is saved"
+          : "Update stock when this voucher is saved";
   const shareDocLabel = isQuotation
     ? "Quotation"
-    : isSales
-      ? "Sales"
-      : "Purchase";
+    : isSalesReturn
+      ? "Sales return"
+      : isSales
+        ? "Sales"
+        : "Purchase";
 
   return (
     <div className="flex min-h-0 flex-col bg-gradient-to-b from-slate-100/95 via-slate-50/90 to-slate-100/80 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">

@@ -2,6 +2,7 @@ import {
   purchaseVouchersApi,
   purchaseReturnVouchersApi,
   salesVouchersApi,
+  salesReturnVouchersApi,
   journalVouchersApi,
   paymentVouchersApi,
   receiptVouchersApi,
@@ -99,6 +100,20 @@ export async function fetchPurchaseReturnDetail(id) {
 export async function fetchSalesOrderDetail(id) {
   const { data } = await salesVouchersApi.getById(id);
   return salesDocToOrderDetailShape(data);
+}
+
+export async function fetchSalesReturnDetail(id) {
+  const { data } = await salesReturnVouchersApi.getById(id);
+  const { billPartyAccount, shipPartyAccount } =
+    await loadPartyAccountsForVoucherDoc(data);
+  const shape = purchaseReturnDocToDetailShape(data, billPartyAccount, {
+    shipPartyAccount,
+  });
+  if (shape) {
+    shape.approvalStatus = data?.approvalStatus || "Pending";
+    shape.isSalesReturn = true;
+  }
+  return shape;
 }
 
 function labelAccountForJournal(a) {

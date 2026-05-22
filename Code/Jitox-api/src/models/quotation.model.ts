@@ -65,11 +65,17 @@ const quotationSchema = new Schema<IQuatationVoucher>(
     orderListDecisionMade: { type: Boolean, default: false },
     /** Dashboard order list / tabs (sales quotations as orders). */
     paidAmount: { type: Number, default: 0 },
+    /** Total receipts / collections (not reduced by returns). */
+    receivedAmount: { type: Number, default: 0 },
+    /** Sum of approved sales return amounts — net due = totalAmount − returnedAmount. */
+    returnedAmount: { type: Number, default: 0 },
+    /** Refund payments posted against linked sales returns. */
+    customerRefundedAmount: { type: Number, default: 0 },
     paymentStatus: {
       type: String,
       trim: true,
       default: "Pending",
-      enum: ["Pending", "Partial", "Paid", "Unpaid"],
+      enum: ["Pending", "Partial", "Paid", "Unpaid", "Refund Pending"],
     },
     /** Receipt voucher that collected payment for this order. */
     receiptRequestId: {
@@ -88,6 +94,7 @@ const quotationSchema = new Schema<IQuatationVoucher>(
         "Dispatched",
         "Processing",
         "Cancelled",
+        "Return",
         "Approved",
         "Quotation",
       ],

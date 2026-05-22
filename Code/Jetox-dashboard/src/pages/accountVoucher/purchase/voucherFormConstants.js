@@ -341,5 +341,11 @@ export function mapPurchaseApiDocToPrefill(doc) {
     gstRate,
     productRows,
     stockToggle: doc.stockDetails?.stockQuantity !== false,
+    sourceSalesId: doc.sourceSalesId
+      ? String(doc.sourceSalesId?._id ?? doc.sourceSalesId).trim()
+      : undefined,
+    sourceQuotationId: doc.sourceQuotationId
+      ? String(doc.sourceQuotationId?._id ?? doc.sourceQuotationId).trim()
+      : undefined,
   };
 }

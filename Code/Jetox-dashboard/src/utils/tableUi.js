@@ -9,6 +9,10 @@ export const TABLE_CELL_BORDER =
 const RIGHT_ALIGN_KEYS = new Set([
   "Paid",
   "Due",
+  "Return Amt",
+  "Refund Due",
+  "Refunded",
+  "Net Amount",
   "Total Amount",
   "Amount",
   "Amount (₹)",
@@ -124,6 +128,16 @@ export const ORDER_TABLE_COL = {
   },
   Paid: { th: "min-w-[4.5rem]", td: "min-w-[4.5rem]" },
   Due: { th: "min-w-[4.5rem]", td: "min-w-[4.5rem]" },
+  "Return Amt": {
+    th: "min-w-[6.5rem] hidden xl:table-cell",
+    td: "hidden min-w-[6.5rem] xl:table-cell",
+  },
+  "Refund Due": { th: "min-w-[6.5rem]", td: "min-w-[6.5rem]" },
+  Refunded: {
+    th: "min-w-[6rem] hidden lg:table-cell",
+    td: "hidden min-w-[6rem] lg:table-cell",
+  },
+  "Net Amount": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
   "Payment Status": {
     th: "min-w-[8.5rem]",
     td: "min-w-[8.5rem]",
@@ -131,12 +145,12 @@ export const ORDER_TABLE_COL = {
   "Total Amount": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
   "Order Status": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
   Actions: {
-    th: "w-[9rem] min-w-[9rem] max-w-[9rem]",
-    td: "w-[9rem] min-w-[9rem] max-w-[9rem]",
+    th: "w-[13rem] min-w-[13rem] max-w-[13rem]",
+    td: "w-[13rem] min-w-[13rem] max-w-[13rem]",
   },
   Action: {
-    th: "w-[9rem] min-w-[9rem] max-w-[9rem]",
-    td: "w-[9rem] min-w-[9rem] max-w-[9rem]",
+    th: "w-[13rem] min-w-[13rem] max-w-[13rem]",
+    td: "w-[13rem] min-w-[13rem] max-w-[13rem]",
   },
 };
 
@@ -301,6 +315,8 @@ export function paymentStatusBadgeClasses(value, options = {}) {
     return `${B} border-green-200/90 bg-green-100 text-green-800 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50`;
   if (s === "partial")
     return `${B} border-sky-200/90 bg-sky-100 text-sky-900 dark:border-sky-400/45 dark:bg-sky-500/16 dark:text-sky-50`;
+  if (s === "refund pending")
+    return `${B} border-amber-200/90 bg-amber-100 text-amber-950 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50`;
   if (s === "pending")
     return `${B} border-amber-200/90 bg-amber-100 text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/16 dark:text-amber-50`;
   if (s === "unpaid")
@@ -330,6 +346,7 @@ export function orderStatusBadgeClasses(value, options = {}) {
     approved: `${B} border-emerald-200/90 bg-emerald-100 text-emerald-900 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-50`,
     dispatched: `${B} border-purple-200/90 bg-purple-100 text-purple-900 dark:border-violet-400/45 dark:bg-violet-500/18 dark:text-violet-50`,
     cancelled: `${B} border-red-200/90 bg-red-100 text-red-900 dark:border-rose-400/45 dark:bg-rose-500/18 dark:text-rose-50`,
+    return: `${B} border-orange-200/90 bg-orange-100 text-orange-900 dark:border-orange-400/45 dark:bg-orange-500/18 dark:text-orange-50`,
     processing: `${B} border-blue-200/90 bg-blue-100 text-blue-900 dark:border-sky-400/45 dark:bg-sky-500/18 dark:text-sky-50`,
     quotation: `${B} border-slate-200/80 bg-gray-100 text-gray-700 dark:border-slate-500/35 dark:bg-slate-500/15 dark:text-slate-200`,
     notonorderlist: `${B} border-red-200/90 bg-red-100 text-red-800 dark:border-red-400/45 dark:bg-red-500/18 dark:text-red-50`,

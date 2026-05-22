@@ -3,6 +3,7 @@ export const ORDER_STATUS_VALUES = [
   "Dispatched",
   "Processing",
   "Cancelled",
+  "Return",
   "Approved",
   "Quotation",
 ] as const;
@@ -24,5 +25,6 @@ export function dashboardTabForOrderStatus(status: string): string {
   const n = normalizeOrderStatus(status);
   if (n === "Dispatched") return "dispatched";
   if (n === "Cancelled") return "cancelled";
+  if (n === "Return") return "partSupply";
   return "pending";
 }

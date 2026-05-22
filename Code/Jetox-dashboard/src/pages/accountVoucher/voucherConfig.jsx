@@ -7,6 +7,7 @@ import {
   fetchPurchaseDetail,
   fetchQuotationDetail,
   fetchPurchaseReturnDetail,
+  fetchSalesReturnDetail,
   fetchSalesOrderDetail,
   fetchJournalDetail,
   fetchPaymentDetail,
@@ -34,6 +35,8 @@ import {
   purchaseRowIsFullyPaid,
   purchaseReturnRowHasParty,
   purchaseReturnRowHasRefund,
+  salesReturnRowHasParty,
+  salesReturnRowHasRefund,
 } from "../../utils/purchasePaymentStatus";
 import { buildUploadUrl } from "../../utils/uploadUrl";
 import { IoEyeOutline, IoDocumentTextOutline } from "react-icons/io5";
@@ -47,6 +50,7 @@ import {
   Plus,
   Share2,
   Trash2,
+  XCircle,
   Play,
   CircleCheck,
   Pause,
@@ -188,7 +192,8 @@ const salesReturnColumns = [
   "Returned QTY",
   "Reason ",
   "Amount",
-  "Status",
+  "Refund Order Status",
+  "Refund Payment Status",
   "Actions",
 ];
 
@@ -316,6 +321,7 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
     mfgStop: "Mark failed",
     purchaseMarkPaid: "Create payment voucher",
     purchaseReturnRefund: "Refund money — create receipt",
+    salesReturnRefund: "Refund to customer — create payment voucher",
     receiptReceive: "Record refund — bank/cash and Received",
     receiptReceived: "Already received",
     saleReceipt: "Create receipt voucher — record payment received",
@@ -567,12 +573,26 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
               <button
                 type="button"
                 onClick={() => action.onClick?.(row, navigate)}
-                className="hover:text-blue transition"
+                className="hover:text-emerald-600 transition"
                 aria-label="Approve"
               >
                 <BadgeCheck size={18} />
               </button>,
               action.tooltip || tooltipLabels.approve,
+              index
+            );
+          }
+          if (action.type === "reject") {
+            return renderButtonWithTooltip(
+              <button
+                type="button"
+                onClick={() => action.onClick?.(row, navigate)}
+                className="hover:text-red-500 transition"
+                aria-label="Reject"
+              >
+                <XCircle size={18} />
+              </button>,
+              action.tooltip || "Reject",
               index
             );
           }
@@ -660,7 +680,11 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
               index
             );
           }
-          if (action.type === "purchaseReturnRefund") {
+          if (
+            action.type === "purchaseReturnRefund" ||
+            action.type === "salesReturnRefund"
+          ) {
+            const isSalesReturnRefund = action.type === "salesReturnRefund";
             const hasRefund =
               typeof action.hasRefund === "function"
                 ? action.hasRefund(row)
@@ -674,15 +698,22 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
               noParty ||
               (typeof action.isDisabled === "function" &&
                 !!action.isDisabled(row));
-            let tooltip =
-              action.tooltip || tooltipLabels.purchaseReturnRefund;
+            let tooltip = isSalesReturnRefund
+              ? action.tooltip || tooltipLabels.salesReturnRefund
+              : action.tooltip || tooltipLabels.purchaseReturnRefund;
             if (disabled) {
               if (hasRefund) {
-                tooltip = action.refundTooltip || "Refund receipt already created";
+                tooltip =
+                  action.refundTooltip ||
+                  (isSalesReturnRefund
+                    ? "Refund payment already created"
+                    : "Refund receipt already created");
               } else if (noParty) {
                 tooltip =
                   action.noPartyTooltip ||
-                  "Set Party Name on purchase return first";
+                  (isSalesReturnRefund
+                    ? "Set client name on sales return first"
+                    : "Set Party Name on purchase return first");
               } else if (action.disabledTooltip) {
                 tooltip = action.disabledTooltip;
               }
@@ -691,16 +722,22 @@ const createActionButtons = (actions, { openDetails, navigate, row, openPurchase
               <button
                 type="button"
                 onClick={() => {
-                  if (disabled) return;
+                  if (disabled) {
+                    toast.error(tooltip);
+                    return;
+                  }
                   action.onClick?.(row);
                 }}
-                disabled={disabled}
                 className={
                   disabled
                     ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
                     : "text-emerald-500 hover:text-emerald-600 transition dark:text-emerald-400 dark:hover:text-emerald-300"
                 }
-                aria-label="Refund from supplier"
+                aria-label={
+                  isSalesReturnRefund
+                    ? "Refund to customer"
+                    : "Refund from supplier"
+                }
                 aria-disabled={disabled || undefined}
               >
                 <Banknote size={18} />
@@ -905,6 +942,50 @@ const expenseTableRenderer = (key, value, defaultRenderer, row) => {
     }
     return (
       <td className={`${tableTdClasses(key)} text-slate-500 dark:text-slate-400`}>-</td>
+    );
+  }
+  return defaultRenderer(key, value);
+};
+
+const salesReturnBadgeRenderer = (key, value, defaultRenderer) => {
+  if (key === "Refund Payment Status") {
+    const v = String(value || "Pending");
+    const cls =
+      v === "Refunded"
+        ? "bg-primary text-white"
+        : v === "Partial" || v === "Processing"
+          ? "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-100"
+          : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
+    return (
+      <td key={key} className={tableTdClasses(key)}>
+        <div className={STATUS_CELL_INNER}>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}
+          >
+            {v}
+          </span>
+        </div>
+      </td>
+    );
+  }
+  if (key === "Refund Order Status") {
+    const v = String(value || "Pending");
+    const cls =
+      v === "Approved"
+        ? "bg-primary text-white"
+        : v === "Rejected"
+          ? "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200"
+          : "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-100";
+    return (
+      <td key={key} className={tableTdClasses(key)}>
+        <div className={STATUS_CELL_INNER}>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}
+          >
+            {v}
+          </span>
+        </div>
+      </td>
     );
   }
   return defaultRenderer(key, value);
@@ -1244,19 +1325,92 @@ export const voucherConfigs = {
 "sales-return": {
   title: "Sales Return Voucher",
   columns: salesReturnColumns,
-  rowId: "Invoice No.",
-  emptyState: {
-    title: "Sales returns not available",
-    description:
-      "There is no sales-return API in the backend yet. This screen will list returns once an endpoint is added.",
-  },
+  rowId: "Return ID",
+  fetchDetail: fetchSalesReturnDetail,
   detailsComponent: PurchaseDetails,
-  filterFields: [],
-  renderRowCell: salesBadgeRenderer,
+  enableColumnPicker: false,
+  modals: [{ key: "payment-modal", component: PaymentModal }],
+  filterFields: [
+    voucherAddButton({
+      key: "addSalesReturn",
+      action: "sales-return-open",
+    }),
+  ],
+  renderRowCell: salesReturnBadgeRenderer,
   buildTableAction:
-    ({ navigate, openDetails }) =>
-    (row) =>
-      createActionButtons([], { openDetails, navigate, row }),
+    ({
+      openDetails,
+      navigate,
+      openSalesReturnModal,
+      deleteSalesReturnVoucher,
+      approveSalesReturnVoucher,
+      rejectSalesReturnVoucher,
+      createRefundPaymentForSalesReturn,
+    }) =>
+    (row) => {
+      const status = String(
+        row["Refund Order Status"] || row.Status || "Pending"
+      );
+      const isPending = status === "Pending";
+      const isApproved = status === "Approved";
+      return createActionButtons(
+        [
+          { type: "eye" },
+          ...(isPending
+            ? [
+                {
+                  type: "approve",
+                  tooltip: "Approve — review return qty, then save",
+                  onClick: (r) => approveSalesReturnVoucher?.(r),
+                },
+                {
+                  type: "reject",
+                  tooltip: "Reject return",
+                  onClick: (r) => rejectSalesReturnVoucher?.(r),
+                },
+              ]
+            : []),
+          ...(isApproved
+            ? [
+                {
+                  type: "salesReturnRefund",
+                  tooltip: "Refund to customer — create payment voucher",
+                  refundTooltip: "Refund payment already created",
+                  hasParty: (r) => salesReturnRowHasParty(r),
+                  hasRefund: (r) => salesReturnRowHasRefund(r),
+                  noPartyTooltip:
+                    "Set client name on this sales return first",
+                  onClick: (r) => createRefundPaymentForSalesReturn?.(r),
+                },
+              ]
+            : []),
+          {
+            type: "delete",
+            onClick: async (r) => {
+              if (
+                !window.confirm(
+                  `Delete sales return ${r["Return ID"] || ""}?`
+                )
+              ) {
+                return;
+              }
+              const id = r?._id;
+              if (!id) {
+                toast.error("Cannot delete this row (missing id).");
+                return;
+              }
+              try {
+                await deleteSalesReturnVoucher(id);
+                toast.success("Sales return deleted.");
+              } catch (e) {
+                toast.error(getApiErrorMessage(e, "Delete failed"));
+              }
+            },
+          },
+        ],
+        { openDetails, navigate, row, openSalesReturnModal }
+      );
+    },
 },
   payment: {
     title: "Payment Voucher",

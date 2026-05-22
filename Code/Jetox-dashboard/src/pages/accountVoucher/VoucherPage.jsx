@@ -20,6 +20,7 @@ import {
   purchaseRowPartyName,
   purchaseReturnRowHasParty,
   purchaseReturnRowHasRefund,
+  salesReturnRowHasParty,
   purchaseReturnRowPartyName,
 } from "../../utils/purchasePaymentStatus";
 import { invalidateProductAndStockQueries } from "../../utils/invalidateStockQueries";
@@ -54,6 +55,7 @@ import { ManufacturingBlockedModal } from "./manufacturing/ManufacturingStockMod
 import PurchaseVoucherModal from "./purchase/PurchaseVoucherModal";
 import PurchaseReturnModal from "./purchase/PurchaseReturnModal";
 import SalesVoucherModal from "./purchase/SalesVoucherModal";
+import SalesReturnModal from "./purchase/SalesReturnModal";
 import QuotationVoucherModal from "./purchase/QuotationVoucherModal";
 import {
   expenseVouchersApi,
@@ -63,6 +65,7 @@ import {
   purchaseVouchersApi,
   receiptVouchersApi,
   salesVouchersApi,
+  salesReturnVouchersApi,
   manufacturingVouchersApi,
   quotationsApi,
 } from "../../services/api";
@@ -532,6 +535,9 @@ const VoucherPage = () => {
         }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["account-ledger"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "sales-return"],
+        }),
       ]);
     },
     [queryClient]
@@ -565,6 +571,66 @@ const VoucherPage = () => {
         queryKey: ["voucher-list", "purchase-return"],
       });
       invalidateProductAndStockQueries(queryClient);
+    },
+    [queryClient]
+  );
+
+  const [salesReturnModal, setSalesReturnModal] = useState({
+    open: false,
+    sourceRow: null,
+    mode: "create",
+  });
+  const openSalesReturnModal = useCallback((sourceRow, mode) => {
+    setSalesReturnModal({
+      open: true,
+      sourceRow:
+        sourceRow && typeof sourceRow === "object" ? sourceRow : null,
+      mode: mode || "create",
+    });
+  }, []);
+  const closeSalesReturnModal = useCallback(() => {
+    setSalesReturnModal({ open: false, sourceRow: null, mode: "create" });
+  }, []);
+
+  const deleteSalesReturnVoucher = useCallback(
+    async (id) => {
+      if (!id) return;
+      await salesReturnVouchersApi.delete(String(id));
+      await queryClient.invalidateQueries({
+        queryKey: ["voucher-list", "sales-return"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] });
+      invalidateProductAndStockQueries(queryClient);
+    },
+    [queryClient]
+  );
+
+  const approveSalesReturnVoucher = useCallback(
+    (row) => {
+      openSalesReturnModal(row, "approve");
+    },
+    [openSalesReturnModal]
+  );
+
+  const rejectSalesReturnVoucher = useCallback(
+    async (row) => {
+      const id = row?._id;
+      if (!id) {
+        toast.error("Missing return id.");
+        return;
+      }
+      if (!window.confirm("Reject this sales return? Stock and ledger will not change.")) {
+        return;
+      }
+      try {
+        await salesReturnVouchersApi.reject(String(id));
+        toast.success("Sales return rejected.");
+        await queryClient.invalidateQueries({
+          queryKey: ["voucher-list", "sales-return"],
+        });
+      } catch (e) {
+        toast.error(getApiErrorMessage(e, "Reject failed"));
+      }
     },
     [queryClient]
   );
@@ -768,6 +834,61 @@ const VoucherPage = () => {
       ...(quotationId ? { sourceQuotationId: quotationId } : {}),
     });
     setActiveModalKey("receipt-modal");
+  }, []);
+
+  /**
+   * Approved sales return — opens Payment Voucher (money out to customer).
+   */
+  const createRefundPaymentForSalesReturn = useCallback((row) => {
+    const raw = row?._raw || {};
+    const rowId = raw._id ?? row?._id;
+    if (!rowId) {
+      toast.error(
+        "This sales return row is missing an id — cannot create payment."
+      );
+      return;
+    }
+    if (
+      String(
+        raw.approvalStatus ||
+          row?.["Refund Order Status"] ||
+          row?.Status ||
+          ""
+      ) !== "Approved"
+    ) {
+      toast.error("Approve the sales return before recording a refund.");
+      return;
+    }
+    if (!salesReturnRowHasParty(row)) {
+      toast.error(
+        "Please set client name on this sales return, then create refund payment."
+      );
+      return;
+    }
+    const total = Number(raw.totalAmount) || 0;
+    const refunded = Number(raw.refundedAmount) || 0;
+    const amount = Math.max(0, total - refunded);
+    if (!amount) {
+      toast.error("This return is already fully refunded.");
+      return;
+    }
+    const voucherNo = raw.voucherNo || row?.["Return ID"] || "";
+    const today = new Date().toISOString().slice(0, 10);
+    const party =
+      raw.partyName || row?.["Client Name"] || row?.Party || "";
+    setEditingPayment(null);
+    setPaymentDraft({
+      date: today,
+      amount,
+      paymentTo: party,
+      paymentFrom: "",
+      remarks: voucherNo
+        ? `Refund for sales return ${voucherNo}`
+        : "Refund for sales return",
+      status: "Paid",
+      sourceSalesReturnId: String(rowId),
+    });
+    setActiveModalKey("payment-modal");
   }, []);
 
   const createRefundReceiptForPurchaseReturn = useCallback((row) => {
@@ -1161,6 +1282,7 @@ const VoucherPage = () => {
       openDetails: openDetailsForTable,
       openPurchaseModal,
       openPurchaseReturnModal,
+      openSalesReturnModal,
       openSalesModal,
       deletePurchaseVoucher,
       createPaymentRequestForPurchase,
@@ -1169,7 +1291,11 @@ const VoucherPage = () => {
       setQuotationAddedToOrder,
       quotationOrderBusyId,
       deletePurchaseReturnVoucher,
+      deleteSalesReturnVoucher,
+      approveSalesReturnVoucher,
+      rejectSalesReturnVoucher,
       createRefundReceiptForPurchaseReturn,
+      createRefundPaymentForSalesReturn,
       deleteSalesVoucher,
       createPaymentRequestForSale,
       createReceiptForSale,
@@ -1211,6 +1337,10 @@ const VoucherPage = () => {
         }
         if (field.action === "purchase-return-open") {
           openPurchaseReturnModal(null, "create");
+          return;
+        }
+        if (field.action === "sales-return-open") {
+          openSalesReturnModal(null, "create");
           return;
         }
         if (field.action === "sales-open") {
@@ -1565,6 +1695,15 @@ const VoucherPage = () => {
             onClose={closeSalesModal}
             sourceRow={salesModal.sourceRow}
             mode={salesModal.mode}
+          />
+        )}
+
+        {voucherSlug === "sales-return" && (
+          <SalesReturnModal
+            open={salesReturnModal.open}
+            onClose={closeSalesReturnModal}
+            sourceRow={salesReturnModal.sourceRow}
+            mode={salesReturnModal.mode}
           />
         )}
 

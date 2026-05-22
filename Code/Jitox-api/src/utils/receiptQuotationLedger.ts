@@ -4,7 +4,12 @@ import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { parsePaymentAmount } from "./applyPaymentToAccountBalance";
 
-export type CollectionPaymentStatus = "Pending" | "Partial" | "Paid" | "Unpaid";
+export type CollectionPaymentStatus =
+  | "Pending"
+  | "Partial"
+  | "Paid"
+  | "Unpaid"
+  | "Refund Pending";
 
 export function deriveCollectionPaymentStatus(
   totalAmount: unknown,
@@ -16,6 +21,20 @@ export function deriveCollectionPaymentStatus(
   if (paid > 0) return "Partial";
   if (total > 0) return "Unpaid";
   return "Pending";
+}
+
+/** Net sale after returns: refund still owed vs collection still owed. */
+export function deriveNetPayablePaymentStatus(
+  effectiveTotal: unknown,
+  paidAmount: unknown,
+  customerRefunded: unknown
+): CollectionPaymentStatus {
+  const effective = Math.max(0, Number(effectiveTotal) || 0);
+  const paid = Math.max(0, Number(paidAmount) || 0);
+  const refunded = Math.max(0, Number(customerRefunded) || 0);
+  const refundDue = Math.max(0, paid - effective - refunded);
+  if (refundDue > 0) return "Refund Pending";
+  return deriveCollectionPaymentStatus(effective, paid);
 }
 
 function applyPaymentStatusToSale(
@@ -59,6 +78,7 @@ export async function recomputeQuotationPaymentState(
     paidSum = Math.max(paidSum, Number(sale.paidAmount) || 0);
   }
 
+  quotation.receivedAmount = paidSum;
   quotation.paidAmount = Math.min(total, paidSum);
   quotation.paymentStatus = deriveCollectionPaymentStatus(
     total,

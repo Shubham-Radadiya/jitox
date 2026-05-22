@@ -7,6 +7,7 @@ import {
   ExpenseVoucher,
   CashVoucher,
   Quotation,
+  SalesReturnVoucher,
   Product,
   Account,
   Employee,
@@ -651,7 +652,19 @@ export const getDashboardOverview = async (_req: Request, res: Response) => {
     const salesAmt = Math.round(
       dbTotals.salesTotal > 0 ? dbTotals.salesTotal : salesFromOrders
     );
-    const salesReturnAmt = 0;
+    const salesReturnAmt = await safeDbNumber(async () => {
+      const rows = (await SalesReturnVoucher.aggregate([
+        { $match: { approvalStatus: "Approved" } },
+        {
+          $group: {
+            _id: null,
+            t: { $sum: { $ifNull: ["$totalAmount", 0] } },
+          },
+        },
+      ])) as { t?: number }[];
+      const n = Number(rows[0]?.t);
+      return Number.isFinite(n) ? n : 0;
+    }, 0);
     const cashBankAmt = Math.round(
       dbTotals.receiptTotal -
         dbTotals.paymentTotal +

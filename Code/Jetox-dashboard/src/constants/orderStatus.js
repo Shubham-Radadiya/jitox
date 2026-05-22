@@ -3,6 +3,7 @@ export const ORDER_STATUS_OPTIONS = [
   { value: "Pending", label: "Pending" },
   { value: "Dispatched", label: "Dispatched" },
   { value: "Processing", label: "Processing" },
+  { value: "Return", label: "Return" },
   { value: "Cancelled", label: "Cancelled" },
   { value: "Approved", label: "Approved" },
 ];
@@ -61,6 +62,7 @@ export function dashboardTabForOrderStatus(status) {
   const n = normalizeOrderStatus(status);
   if (n === "Dispatched") return "dispatched";
   if (n === "Cancelled") return "cancelled";
+  if (n === "Return") return "partSupply";
   return "pending";
 }
 

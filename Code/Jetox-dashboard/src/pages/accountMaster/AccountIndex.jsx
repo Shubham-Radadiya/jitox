@@ -15,6 +15,7 @@ import {
   purchaseVouchersApi,
   purchaseReturnVouchersApi,
   salesVouchersApi,
+  salesReturnVouchersApi,
   expenseVouchersApi,
   cashVouchersApi,
 } from "../../services/api";
@@ -243,6 +244,7 @@ const AccountIndex = () => {
           purchaseRes,
           purchaseReturnRes,
           salesRes,
+          salesReturnRes,
         ] = await Promise.all([
           accountsApi.getAll({}),
           paymentVouchersApi.getAll({}),
@@ -253,6 +255,7 @@ const AccountIndex = () => {
           purchaseVouchersApi.getAll({}),
           purchaseReturnVouchersApi.getAll({}),
           salesVouchersApi.getAll({}),
+          salesReturnVouchersApi.getAll({}),
         ]);
         const raw = accountsRes?.data;
         const list = Array.isArray(raw)
@@ -269,7 +272,7 @@ const AccountIndex = () => {
           purchases: normalizeList(purchaseRes),
           purchaseReturns: normalizeList(purchaseReturnRes),
           sales: normalizeList(salesRes),
-          salesReturns: [],
+          salesReturns: normalizeList(salesReturnRes),
         };
         return list.map((a) => {
           const id = a._id || a.id;
@@ -394,6 +397,7 @@ const AccountIndex = () => {
         { data: purchaseRes },
         { data: purchaseReturnRes },
         { data: salesRes },
+        { data: salesReturnRes },
         { data: expenseRes },
         { data: cashRes },
       ] = await Promise.all([
@@ -404,6 +408,7 @@ const AccountIndex = () => {
         purchaseVouchersApi.getAll({}),
         purchaseReturnVouchersApi.getAll({}),
         salesVouchersApi.getAll({}),
+        salesReturnVouchersApi.getAll({}),
         expenseVouchersApi.getAll({}),
         cashVouchersApi.getAll({}),
       ]);
@@ -415,7 +420,7 @@ const AccountIndex = () => {
         purchases: normalizeList(purchaseRes),
         purchaseReturns: normalizeList(purchaseReturnRes),
         sales: normalizeList(salesRes),
-        salesReturns: [],
+        salesReturns: normalizeList(salesReturnRes),
         expenses: normalizeList(expenseRes),
         cashVouchers: normalizeList(cashRes),
       };

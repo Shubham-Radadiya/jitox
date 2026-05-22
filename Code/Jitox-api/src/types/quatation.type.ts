@@ -55,7 +55,15 @@ export interface IQuatationVoucher extends Document {
   addedToOrder?: boolean;
   orderListDecisionMade?: boolean;
   paidAmount?: number;
-  paymentStatus?: "Pending" | "Partial" | "Paid" | "Unpaid";
+  receivedAmount?: number;
+  returnedAmount?: number;
+  customerRefundedAmount?: number;
+  paymentStatus?:
+    | "Pending"
+    | "Partial"
+    | "Paid"
+    | "Unpaid"
+    | "Refund Pending";
   receiptRequestId?: mongoose.Schema.Types.ObjectId;
   dashboardTab?: "pending" | "dispatched" | "partSupply" | "cancelled";
   dashboardOrderStatus?:
@@ -63,6 +71,7 @@ export interface IQuatationVoucher extends Document {
     | "Dispatched"
     | "Processing"
     | "Cancelled"
+    | "Return"
     | "Approved"
     | "Quotation";
   createdAt?: Date;

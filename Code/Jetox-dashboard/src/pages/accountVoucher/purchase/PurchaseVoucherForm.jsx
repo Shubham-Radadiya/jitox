@@ -450,6 +450,7 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
 
   const isQuotation = formType === "quotation";
   const isPurchaseReturn = formType === "purchase-return";
+  const isSalesReturn = formType === "sales-return";
   const isSales = formType === "sales";
   const isPurchase = formType === "purchase";
 
@@ -459,9 +460,11 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       : "Add Quotation"
     : isPurchaseReturn
       ? "Purchase Return Voucher"
-      : isSales
-        ? "Sales Voucher"
-        : "Purchase Voucher";
+      : isSalesReturn
+        ? "Sales Return Voucher"
+        : isSales
+          ? "Sales Voucher"
+          : "Purchase Voucher";
 
   const lineTotals = useMemo(() => {
     return productRows.reduce(
@@ -678,6 +681,12 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
       productRows,
       lineTotals,
       stockToggle,
+      sourceQuotationId: prefill?.sourceQuotationId
+        ? String(prefill.sourceQuotationId).trim()
+        : undefined,
+      sourceSalesId: prefill?.sourceSalesId
+        ? String(prefill.sourceSalesId).trim()
+        : undefined,
     };
   }, [
     formType,
@@ -705,6 +714,8 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     productRows,
     lineTotals,
     stockToggle,
+    prefill?.sourceQuotationId,
+    prefill?.sourceSalesId,
   ]);
 
   useImperativeHandle(ref, () => ({ gatherPayload }), [gatherPayload]);
@@ -800,9 +811,11 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
               ? "Capture line items, delivery, and pricing for your quotation."
               : isPurchaseReturn
                 ? "Record items being returned to the supplier — stock leaves on save."
-                : isSales
-                  ? "Record items being sold to the customer — stock leaves on save."
-                  : "Record party, delivery, products, and tax for this purchase entry."}
+                : isSalesReturn
+                  ? "Record customer return — saved as Pending; stock and ledger apply on Approve."
+                  : isSales
+                    ? "Record items being sold to the customer — stock leaves on save."
+                    : "Record party, delivery, products, and tax for this purchase entry."}
           </p>
         </div>
       )}

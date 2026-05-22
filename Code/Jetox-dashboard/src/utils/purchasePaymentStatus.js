@@ -66,6 +66,52 @@ export function purchaseReturnRowHasRefund(row) {
   return Boolean(row?._raw?.refundRequestId);
 }
 
+/** Party on a sales return list row. */
+export function salesReturnRowPartyName(row) {
+  const raw = row?._raw || {};
+  return String(raw.partyName || row?.["Client Name"] || "").trim();
+}
+
+export function salesReturnRowHasParty(row) {
+  const name = salesReturnRowPartyName(row);
+  return Boolean(name && name !== "—");
+}
+
+export function resolveSalesReturnRefundStatusDisplay(doc) {
+  const explicit = String(doc?.refundStatus || "").trim();
+  if (["Pending", "Processing", "Partial", "Refunded"].includes(explicit)) {
+    return explicit;
+  }
+  const total = Number(doc?.totalAmount) || 0;
+  const refunded = Number(doc?.refundedAmount) || 0;
+  if (total > 0 && refunded >= total) return "Refunded";
+  if (refunded > 0) return "Partial";
+  if (doc?.refundRequestId) return "Processing";
+  return "Pending";
+}
+
+export function salesReturnRowHasRefund(row) {
+  return Boolean(row?._raw?.refundRequestId);
+}
+
+/** Cash refund only when the linked sale had money received from the customer. */
+export function salesReturnRowNeedsRefund(row) {
+  const raw = row?._raw || {};
+  if (
+    String(
+      raw.approvalStatus ||
+        row?.["Refund Order Status"] ||
+        row?.Status ||
+        ""
+    ) !== "Approved"
+  ) {
+    return false;
+  }
+  const saleStatus = String(raw.salePaymentStatus || "").trim();
+  const salePaid = Number(raw.salePaidAmount) || 0;
+  return saleStatus === "Paid" || salePaid > 0;
+}
+
 export function purchaseRowIsFullyPaid(row) {
 
   const raw = row?._raw || {};

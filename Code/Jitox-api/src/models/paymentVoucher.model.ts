@@ -32,6 +32,11 @@ const paymentVoucherSchema = new Schema<IPaymentVoucher>(
       type: Schema.Types.ObjectId,
       ref: "PurchaseVoucher",
     },
+    /** Back-link when this payment refunds an approved sales return (money out to customer). */
+    sourceSalesReturnId: {
+      type: Schema.Types.ObjectId,
+      ref: "SalesReturnVoucher",
+    },
   },
   {
     timestamps: true,

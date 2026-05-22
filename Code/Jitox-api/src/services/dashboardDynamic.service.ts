@@ -3,6 +3,8 @@ import path from "path";
 import mongoose from "mongoose";
 import {
   Quotation,
+  SalesReturnVoucher,
+  SalesVoucher,
   PaymentVoucher,
   ReceiptVoucher,
   Product,
@@ -17,6 +19,11 @@ import {
 } from "../data/employeeTracking.seed";
 import { productLineAmount, resolveProductUnit } from "../utils/productUnit";
 import { applyPaymentToAccountBalance } from "../utils/applyPaymentToAccountBalance";
+import {
+  buildOrderFulfillment,
+  syncQuotationAfterSalesReturns,
+  syncQuotationNetPayableAfterReturns,
+} from "../utils/salesReturnOrderSync";
 
 function parseRupeeAmount(s: string): number {
   const n = Number(
@@ -79,6 +86,9 @@ type QuotationLean = {
   }>;
   totalAmount?: number;
   paidAmount?: number;
+  receivedAmount?: number;
+  returnedAmount?: number;
+  customerRefundedAmount?: number;
   paymentStatus?: string;
   receiptRequestId?: mongoose.Types.ObjectId;
   paymentMode?: string;
@@ -152,53 +162,115 @@ function sumQuotationLineDiscounts(
   );
 }
 
+/** Order-level GST % from stored base + tax (same as sales / purchase voucher). */
+function quotationOrderGstRatePct(q: QuotationLean): number | null {
+  const basePrice = Number(q.basePrice) || 0;
+  const gstAmount = Number(q.gstAmount) || 0;
+  if (basePrice <= 0 || gstAmount <= 0) return null;
+  return (gstAmount / basePrice) * 100;
+}
+
+function quotationLineTaxable(
+  it: NonNullable<QuotationLean["items"]>[number]
+): number {
+  const qty = Number(it.quantity) || 0;
+  const rate = Number(it.rateParUnit) || 0;
+  const base = qty * rate;
+  const discount = quotationLineDiscount(it);
+  return Math.max(0, base - discount);
+}
+
+function quotationLineGst(
+  it: NonNullable<QuotationLean["items"]>[number],
+  gstPct: number | null
+): number {
+  if (gstPct == null || !Number.isFinite(gstPct) || gstPct <= 0) return 0;
+  return Math.round((quotationLineTaxable(it) * gstPct) / 100);
+}
+
 function paymentLabels(q: QuotationLean): {
   paymentStatus: string;
   paid: string;
+  paidReceived: string;
   due: string;
+  dueKind: "refund" | "collect";
+  netTotal: string;
+  grossTotal: string;
+  returnedTotal: string;
+  refundDueTotal: string;
+  refundPaidTotal: string;
+  creditBalance: number;
 } {
-  const total = Number(q.totalAmount) || 0;
-  const paidNum = Number(q.paidAmount) || 0;
-  const dueNum = Math.max(0, total - paidNum);
-  const stored = String(q.paymentStatus || "").trim();
+  const gross = Number(q.totalAmount) || 0;
+  const returned = Number(q.returnedAmount) || 0;
+  const effective = Math.max(0, gross - returned);
+  const receivedNum = Math.max(
+    Number(q.receivedAmount) || 0,
+    Number(q.paidAmount) || 0
+  );
+  const customerRefunded = Number(q.customerRefundedAmount) || 0;
+  const refundDue = Math.max(0, receivedNum - effective - customerRefunded);
+  const collectionDue = Math.max(0, effective - receivedNum);
+  const netRetained = Math.min(receivedNum, effective);
+  const creditNum = refundDue;
   const paymentStatus =
-    stored === "Paid" ||
-    stored === "Partial" ||
-    stored === "Unpaid" ||
-    stored === "Pending"
-      ? stored
-      : paidNum >= total && total > 0
-        ? "Paid"
-        : paidNum > 0
-          ? "Partial"
-          : total > 0
-            ? "Unpaid"
-            : "Pending";
+    refundDue > 0
+      ? "Refund Pending"
+      : (() => {
+          const stored = String(q.paymentStatus || "").trim();
+          if (stored && stored !== "Refund Pending") return stored;
+          return effective > 0 && receivedNum >= effective
+            ? "Paid"
+            : receivedNum > 0
+              ? "Partial"
+              : effective > 0
+                ? "Unpaid"
+                : "Pending";
+        })();
+
   return {
     paymentStatus,
-    paid: formatInr(paidNum),
-    due: formatInr(paymentStatus === "Paid" ? 0 : dueNum),
+    paid: formatInr(netRetained),
+    paidReceived: formatInr(receivedNum),
+    due: formatInr(refundDue > 0 ? refundDue : collectionDue),
+    dueKind: refundDue > 0 ? "refund" : "collect",
+    netTotal: formatInr(effective),
+    grossTotal: formatInr(gross),
+    returnedTotal: returned > 0 ? formatInr(returned) : "—",
+    refundDueTotal: refundDue > 0 ? formatInr(refundDue) : "—",
+    refundPaidTotal:
+      customerRefunded > 0 ? formatInr(customerRefunded) : "—",
+    creditBalance: creditNum,
   };
 }
 
-export function formatOrderRowFromQuotation(q: QuotationLean) {
+export function formatOrderRowFromQuotation(
+  q: QuotationLean,
+  opts?: { hasSale?: boolean }
+) {
   const dateStr = q.voucherDate
     ? new Date(q.voucherDate).toISOString().slice(0, 10)
     : "";
-  const { paymentStatus, paid, due } = paymentLabels(q);
+  const labels = paymentLabels(q);
   const totalStr = formatInr(Number(q.totalAmount) || 0);
   return {
     _id: String(q._id),
     _receiptRecorded: q.receiptRequestId ? "yes" : "",
+    _hasSale: Boolean(opts?.hasSale),
+    _dueKind: labels.dueKind,
     "Order ID": q.voucherNo || String(q._id),
     "Client Name": q.partyName || "—",
     Date: dateStr,
     Products: quotationProductsSummary(q),
     "Manager Name": q.orderby?.trim() || "—",
-    Paid: paid,
-    Due: due,
-    "Payment Status": paymentStatus,
+    Paid: labels.paid,
+    Due: labels.due,
+    "Return Amt": labels.returnedTotal,
+    "Refund Due": labels.refundDueTotal,
+    Refunded: labels.refundPaidTotal,
+    "Payment Status": labels.paymentStatus,
     "Total Amount": totalStr,
+    "Net Amount": labels.netTotal,
     "Order Status": q.dashboardOrderStatus || "Pending",
   };
 }
@@ -235,9 +307,13 @@ export async function fetchOrdersSummary() {
     const p = Number(r.paidAmount) || 0;
     return s + Math.min(p, t);
   }, 0);
+  const orderReturns = await Quotation.countDocuments({
+    addedToOrder: true,
+    dashboardOrderStatus: "Return",
+  });
   return {
     totalOrders: rows.length,
-    orderReturns: 0,
+    orderReturns,
     totalOrderAmount: formatInr(totalAmt),
     revenue: formatInr(paidAmt),
     orderDispatched: tabCounts.dispatched,
@@ -255,10 +331,36 @@ export async function fetchOrdersFiltered(reqQuery: Record<string, unknown>) {
   const dateFrom = String(reqQuery.dateFrom || "");
   const dateTo = String(reqQuery.dateTo || "");
 
-  const docs = (await Quotation.find({ addedToOrder: true })
+  let docs = (await Quotation.find({ addedToOrder: true })
     .populate("items.product", "productName")
     .sort({ voucherDate: -1, createdAt: -1 })
     .lean()) as unknown as QuotationLean[];
+
+  const qIds = docs.map((d) => d._id).filter(Boolean);
+  if (qIds.length) {
+    const returnOrderIds = await SalesReturnVoucher.distinct(
+      "sourceQuotationId",
+      {
+        sourceQuotationId: { $in: qIds },
+        approvalStatus: { $ne: "Rejected" },
+      }
+    );
+    if (returnOrderIds.length) {
+      await Promise.all(
+        returnOrderIds.map(async (id) => {
+          await syncQuotationAfterSalesReturns(id);
+          await syncQuotationNetPayableAfterReturns(id);
+        })
+      );
+      const refreshed = (await Quotation.find({
+        _id: { $in: returnOrderIds },
+      })
+        .populate("items.product", "productName")
+        .lean()) as unknown as QuotationLean[];
+      const byId = new Map(refreshed.map((d) => [String(d._id), d]));
+      docs = docs.map((d) => byId.get(String(d._id)) ?? d);
+    }
+  }
 
   const mapTab: Record<string, string> = {
     pending: "pending",
@@ -276,7 +378,25 @@ export async function fetchOrdersFiltered(reqQuery: Record<string, unknown>) {
     tabFiltered = docs.filter((d) => d.dashboardTab === tabKey);
   }
 
-  let rows = tabFiltered.map(formatOrderRowFromQuotation);
+  const saleQuotationIds = new Set<string>();
+  if (qIds.length) {
+    const linked = await SalesVoucher.find({
+      sourceQuotationId: { $in: qIds },
+    })
+      .select("sourceQuotationId")
+      .lean();
+    for (const s of linked) {
+      if (s.sourceQuotationId) {
+        saleQuotationIds.add(String(s.sourceQuotationId));
+      }
+    }
+  }
+
+  let rows = tabFiltered.map((d) =>
+    formatOrderRowFromQuotation(d, {
+      hasSale: saleQuotationIds.has(String(d._id)),
+    })
+  );
 
   rows = rows.filter((r) => {
     if (client && !String(r["Client Name"]).toLowerCase().includes(client))
@@ -309,27 +429,45 @@ export async function fetchOrdersFiltered(reqQuery: Record<string, unknown>) {
 }
 
 export async function fetchQuotationOrderPayload(id: string) {
+  if (mongoose.isValidObjectId(id)) {
+    await syncQuotationNetPayableAfterReturns(id);
+  }
   const q = (await Quotation.findById(id)
     .populate("items.product", "productName")
     .lean()) as unknown as QuotationLean | null;
   if (!q) return null;
-  const row = formatOrderRowFromQuotation(q);
+  const hasSale = Boolean(
+    await SalesVoucher.exists({ sourceQuotationId: q._id })
+  );
+  const row = formatOrderRowFromQuotation(q, { hasSale });
   const items = q.items || [];
+  let gstPct = quotationOrderGstRatePct(q);
+  if (gstPct == null && items.length > 0) {
+    const taxableSum = items.reduce(
+      (s, it) => s + quotationLineTaxable(it),
+      0
+    );
+    const gstAmount = Number(q.gstAmount) || 0;
+    if (taxableSum > 0 && gstAmount > 0) {
+      gstPct = (gstAmount / taxableSum) * 100;
+    }
+  }
   const productLines = items.map((i) => {
     const name = productLineName(i);
     const qty = i.quantity ?? 0;
     const unit = i.unit || "";
     const rate = i.rateParUnit ?? 0;
     const sub = i.subtotal ?? qty * rate;
+    const gstLine = quotationLineGst(i, gstPct);
     return {
       name,
       qty: `${qty} ${unit}`.trim(),
       rate: formatInr(rate),
+      gst: gstLine > 0 ? formatInr(gstLine) : "—",
       subtotal: formatInr(sub),
     };
   });
   const total = Number(q.totalAmount) || 0;
-  const paidNum = Number(q.paidAmount) || 0;
   const labels = paymentLabels(q);
   const basePrice = Number(q.basePrice) || 0;
   const gstAmount = Number(q.gstAmount) || 0;
@@ -342,17 +480,19 @@ export async function fetchQuotationOrderPayload(id: string) {
     String(q.termsOfPayment || "").trim() ||
     String(q.paymentMode || "").trim() ||
     "—";
-  const dueNum = Math.max(0, total - paidNum);
   const created = q.createdAt
     ? new Date(q.createdAt).toLocaleString("en-IN", {
         dateStyle: "medium",
         timeStyle: "short",
       })
     : "";
+  const fulfillment = await buildOrderFulfillment(q._id);
+
   const detail = {
     createdAt: created,
     paymentStatus: labels.paymentStatus,
     orderStatus: q.dashboardOrderStatus || "Pending",
+    fulfillment,
     manager: {
       fullName: q.orderby || row["Manager Name"],
       region: "",
@@ -389,12 +529,21 @@ export async function fetchQuotationOrderPayload(id: string) {
       paymentMode: q.paymentMode || "—",
       subTotal: formatInr(basePrice),
       totalAmount: formatInr(total),
+      netReceivable: labels.netTotal,
+      returnedAmount: labels.returnedTotal,
+      refundDue: labels.refundDueTotal,
+      refunded: labels.refundPaidTotal,
+      creditBalance: labels.creditBalance,
+      creditBalanceFormatted:
+        labels.creditBalance > 0 ? formatInr(labels.creditBalance) : "",
       tax: formatInr(gstAmount),
       taxLabel: gstPctLabel != null ? `Tax (${gstPctLabel}%)` : "Tax",
       discount: formatInr(discountNum),
-      paid: formatInr(paidNum),
-      due: formatInr(dueNum),
-      finalPayable: formatInr(total),
+      paid: labels.paid,
+      paidReceived: labels.paidReceived,
+      due: labels.due,
+      dueKind: labels.dueKind,
+      finalPayable: labels.netTotal,
       mode: q.paymentMode || "—",
       transactionId: "—",
       grandTotal: formatInr(total),
@@ -442,9 +591,9 @@ export async function fetchQuotationOrderPayload(id: string) {
       taxPct: q.gstAmount && q.basePrice ? "" : "",
       taxAmount: formatInr(Number(q.gstAmount) || 0),
       discount: "₹0",
-      paidAmount: formatInr(paidNum),
-      outstanding: formatInr(Math.max(0, total - paidNum)),
-      finalPayable: formatInr(total),
+      paidAmount: labels.paid,
+      outstanding: labels.due,
+      finalPayable: labels.netTotal,
       terms: "Please pay within the agreed credit period.",
     },
   };
@@ -1445,5 +1594,5 @@ export async function recentOrdersFormatted(limit: number) {
     .sort({ voucherDate: -1, createdAt: -1 })
     .limit(limit)
     .lean()) as unknown as QuotationLean[];
-  return docs.map(formatOrderRowFromQuotation);
+  return docs.map((q) => formatOrderRowFromQuotation(q));
 }

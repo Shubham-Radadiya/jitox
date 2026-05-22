@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   purchaseVouchersApi,
   purchaseReturnVouchersApi,
+  salesReturnVouchersApi,
   salesVouchersApi,
   paymentVouchersApi,
   receiptVouchersApi,
@@ -15,6 +16,7 @@ import {
   mapManufacturingRow,
   mapPurchaseAggregateRow,
   mapPurchaseReturnAggregateRow,
+  mapSalesReturnAggregateRow,
   mapSalesAggregateRow,
   mapPaymentVoucherRow,
   mapAccountingReceiptRow,
@@ -25,11 +27,7 @@ import {
   mapQuotationRow,
 } from "../utils/voucherRowMappers";
 
-const STATIC_EMPTY_SLUGS = new Set(["sales-return"]);
-
 async function loadVoucherRows(slug) {
-  if (STATIC_EMPTY_SLUGS.has(slug)) return [];
-
   switch (slug) {
     case "purchase": {
       const { data } = await purchaseVouchersApi.getAll();
@@ -40,6 +38,11 @@ async function loadVoucherRows(slug) {
       const { data } = await purchaseReturnVouchersApi.getAll();
       const list = Array.isArray(data?.data) ? data.data : [];
       return list.map(mapPurchaseReturnAggregateRow);
+    }
+    case "sales-return": {
+      const { data } = await salesReturnVouchersApi.getAll();
+      const list = Array.isArray(data?.data) ? data.data : [];
+      return list.map(mapSalesReturnAggregateRow);
     }
     case "sales": {
       const { data } = await salesVouchersApi.getAll();

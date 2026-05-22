@@ -6,8 +6,12 @@ import { SearchBar, CommonDropdown, DateRangePicker } from "../../components/ui/
 import { TableContent } from "../../hooks/TableCustomHook";
 import { LuArrowUpDown } from "react-icons/lu";
 import { IoEyeOutline } from "react-icons/io5";
-import { CalendarDays, Receipt, ScrollText } from "lucide-react";
-import { dashboardUiApi, quotationsApi } from "../../services/api";
+import { CalendarDays, PackageMinus, Receipt, ScrollText } from "lucide-react";
+import {
+  dashboardUiApi,
+  quotationsApi,
+  salesReturnVouchersApi,
+} from "../../services/api";
 import { parseRupeeCell, salesDocToOrderDetailShape } from "../../utils/voucherRowMappers";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../utils/apiError";
@@ -70,6 +74,7 @@ const OrderListIndex = () => {
     open: false,
     sourceRow: null,
   });
+  const [returnBusyId, setReturnBusyId] = useState(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptDraft, setReceiptDraft] = useState(null);
 
@@ -82,6 +87,10 @@ const OrderListIndex = () => {
       "Manager Name",
       "Paid",
       "Due",
+      "Return Amt",
+      "Refund Due",
+      "Refunded",
+      "Net Amount",
       "Payment Status",
       "Total Amount",
       "Order Status",
@@ -145,6 +154,20 @@ const OrderListIndex = () => {
     },
   });
 
+  /** All orders (no client filter) — unique client names for the filter dropdown. */
+  const { data: ordersForClientFilter = [] } = useQuery({
+    queryKey: ["dashboard", "orders", "client-filter-options"],
+    queryFn: async () => {
+      const { data } = await dashboardUiApi.getOrders({
+        tab: "all",
+        orderStatus: "all",
+        paymentStatus: "all",
+      });
+      return data.orders || [];
+    },
+    staleTime: 60_000,
+  });
+
   useEffect(() => {
     if (ordersError && ordersErrObj) {
       toast.error(getApiErrorMessage(ordersErrObj, "Could not load orders"));
@@ -160,13 +183,13 @@ const OrderListIndex = () => {
     if (!row) return;
     const id = row._id || row["Order ID"];
     try {
-      const res = await quotationsApi.getById(id);
-      const doc = res?.data;
-      setDetail(doc ? salesDocToOrderDetailShape(doc) : null);
+      const { data } = await dashboardUiApi.getOrder(id);
+      setDetail(data?.detail || null);
     } catch {
       try {
-        const { data } = await dashboardUiApi.getOrder(id);
-        setDetail(data.detail || null);
+        const res = await quotationsApi.getById(id);
+        const doc = res?.data;
+        setDetail(doc ? salesDocToOrderDetailShape(doc) : null);
       } catch {
         setDetail(null);
       }
@@ -257,6 +280,46 @@ const OrderListIndex = () => {
     setSalesModal({ open: true, sourceRow: { _id: String(id) } });
   };
 
+  const openSalesReturnFromOrder = async (row) => {
+    if (!row?._hasSale) {
+      toast.error("Create a sales voucher for this order first.");
+      return;
+    }
+    const id = row?._id || row?.["Order ID"];
+    if (!id) {
+      toast.error("This order has no id — cannot create a sales return.");
+      return;
+    }
+    const key = String(id);
+    setReturnBusyId(key);
+    try {
+      const res = await salesReturnVouchersApi.createFromQuotation(key);
+      const no =
+        res?.data?.voucherNo ||
+        res?.data?.data?.voucherNo ||
+        "Sales return";
+      toast.success(
+        `${no} added (Pending). Open Sales Return voucher → Approve to review and confirm.`
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ["voucher-list", "sales-return"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] });
+      if (selectedRow && String(selectedRow._id || selectedRow["Order ID"]) === key) {
+        await refreshOrderDetail(selectedRow);
+      }
+    } catch (e) {
+      toast.error(
+        getApiErrorMessage(
+          e,
+          "Could not add sales return. Create a sales voucher for this order first."
+        )
+      );
+    } finally {
+      setReturnBusyId(null);
+    }
+  };
+
   const renderRowCell = (key, value, row) => {
     if (key === "Date" && value && /^\d{4}-\d{2}-\d{2}/.test(String(value))) {
       const formatted = dayjs(value).format("DD MMM YYYY");
@@ -304,6 +367,71 @@ const OrderListIndex = () => {
         </td>
       );
     }
+    if (key === "Due") {
+      const isRefund = row?._dueKind === "refund";
+      const dueTitle = isRefund
+        ? "Refund due to customer"
+        : "Outstanding to collect";
+      return (
+        <td key={key} className={orderTableTdClasses(key)}>
+          <TruncatedText
+            align="right"
+            className={
+              isRefund && value && value !== "—" && value !== "₹0"
+                ? "tabular-nums font-semibold text-amber-800 dark:text-amber-200"
+                : "tabular-nums text-gray-800 dark:text-slate-200"
+            }
+            title={dueTitle}
+          >
+            {value}
+          </TruncatedText>
+        </td>
+      );
+    }
+    if (key === "Return Amt") {
+      return (
+        <td key={key} className={orderTableTdClasses(key)}>
+          <TruncatedText
+            align="right"
+            className="tabular-nums text-rose-800 dark:text-rose-200"
+            title="Approved sales return (credit note) value"
+          >
+            {value ?? "—"}
+          </TruncatedText>
+        </td>
+      );
+    }
+    if (key === "Refund Due") {
+      const highlight = value && value !== "—";
+      return (
+        <td key={key} className={orderTableTdClasses(key)}>
+          <TruncatedText
+            align="right"
+            className={
+              highlight
+                ? "tabular-nums font-semibold text-amber-800 dark:text-amber-200"
+                : "tabular-nums text-gray-800 dark:text-slate-200"
+            }
+            title="Cash still to pay back to customer"
+          >
+            {value ?? "—"}
+          </TruncatedText>
+        </td>
+      );
+    }
+    if (key === "Refunded") {
+      return (
+        <td key={key} className={orderTableTdClasses(key)}>
+          <TruncatedText
+            align="right"
+            className="tabular-nums text-emerald-800 dark:text-emerald-200"
+            title="Refund payment already posted"
+          >
+            {value ?? "—"}
+          </TruncatedText>
+        </td>
+      );
+    }
     const align = getCellTextAlign(key);
     return (
       <td key={key} className={orderTableTdClasses(key)}>
@@ -336,7 +464,9 @@ const OrderListIndex = () => {
           type="button"
           title="Create receipt voucher — record payment received"
           className={TABLE_ACTION_ICON_BTN_DENSE}
-          disabled={String(row["Payment Status"]).toLowerCase() === "paid"}
+          disabled={["paid", "refund pending"].includes(
+            String(row["Payment Status"] || "").toLowerCase()
+          )}
           onClick={() => openReceiptFromOrder(row)}
         >
           <Receipt size={14} strokeWidth={2} />
@@ -348,6 +478,19 @@ const OrderListIndex = () => {
           onClick={() => openSalesVoucherFromOrder(row)}
         >
           <ScrollText size={14} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          title={
+            row?._hasSale
+              ? "Add sales return row (Pending) — approve from Sales Return list"
+              : "Create a sales voucher first"
+          }
+          className={TABLE_ACTION_ICON_BTN_DENSE}
+          disabled={returnBusyId === String(row?._id || row?.["Order ID"] || "")}
+          onClick={() => openSalesReturnFromOrder(row)}
+        >
+          <PackageMinus size={14} strokeWidth={2} />
         </button>
         <button
           type="button"
@@ -376,13 +519,19 @@ const OrderListIndex = () => {
     { key: "cancelled", label: "Cancelled", count: tabCounts.cancelled },
   ];
 
-  const clientOptions = [
-    { value: "all", label: "Client Name" },
-    { value: "Mr. Ramesh Mehta", label: "Mr. Ramesh Mehta" },
-    { value: "Alpha Traders", label: "Alpha Traders" },
-    { value: "Bright Supplies", label: "Bright Supplies" },
-    { value: "Green Agro", label: "Green Agro" },
-  ];
+  const clientOptions = useMemo(() => {
+    const names = new Set();
+    for (const row of ordersForClientFilter) {
+      const n = String(row["Client Name"] ?? "").trim();
+      if (n && n !== "—") names.add(n);
+    }
+    return [
+      { value: "all", label: "All clients" },
+      ...[...names]
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+        .map((n) => ({ value: n, label: n })),
+    ];
+  }, [ordersForClientFilter]);
 
   const orderStatusOptions = [
     { value: "all", label: "Order Status" },
@@ -392,16 +541,25 @@ const OrderListIndex = () => {
   const paymentStatusOptions = [
     { value: "all", label: "Payment Status" },
     { value: "Paid", label: "Paid" },
+    { value: "Refund Pending", label: "Refund Pending" },
     { value: "Partial", label: "Partial" },
     { value: "Unpaid", label: "Unpaid" },
     { value: "Pending", label: "Pending" },
   ];
 
-  const tableHeader = (label) => (
-    <th key={label} className={orderTableThClasses(label)}>
-      {label}
-    </th>
-  );
+  const tableHeader = (label) => {
+    const title =
+      label === "Due"
+        ? "Amount to collect, or refund owed after returns"
+        : label === "Paid"
+          ? "Net collected after returns"
+          : undefined;
+    return (
+      <th key={label} className={orderTableThClasses(label)} title={title}>
+        {label}
+      </th>
+    );
+  };
 
   const invoiceData = detail?.invoice;
 

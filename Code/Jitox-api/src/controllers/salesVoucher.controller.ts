@@ -19,6 +19,7 @@ import {
 } from "../utils/applyPaymentToAccountBalance";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
 import { buildPartyAddressesMap } from "../utils/partyVoucherAddress.util";
+import { dashboardTabForOrderStatus } from "../constants/orderStatus";
 
 /** Fields accepted from PUT body when updating a sales voucher. */
 const SALES_VOUCHER_PATCH_KEYS = [
@@ -85,10 +86,60 @@ async function resolveUniqueSalesVoucherNo(
   return `JITOX-DEMO-SL-${Date.now()}`;
 }
 
+function stockCutEnabled(stockDetails: unknown): boolean {
+  if (!stockDetails || typeof stockDetails !== "object") return false;
+  const sq = (stockDetails as { stockQuantity?: unknown }).stockQuantity;
+  return sq !== false && sq !== 0 && String(sq).toLowerCase() !== "false";
+}
+
 /** Did the user opt into stock update for this voucher? */
 function shouldUpdateStock(stockDetails: unknown): boolean {
-  if (!stockDetails || typeof stockDetails !== "object") return false;
-  return Boolean((stockDetails as { stockQuantity?: unknown }).stockQuantity);
+  return stockCutEnabled(stockDetails);
+}
+
+/** Normalize stock flags on create (default stock cut ON when body omits stockDetails). */
+function resolveStockDetails(stockDetails: unknown): Record<string, unknown> {
+  const hasBody =
+    stockDetails != null && typeof stockDetails === "object";
+  const base = hasBody
+    ? { ...(stockDetails as Record<string, unknown>) }
+    : {};
+  const cutOn = hasBody ? stockCutEnabled(base) : true;
+  return {
+    generetePurchaseBill: false,
+    updateStockAfterOrderPlaced: false,
+    ...base,
+    stockQuantity: cutOn,
+  };
+}
+
+function toMongoObjectId(id: unknown): Types.ObjectId | null {
+  if (id == null) return null;
+  const s = String(id);
+  if (!Types.ObjectId.isValid(s)) return null;
+  return new Types.ObjectId(s);
+}
+
+/** Stock left the warehouse — sale and linked order list row show Dispatched. */
+async function markDispatchedAfterStockCut(
+  voucherId: Types.ObjectId,
+  quotationId?: unknown
+): Promise<InstanceType<typeof SalesVoucher> | null> {
+  const updated = await SalesVoucher.findByIdAndUpdate(
+    voucherId,
+    { orderStatus: "Dispatched" },
+    { new: true }
+  );
+
+  const qid = toMongoObjectId(quotationId);
+  if (qid) {
+    await Quotation.findByIdAndUpdate(qid, {
+      dashboardOrderStatus: "Dispatched",
+      dashboardTab: dashboardTabForOrderStatus("Dispatched"),
+    });
+  }
+
+  return updated;
 }
 
 export const createSalesVoucher = async (
@@ -175,6 +226,9 @@ export const createSalesVoucher = async (
       }
     }
 
+    const stockDetailsResolved = resolveStockDetails(stockDetails);
+    const stockCutOn = shouldUpdateStock(stockDetailsResolved);
+
     const newVoucher = new SalesVoucher({
       partyName,
       invoiceNo,
@@ -197,19 +251,27 @@ export const createSalesVoucher = async (
       paymentMode,
       basePrice,
       paymentStatus,
-      orderStatus,
-      stockDetails,
+      orderStatus: stockCutOn ? "Dispatched" : orderStatus,
+      stockDetails: stockDetailsResolved,
       ...(createdByUserId ? { createdByUserId } : {}),
       ...(territoryId ? { territoryId } : {}),
       ...(managerUserId ? { managerUserId } : {}),
       ...(linkedQuotationId ? { sourceQuotationId: linkedQuotationId } : {}),
     });
 
-    const savedVoucher = await newVoucher.save();
+    let savedVoucher = await newVoucher.save();
 
-    /** Stock toggle ON → sales leave stock, decrement product qty by line qty. */
-    if (shouldUpdateStock(stockDetails)) {
+    const quotationIdForDispatch =
+      linkedQuotationId ?? savedVoucher.sourceQuotationId;
+
+    /** Stock toggle ON → sales leave stock, decrement product qty, mark Dispatched. */
+    if (stockCutOn) {
       await applyProductStockDelta(items as ISalesItem[], -1);
+      const refreshed = await markDispatchedAfterStockCut(
+        savedVoucher._id as Types.ObjectId,
+        quotationIdForDispatch
+      );
+      if (refreshed) savedVoucher = refreshed;
     }
 
     await logDayBookEntry({

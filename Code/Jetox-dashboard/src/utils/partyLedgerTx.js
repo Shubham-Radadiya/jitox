@@ -350,8 +350,10 @@ export function buildPartyTransactionEntries(account, accountId, ledgerSource) {
     });
 
   const salesReturnRows = (ledgerSource.salesReturns || [])
-    .filter((sv) =>
-      matchesPartyName(accountName, personName, sv.partyName, matchKeys)
+    .filter(
+      (sv) =>
+        String(sv.approvalStatus || "") === "Approved" &&
+        matchesPartyName(accountName, personName, sv.partyName, matchKeys)
     )
     .map((sv) => {
       const rowDate = sv.voucherDate || sv.createdAt;

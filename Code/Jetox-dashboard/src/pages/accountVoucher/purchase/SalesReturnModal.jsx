@@ -4,11 +4,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommonModal } from "../../../components/ui/CommanUI";
 import PurchaseVoucherForm from "./PurchaseVoucherForm";
 import { mapPurchaseApiDocToPrefill } from "./voucherFormConstants";
-import { quotationsApi, salesVouchersApi } from "../../../services/api";
+import { salesReturnVouchersApi } from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { invalidateProductAndStockQueries } from "../../../utils/invalidateStockQueries";
-import { salesPayloadToCreateBody } from "./salesPayloadToApi";
-import { useSalesFormMeta } from "../../../hooks/useSalesFormMeta";
+import { salesReturnPayloadToCreateBody } from "./salesReturnPayloadToApi";
+import { useSalesReturnFormMeta } from "../../../hooks/useSalesReturnFormMeta";
 
 function savedVoucherNoFromResponse(res, fallbackNo) {
   const d = res?.data;
@@ -23,18 +23,11 @@ function savedVoucherNoFromResponse(res, fallbackNo) {
   return String(fallbackNo ?? "");
 }
 
-/**
- * Wide sales-invoice modal — reuses PurchaseVoucherForm with `formType="sales"`
- * so the UI stays identical to purchase invoicing. Save calls `salesVouchersApi`,
- * and stock decrement is handled server-side based on the stock toggle.
- */
-export default function SalesVoucherModal({
+export default function SalesReturnModal({
   open,
   onClose,
   sourceRow = null,
   mode = "create",
-  /** `"sales"` (default) or `"quotation"` when opening from Order List. */
-  sourceKind = "sales",
 }) {
   const formRef = useRef(null);
   const queryClient = useQueryClient();
@@ -42,16 +35,15 @@ export default function SalesVoucherModal({
   const [mountId, setMountId] = useState(0);
   const [continuingAsNew, setContinuingAsNew] = useState(false);
 
+  const isApprove = mode === "approve";
   const voucherId =
     sourceRow && typeof sourceRow === "object" ? sourceRow._id : null;
-  const fromOrder =
-    sourceKind === "quotation" && mode === "fromOrder";
-  const needsDetail =
-    Boolean(
-      open &&
-        voucherId &&
-        (fromOrder || mode === "edit" || mode === "revoucher")
-    ) && !continuingAsNew;
+  const needsDetail = Boolean(
+    open &&
+      voucherId &&
+      (isApprove || mode === "edit" || mode === "revoucher") &&
+      !continuingAsNew
+  );
 
   const {
     data: voucherDoc,
@@ -59,24 +51,17 @@ export default function SalesVoucherModal({
     isError: detailError,
     error: detailErrObj,
   } = useQuery({
-    queryKey: [
-      fromOrder ? "quotation-voucher-detail" : "sales-voucher-detail",
-      voucherId,
-    ],
+    queryKey: ["sales-return-voucher-detail", voucherId],
     queryFn: async () => {
-      if (fromOrder) {
-        const res = await quotationsApi.getById(voucherId);
-        return res?.data;
-      }
-      const res = await salesVouchersApi.getById(voucherId);
+      const res = await salesReturnVouchersApi.getById(voucherId);
       return res?.data;
     },
     enabled: needsDetail,
     staleTime: 0,
   });
 
-  const { data: salesMeta } = useSalesFormMeta(open);
-  const nextSalesVoucherNo = salesMeta?.nextSalesVoucherNo || "";
+  const { data: returnMeta } = useSalesReturnFormMeta(open && !isApprove);
+  const nextReturnVoucherNo = returnMeta?.nextSalesReturnVoucherNo || "";
 
   useEffect(() => {
     if (!open) {
@@ -95,89 +80,99 @@ export default function SalesVoucherModal({
   useEffect(() => {
     if (!detailError || !open) return;
     toast.error(
-      getApiErrorMessage(
-        detailErrObj,
-        fromOrder
-          ? "Could not load order for sales voucher"
-          : "Could not load sales voucher"
-      )
+      getApiErrorMessage(detailErrObj, "Could not load sales return")
     );
-  }, [detailError, detailErrObj, open, fromOrder]);
+  }, [detailError, detailErrObj, open]);
 
   const prefill = useMemo(() => {
     if (!open) return null;
-    if (mode === "create" || continuingAsNew) {
-      return nextSalesVoucherNo
-        ? { voucherNo: nextSalesVoucherNo, stockToggle: true }
+    if ((mode === "create" || continuingAsNew) && !isApprove) {
+      return nextReturnVoucherNo
+        ? { voucherNo: nextReturnVoucherNo, stockToggle: true }
         : { stockToggle: true };
     }
     if (!voucherDoc) return null;
     const base = mapPurchaseApiDocToPrefill(voucherDoc);
     if (!base) return null;
-    if ((mode === "revoucher" || mode === "fromOrder") && nextSalesVoucherNo) {
-      return {
-        ...base,
-        voucherNo: nextSalesVoucherNo,
-        stockToggle: true,
-        ...(fromOrder && voucherId ? { sourceQuotationId: voucherId } : {}),
-      };
+    if (mode === "revoucher" && nextReturnVoucherNo) {
+      return { ...base, voucherNo: nextReturnVoucherNo };
     }
-    if (mode === "fromOrder") {
-      return {
-        ...base,
-        stockToggle: true,
-        ...(voucherId ? { sourceQuotationId: voucherId } : {}),
-      };
-    }
-    return base;
-  }, [open, mode, voucherDoc, continuingAsNew, nextSalesVoucherNo]);
+    return {
+      ...base,
+      sourceSalesId: voucherDoc.sourceSalesId,
+      sourceQuotationId: voucherDoc.sourceQuotationId,
+    };
+  }, [open, mode, voucherDoc, continuingAsNew, nextReturnVoucherNo, isApprove]);
 
   const showForm =
     open &&
     (!needsDetail || (!detailLoading && !detailError && voucherDoc));
 
+  const invalidateAfterSave = async (sourceQuotationId) => {
+    await queryClient.invalidateQueries({
+      queryKey: ["voucher-list", "sales-return"],
+    });
+    await queryClient.invalidateQueries({
+      queryKey: ["sales-return-form-meta"],
+    });
+    await queryClient.invalidateQueries({ queryKey: ["account-ledger"] });
+    await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+    if (sourceQuotationId) {
+      await queryClient.invalidateQueries({
+        queryKey: ["dashboard", "orders"],
+      });
+    }
+    invalidateProductAndStockQueries(queryClient);
+  };
+
   const handleInvoiceAction = async (payload, kind) => {
-    const body = salesPayloadToCreateBody(payload);
+    const body = salesReturnPayloadToCreateBody(payload);
+    if (!body.sourceSalesId && voucherDoc?.sourceSalesId) {
+      body.sourceSalesId = String(
+        voucherDoc.sourceSalesId?._id ?? voucherDoc.sourceSalesId
+      ).trim();
+    }
+    if (!body.sourceQuotationId && voucherDoc?.sourceQuotationId) {
+      body.sourceQuotationId = String(
+        voucherDoc.sourceQuotationId?._id ?? voucherDoc.sourceQuotationId
+      ).trim();
+    }
     if (!body.items?.length) {
-      toast.error("Add at least one line with a product, quantity, and rate.");
+      toast.error("Enter return quantity for at least one product line.");
       return;
     }
     if (!body.partyName) {
-      toast.error("Select a party (customer account).");
+      toast.error("Select a party (customer).");
       return;
     }
-    const isEdit =
-      mode === "edit" && Boolean(voucherId) && !continuingAsNew;
-    if (fromOrder && voucherId && !isEdit) {
-      body.sourceQuotationId = String(voucherId);
+    if (!body.sourceSalesId) {
+      toast.error("This return must be linked to a sales voucher.");
+      return;
     }
+
     try {
+      if (isApprove && voucherId) {
+        const res = await salesReturnVouchersApi.finalize(voucherId, body);
+        const savedNo = savedVoucherNoFromResponse(res, body.voucherNo);
+        await invalidateAfterSave(body.sourceQuotationId);
+        toast.success(
+          `${savedNo} approved — stock, ledger, and order updated.`
+        );
+        onClose();
+        return;
+      }
+
+      const isEdit =
+        mode === "edit" && Boolean(voucherId) && !continuingAsNew;
       const res = isEdit
-        ? await salesVouchersApi.update(voucherId, body)
-        : await salesVouchersApi.create(body);
-      if (body.sourceQuotationId) {
-        await queryClient.invalidateQueries({
-          queryKey: ["dashboard", "orders"],
-        });
-        await queryClient.invalidateQueries({
-          queryKey: ["quotation-voucher-detail", body.sourceQuotationId],
-        });
-      }
+        ? await salesReturnVouchersApi.update(voucherId, body)
+        : await salesReturnVouchersApi.create(body);
       const savedNo = savedVoucherNoFromResponse(res, body.voucherNo);
-      await queryClient.invalidateQueries({
-        queryKey: ["voucher-list", "sales"],
-      });
-      await queryClient.invalidateQueries({ queryKey: ["sales-form-meta"] });
-      if (voucherId) {
-        await queryClient.invalidateQueries({
-          queryKey: ["sales-voucher-detail", voucherId],
-        });
-      }
-      invalidateProductAndStockQueries(queryClient);
+      await invalidateAfterSave(body.sourceQuotationId);
       toast.success(
         kind === "new"
-          ? `Saved ${savedNo}. Form cleared for a new sale.`
-          : `Saved ${savedNo}.`
+          ? `Saved ${savedNo} as Pending. Approve from Sales Return list.`
+          : `Saved ${savedNo} as Pending.`
       );
       if (kind === "close") {
         onClose();
@@ -186,7 +181,12 @@ export default function SalesVoucherModal({
         setMountId((k) => k + 1);
       }
     } catch (e) {
-      toast.error(getApiErrorMessage(e, "Could not save sales voucher"));
+      toast.error(
+        getApiErrorMessage(
+          e,
+          isApprove ? "Could not approve sales return" : "Could not save sales return"
+        )
+      );
     }
   };
 
@@ -205,20 +205,23 @@ export default function SalesVoucherModal({
     >
       {needsDetail && detailLoading && (
         <div className="flex min-h-[240px] flex-1 items-center justify-center px-6 text-sm text-slate-500 dark:text-slate-400">
-          {fromOrder ? "Loading order…" : "Loading sales invoice…"}
+          {isApprove
+            ? "Loading return for approval…"
+            : "Loading sales return…"}
         </div>
       )}
       {needsDetail && !detailLoading && detailError && (
         <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-red-600 dark:text-red-400">
-          Could not load this sale. Close and try again.
+          Could not load this return. Close and try again.
         </div>
       )}
       {showForm && (
         <PurchaseVoucherForm
           key={mountId}
           ref={formRef}
-          formType="sales"
+          formType="sales-return"
           prefill={prefill}
+          editMode={isApprove || mode === "edit"}
           showPageHeader={false}
           layout="invoice"
           liveNow={now}

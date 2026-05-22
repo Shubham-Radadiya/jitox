@@ -5,6 +5,7 @@ import Product from "./product.model";
 import PurchaseVoucher from "./purchaseVoucher.model";
 import PurchaseReturnVoucher from "./purchaseReturnVoucher.model";
 import SalesVoucher from "./salesVoucher.model";
+import SalesReturnVoucher from "./salesReturnVoucher.model";
 import PaymentVoucher from "./paymentVoucher.model";
 import ReceiptVoucher from "./receiptVoucher.model";
 import ExpenseVoucher from "./expenseVoucher.model";
@@ -36,6 +37,7 @@ export {
   PurchaseVoucher,
   PurchaseReturnVoucher,
   SalesVoucher,
+  SalesReturnVoucher,
   PaymentVoucher,
   ReceiptVoucher,
   ExpenseVoucher,

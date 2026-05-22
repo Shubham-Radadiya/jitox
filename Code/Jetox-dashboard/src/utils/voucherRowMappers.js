@@ -9,6 +9,7 @@ import { invoiceCompanyFields } from "../constants/invoiceCompanyProfile";
 import {
   resolvePurchasePaymentStatusDisplay,
   resolvePurchaseReturnRefundStatusDisplay,
+  resolveSalesReturnRefundStatusDisplay,
 } from "./purchasePaymentStatus";
 
 export function fmtRupee(n) {
@@ -73,6 +74,31 @@ export function mapPurchaseAggregateRow(v) {
     "Due Amount": fmtRupee(remaining),
     "Debit Amount": total > 0 ? fmtRupee(total) : "—",
     "Payment Status": resolvePurchasePaymentStatusDisplay(v),
+  };
+}
+
+export function mapSalesReturnAggregateRow(v) {
+  const id = v._id;
+  const date = v.voucherDate
+    ? dayjs(v.voucherDate).format("YYYY-MM-DD")
+    : "";
+  const total = Number(v.totalAmount) || 0;
+  const refunded = Number(v.refundedAmount) || 0;
+  const returnedQty = Array.isArray(v.items)
+    ? v.items.reduce((s, it) => s + (Number(it.quantity) || 0), 0)
+    : 0;
+  return {
+    _id: id,
+    _raw: v,
+    "Return ID": v.voucherNo || "—",
+    "Invoice No.": v.salesInvoiceNo || v.invoiceNo || "—",
+    "Client Name": v.partyName || "—",
+    "Return Date": date,
+    "Returned QTY": returnedQty,
+    "Reason ": v.returnReason || v.narration || "—",
+    Amount: fmtRupee(total),
+    "Refund Order Status": v.approvalStatus || "Pending",
+    "Refund Payment Status": resolveSalesReturnRefundStatusDisplay(v),
   };
 }
 

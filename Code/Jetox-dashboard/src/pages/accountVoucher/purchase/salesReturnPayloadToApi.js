@@ -27,16 +27,12 @@ function lineTaxableAndTax(row, gstRatePct) {
   return { taxable, tax };
 }
 
-/**
- * Maps UI gatherPayload → Jitox-api `create-sales-voucher` body.
- */
-export function salesPayloadToCreateBody(payload) {
+export function salesReturnPayloadToCreateBody(payload) {
   const gstRate = payload.gstRate;
   const items = (payload.productRows || [])
-    .filter((r) => r.product)
+    .filter((r) => r.product && parseNum(r.qty) > 0)
     .map((row) => {
       const { taxable } = lineTaxableAndTax(row, gstRate);
-      const subtotal = taxable;
       return {
         product: row.product,
         quantity: parseNum(row.qty) || 0,
@@ -44,7 +40,7 @@ export function salesPayloadToCreateBody(payload) {
         group: row.group || "",
         category: row.category || "",
         unit: row.unit || "Nos",
-        subtotal,
+        subtotal: taxable,
         hsn: String(row.hsn ?? "").trim(),
         batch: String(row.batch ?? "").trim(),
         expDate: String(row.expDate ?? "").trim(),
@@ -54,10 +50,10 @@ export function salesPayloadToCreateBody(payload) {
     });
 
   const lineTax = (payload.productRows || [])
-    .filter((r) => r.product)
+    .filter((r) => r.product && parseNum(r.qty) > 0)
     .reduce((s, row) => s + lineTaxableAndTax(row, gstRate).tax, 0);
   const lineTaxableTotal = (payload.productRows || [])
-    .filter((r) => r.product)
+    .filter((r) => r.product && parseNum(r.qty) > 0)
     .reduce((s, row) => s + lineTaxableAndTax(row, gstRate).taxable, 0);
 
   const gstAmount =
@@ -75,8 +71,6 @@ export function salesPayloadToCreateBody(payload) {
       : String(payload.shipDifferent || "").toLowerCase() === "true";
   const shipLine = sd ? shipRaw : billTo;
 
-  const stockCutOn = payload.stockToggle !== false;
-
   return {
     partyName: String(payload.partyName || "").trim(),
     voucherNo: String(payload.voucherNo || "").trim(),
@@ -92,19 +86,20 @@ export function salesPayloadToCreateBody(payload) {
       : String(payload.partyName || "").trim(),
     shipDifferent: sd,
     narration: String(payload.narration || "").trim(),
-    termsAndConditions: String(payload.termsText || "").trim(),
+    returnReason: String(payload.returnReason || payload.narration || "").trim(),
     items,
     gstAmount,
     totalAmount,
     paymentMode: mapPaymentMode(payload.termsPayment),
     basePrice: lineTaxableTotal,
     stockDetails: {
-      /** Sales reduce product qty on save when toggle is on (default). */
-      stockQuantity: stockCutOn,
+      stockQuantity: payload.stockToggle !== false,
       generetePurchaseBill: false,
       updateStockAfterOrderPlaced: false,
     },
-    ...(stockCutOn ? { orderStatus: "Dispatched" } : {}),
+    ...(payload.sourceSalesId
+      ? { sourceSalesId: String(payload.sourceSalesId).trim() }
+      : {}),
     ...(payload.sourceQuotationId
       ? { sourceQuotationId: String(payload.sourceQuotationId).trim() }
       : {}),

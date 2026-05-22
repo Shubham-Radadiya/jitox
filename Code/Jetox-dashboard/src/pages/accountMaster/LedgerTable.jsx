@@ -25,6 +25,7 @@ import {
   purchaseVouchersApi,
   purchaseReturnVouchersApi,
   salesVouchersApi,
+  salesReturnVouchersApi,
 } from "../../services/api";
 import { getApiErrorMessage, isEmptyListNotFound } from "../../utils/apiError";
 import {
@@ -91,6 +92,7 @@ const LedgerTable = () => {
           { data: purchaseRes },
           { data: purchaseReturnRes },
           { data: salesRes },
+          { data: salesReturnRes },
         ] = await Promise.all([
           accountsApi.getById(accountId),
           paymentVouchersApi.getAll({}),
@@ -101,6 +103,7 @@ const LedgerTable = () => {
           purchaseVouchersApi.getAll({}),
           purchaseReturnVouchersApi.getAll({}),
           salesVouchersApi.getAll({}),
+          salesReturnVouchersApi.getAll({}),
         ]);
         return {
           account: account || {},
@@ -112,7 +115,7 @@ const LedgerTable = () => {
           purchases: normalizeList(purchaseRes),
           purchaseReturns: normalizeList(purchaseReturnRes),
           sales: normalizeList(salesRes),
-          salesReturns: [],
+          salesReturns: normalizeList(salesReturnRes),
         };
       } catch (e) {
         if (isEmptyListNotFound(e)) {

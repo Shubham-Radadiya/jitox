@@ -212,6 +212,40 @@ export const purchaseReturnVouchersApi = {
     ),
 };
 
+export const salesReturnVouchersApi = {
+  getAll: (params) => http.get("/salesReturnVouchers/", { params }),
+  getById: (id) => http.get(`/salesReturnVouchers/${encodeURIComponent(id)}`),
+  getFormMeta: () => http.get("/salesReturnVouchers/form-meta"),
+  getPrefillFromQuotation: (quotationId) =>
+    http.get(
+      `/salesReturnVouchers/prefill-from-quotation/${encodeURIComponent(quotationId)}`
+    ),
+  create: (body) =>
+    http.post("/salesReturnVouchers/create-sales-return-voucher", body),
+  update: (id, body) =>
+    http.put(
+      `/salesReturnVouchers/update-sales-return-voucher/${encodeURIComponent(id)}`,
+      body
+    ),
+  createFromQuotation: (quotationId) =>
+    http.post(
+      `/salesReturnVouchers/create-from-quotation/${encodeURIComponent(quotationId)}`
+    ),
+  finalize: (id, body) =>
+    http.post(
+      `/salesReturnVouchers/finalize-sales-return-voucher/${encodeURIComponent(id)}`,
+      body
+    ),
+  reject: (id) =>
+    http.post(
+      `/salesReturnVouchers/reject-sales-return-voucher/${encodeURIComponent(id)}`
+    ),
+  delete: (id) =>
+    http.delete(
+      `/salesReturnVouchers/delete-sales-return-voucher/${encodeURIComponent(id)}`
+    ),
+};
+
 export const salesVouchersApi = {
   getAll: (params) => http.get("/salesVouchers/", { params }),
   getById: (id) => http.get(`/salesVouchers/${encodeURIComponent(id)}`),

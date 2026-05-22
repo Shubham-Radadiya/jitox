@@ -42,6 +42,7 @@ export default function OrderDetailsDrawer({
   const mgr = d.manager || {};
   const client = d.client || {};
   const products = d.products || [];
+  const fulfillment = d.fulfillment;
   const pay = d.payment || {};
   const delivery = d.delivery || {};
 
@@ -181,10 +182,59 @@ export default function OrderDetailsDrawer({
             </div>
           </section>
 
+          {fulfillment?.lines?.length > 0 && (
+            <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <h3 className="mb-2 text-base font-bold text-slate-900 dark:text-slate-100">
+                Sold / returned (net)
+              </h3>
+              {fulfillment.salesVoucherNo ? (
+                <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+                  Sales voucher: {fulfillment.salesVoucherNo}
+                </p>
+              ) : null}
+              <div className="overflow-hidden rounded-lg border border-light-border dark:border-slate-700">
+                <table className="w-full text-xs">
+                  <thead className="bg-headBg text-light dark:bg-slate-800 dark:text-slate-300">
+                    <tr>
+                      <th className="px-2 py-2 text-left">Product</th>
+                      <th className="px-2 py-2 text-right">Sold</th>
+                      <th className="px-2 py-2 text-right">Returned</th>
+                      <th className="px-2 py-2 text-right">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fulfillment.lines.map((ln) => (
+                      <tr
+                        key={ln.productId}
+                        className="border-t border-light-border dark:border-slate-700"
+                      >
+                        <td className="px-2 py-2">{ln.name}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{ln.soldQty}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{ln.returnedQty}</td>
+                        <td className="px-2 py-2 text-right tabular-nums font-medium">
+                          {ln.netQty}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {fulfillment.returns?.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                  {fulfillment.returns.map((r) => (
+                    <li key={r.id}>
+                      Return {r.voucherNo} — {r.status}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          )}
+
           {products.length > 0 && (
             <section className="rounded-xl border border-light-border bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <h3 className="mb-2 text-base font-bold text-slate-900 dark:text-slate-100">
-                Product Details
+                Product Details (order)
               </h3>
               <div className="overflow-hidden rounded-lg border border-light-border dark:border-slate-700">
                 <table className="w-full text-xs">
@@ -263,12 +313,44 @@ export default function OrderDetailsDrawer({
                   </span>
                 </div>
               ) : null}
+              {pay.dueKind === "refund" && pay.due && pay.due !== "—" ? (
+                <div className="rounded-lg border border-amber-300/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100">
+                  Refund{" "}
+                  <span className="font-semibold tabular-nums">{pay.due}</span>{" "}
+                  to the customer (return reduced what you keep). Post refund from
+                  the Sales Return list.
+                </div>
+              ) : null}
               {[
                 { label: "Total Amount", value: pay.totalAmount || pay.grandTotal },
+                pay.returnedAmount && pay.returnedAmount !== "—"
+                  ? { label: "Return amount", value: pay.returnedAmount }
+                  : null,
+                pay.refundDue && pay.refundDue !== "—"
+                  ? { label: "Refund due", value: pay.refundDue }
+                  : null,
+                pay.refunded && pay.refunded !== "—"
+                  ? { label: "Refunded (paid back)", value: pay.refunded }
+                  : null,
+                pay.netReceivable
+                  ? { label: "Net receivable", value: pay.netReceivable }
+                  : null,
                 { label: pay.taxLabel || "Tax", value: pay.tax },
                 { label: "Discount", value: pay.discount ?? "₹0" },
-                { label: "Paid Amount", value: pay.paid },
-                { label: "Outstanding Due", value: pay.due },
+                pay.paidReceived && pay.paidReceived !== pay.paid
+                  ? {
+                      label: "Received from customer",
+                      value: pay.paidReceived,
+                    }
+                  : null,
+                { label: "Net collected (after return)", value: pay.paid },
+                {
+                  label:
+                    pay.dueKind === "refund"
+                      ? "Refund due to customer"
+                      : "Outstanding Due",
+                  value: pay.due,
+                },
                 { label: "Payment Mode", value: pay.mode || pay.paymentMode },
                 pay.dueDate
                   ? { label: "Due Date", value: pay.dueDate }

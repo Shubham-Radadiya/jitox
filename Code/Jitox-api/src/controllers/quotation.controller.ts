@@ -357,7 +357,7 @@ export const updateQuotation = async (
       if (!normalized) {
         throw new AppError(
           HttpStatusCode.BAD_REQUEST,
-          "Invalid order status. Use Pending, Dispatched, Processing, Cancelled, Approved, or Quotation."
+          "Invalid order status. Use Pending, Dispatched, Processing, Cancelled, Return, Approved, or Quotation."
         );
       }
       updateData.dashboardOrderStatus = normalized;
