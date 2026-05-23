@@ -16,6 +16,7 @@
  * - /paymentVouchers, /purchaseVouchers, … — vouchers
  */
 import http from "./axios.config.jsx";
+import { dashboardTabForOrderStatus } from "../constants/orderStatus";
 
 /**
  * Multipart body for user create/update (optional `photo` file).
@@ -236,10 +237,14 @@ export const salesReturnVouchersApi = {
       `/salesReturnVouchers/finalize-sales-return-voucher/${encodeURIComponent(id)}`,
       body
     ),
-  reject: (id) =>
-    http.post(
-      `/salesReturnVouchers/reject-sales-return-voucher/${encodeURIComponent(id)}`
-    ),
+  reject: (id, body) => {
+    const isFd = typeof FormData !== "undefined" && body instanceof FormData;
+    return http.post(
+      `/salesReturnVouchers/reject-sales-return-voucher/${encodeURIComponent(id)}`,
+      body,
+      isFd ? { headers: { "Content-Type": "multipart/form-data" } } : undefined
+    );
+  },
   delete: (id) =>
     http.delete(
       `/salesReturnVouchers/delete-sales-return-voucher/${encodeURIComponent(id)}`
@@ -371,6 +376,7 @@ export const quotationsApi = {
   setOrderStatus: (id, dashboardOrderStatus) =>
     http.put(`/quotations/update-quotation/${encodeURIComponent(id)}`, {
       dashboardOrderStatus,
+      dashboardTab: dashboardTabForOrderStatus(dashboardOrderStatus),
     }),
   delete: (id) =>
     http.delete(`/quotations/delete-quotation/${encodeURIComponent(id)}`),
@@ -415,11 +421,24 @@ export const dashboardUiApi = {
     http.delete(`${DU}/documents/entries/${encodeURIComponent(id)}`),
 
   getOverview: () => http.get(`${DU}/overview`),
-  getTargetIncentive: () => http.get(`${DU}/target-incentive`),
+  getTargetIncentive: (params) =>
+    http.get(`${DU}/target-incentive`, { params }),
+  saveTargetAchievementPlans: (body) =>
+    http.post(`${DU}/target-incentive/plans`, body),
+  listTargetAchievementPlans: (params) =>
+    http.get(`${DU}/target-incentive/plans`, { params }),
+  getTargetIncentiveAssignMeta: () =>
+    http.get(`${DU}/target-incentive/assign-meta`),
   saveTargetIncentiveAssign: (body) =>
     http.post(`${DU}/target-incentive/assign`, body),
+  updateTargetIncentiveAssign: (id, body) =>
+    http.put(`${DU}/target-incentive/assign/${encodeURIComponent(id)}`, body),
+  getTargetIncentiveAssignment: (id) =>
+    http.get(`${DU}/target-incentive/assignments/${encodeURIComponent(id)}`),
   listTargetIncentiveAssignments: () =>
     http.get(`${DU}/target-incentive/assignments`),
+  deleteTargetIncentiveAssign: (id) =>
+    http.delete(`${DU}/target-incentive/assign/${encodeURIComponent(id)}`),
   getReports: (params) => http.get(`${DU}/reports`, { params }),
   getEmployees: () => http.get(`${DU}/employees`),
   getEmployeeTracking: (id, params) =>

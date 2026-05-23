@@ -7,6 +7,7 @@ import {
   deriveNetPayablePaymentStatus,
   recomputeQuotationPaymentState,
 } from "./receiptQuotationLedger";
+import { notifyOrderReturned } from "../services/orderNotification.service";
 
 export type FulfillmentLine = {
   productId: string;
@@ -216,6 +217,8 @@ export async function syncQuotationAfterSalesReturns(
   const quotation = await Quotation.findById(quotationId);
   if (!quotation) return;
 
+  const prevOrderStatus = String(quotation.dashboardOrderStatus || "");
+
   const sale = await SalesVoucher.findOne({
     sourceQuotationId: quotation._id,
   }).lean();
@@ -268,6 +271,12 @@ export async function syncQuotationAfterSalesReturns(
   }
 
   await quotation.save();
+
+  if (prevOrderStatus !== "Return" && quotation.dashboardOrderStatus === "Return") {
+    void notifyOrderReturned(quotation.toObject()).catch((err) =>
+      console.error("Order return notification failed:", err)
+    );
+  }
 
   await syncQuotationNetPayableAfterReturns(quotationId);
 }

@@ -342,9 +342,25 @@ export const rejectSalesReturnVoucher = async (
   }
   assertPending(voucher);
 
+  const rejectReason = String(req.body?.rejectReason || "").trim();
+  const rejectNotes = String(
+    req.body?.rejectNotes || req.body?.customNotes || ""
+  ).trim();
+  if (!rejectReason) {
+    throw new AppError(
+      HttpStatusCode.BAD_REQUEST,
+      "Reject reason is required."
+    );
+  }
+
   voucher.approvalStatus = "Rejected";
   voucher.rejectedAt = new Date();
   voucher.approvedAt = undefined;
+  voucher.rejectReason = rejectReason;
+  voucher.rejectNotes = rejectNotes;
+  if (req.file) {
+    voucher.rejectProof = req.file.path;
+  }
   await voucher.save();
 
   if (voucher.sourceQuotationId) {

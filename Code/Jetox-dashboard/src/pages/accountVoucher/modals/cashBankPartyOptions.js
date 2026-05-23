@@ -32,3 +32,16 @@ export function partyLabelFromOptions(options, selectedValue) {
   if (v === CASH_LEDGER_OPTION.value) return CASH_LEDGER_OPTION.label;
   return v.trim();
 }
+
+/** Map stored party name back to dropdown value for edit/view forms. */
+export function partyValueFromLabel(options, label) {
+  const name = String(label ?? "").trim();
+  if (!name) return "";
+  if (name.toLowerCase() === CASH_LEDGER_OPTION.label.toLowerCase()) {
+    return CASH_LEDGER_OPTION.value;
+  }
+  const hit = (options || []).find(
+    (o) => String(o.label ?? o.value).trim().toLowerCase() === name.toLowerCase()
+  );
+  return hit ? String(hit.value) : name;
+}

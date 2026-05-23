@@ -11,6 +11,7 @@ import {
   rejectSalesReturnVoucher,
   updateSalesReturnVoucher,
 } from "../controllers/salesReturnVoucher.controller";
+import { optionalProofUpload } from "../middleware/multer.middleware";
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.post(
 );
 router.post(
   "/reject-sales-return-voucher/:id",
+  optionalProofUpload("rejectProof"),
   rejectSalesReturnVoucher
 );
 router.get("/form-meta", getSalesReturnFormMeta);

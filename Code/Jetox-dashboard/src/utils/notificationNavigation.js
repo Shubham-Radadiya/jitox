@@ -28,6 +28,26 @@ export function getNotificationTargetPath(raw) {
     return `/dashboard/territories${q}`;
   }
 
+  if (type === "product_low_stock") {
+    return "/dashboard/stock";
+  }
+
+  const orderTypes = new Set([
+    "order_new",
+    "order_pending",
+    "order_approved",
+    "order_cancelled",
+    "order_dispatched",
+    "order_invoice_generated",
+    "order_returned",
+  ]);
+  if (orderTypes.has(type)) {
+    const qid = raw.meta?.quotationId;
+    return qid
+      ? `/dashboard/order-list?orderId=${encodeURIComponent(String(qid))}`
+      : "/dashboard/order-list";
+  }
+
   const user = getStoredUser();
   const tasksHome = isAdminUser(user)
     ? "/dashboard/tasks/all"

@@ -1,6 +1,16 @@
 import { addressFromUser, buildTableSummary } from "../../utils/addressFormat";
 import { buildUploadUrl } from "../../utils/uploadUrl";
 
+function idToString(ref) {
+  if (!ref) return "";
+  if (typeof ref === "string") return ref;
+  if (typeof ref === "object") {
+    const inner = ref._id ?? ref.id;
+    if (inner) return String(inner);
+  }
+  return String(ref);
+}
+
 /** Map API user document to User Master table row shape. */
 export function mapApiUserToRow(u) {
   const id = u._id || u.id;
@@ -27,6 +37,8 @@ export function mapApiUserToRow(u) {
         ? u.subordinateCount
         : Number(u.subordinateCount) || 0,
     region: u.region || "",
+    territoryId: idToString(u.territoryId),
+    managerId: idToString(u.managerId),
     Region: u.region || u.city || "-",
     Area: u.district || u.taluka || "-",
     Address: u.addressSummary || buildTableSummary(addr),

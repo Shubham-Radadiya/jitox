@@ -13,6 +13,8 @@ import {
   fetchPaymentDetail,
   fetchReceiptDetail,
   fetchManufacturingDetail,
+  fetchCashVoucherDetail,
+  fetchBankVoucherDetail,
 } from "./voucherDetailFetchers.jsx";
 import { parseRupeeCell, fmtRupee } from "../../utils/voucherRowMappers";
 import {
@@ -66,6 +68,7 @@ import CashTransferModal from "./modals/CashTransferModal";
 import BankToCashModal from "./modals/BankToCashModal";
 import JournalModal from "./modals/JournalModal";
 import JournalDetailsDrawer from "./JournalDetailsDrawer";
+import CashBankVoucherDetailsDrawer from "./CashBankVoucherDetailsDrawer";
 import PaymentDetailsDrawer from "./PaymentDetailsDrawer";
 import ReceiptPaymentView from "./ReceiptPaymentView";
 import ManufacturingDetailsDrawer from "./manufacturing/ManufacturingDetailsDrawer";
@@ -244,7 +247,7 @@ const bankColumns = [
   "Voucher No",
   "Date",
   "Particulars",
-  "Debit From",
+  "Debit (Inflow)",
   "Credit (Outflow)",
   "Balance",
   "Actions",
@@ -1589,6 +1592,8 @@ export const voucherConfigs = {
     title: "Cash Voucher",
     columns: cashColumns,
     rowId: "Voucher No",
+    fetchDetail: fetchCashVoucherDetail,
+    detailsComponent: CashBankVoucherDetailsDrawer,
     renderRowCell: formatIsoDateRow,
     modals: [{ key: "cash-transfer-modal", component: CashTransferModal }],
     filterFields: [
@@ -1598,7 +1603,7 @@ export const voucherConfigs = {
         modalKey: "cash-transfer-modal",
       }),
     ],
-    footerRenderer: cashBankFooterRenderer("Debit (Outflow)"),
+    footerRenderer: cashBankFooterRenderer("Balance"),
     buildTableAction:
       ({ openDetails, navigate }) =>
       (row) =>
@@ -1608,6 +1613,8 @@ export const voucherConfigs = {
     title: "Bank Voucher",
     columns: bankColumns,
     rowId: "Voucher No",
+    fetchDetail: fetchBankVoucherDetail,
+    detailsComponent: CashBankVoucherDetailsDrawer,
     modals: [{ key: "bank-to-cash-modal", component: BankToCashModal }],
     renderRowCell: formatIsoDateRow,
     filterFields: [

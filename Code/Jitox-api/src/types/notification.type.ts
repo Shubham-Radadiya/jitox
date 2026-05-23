@@ -5,7 +5,15 @@ export type NotificationType =
   | "task_updated"
   | "task_completed"
   | "task_overdue"
-  | "territory_unmapped_district";
+  | "territory_unmapped_district"
+  | "product_low_stock"
+  | "order_new"
+  | "order_pending"
+  | "order_approved"
+  | "order_cancelled"
+  | "order_dispatched"
+  | "order_invoice_generated"
+  | "order_returned";
 
 export interface INotification extends Document {
   userId: string;

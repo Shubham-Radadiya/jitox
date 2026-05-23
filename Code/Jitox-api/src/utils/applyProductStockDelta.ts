@@ -1,5 +1,6 @@
 import { Product } from "../models/index";
 import { productIdFromRef } from "./productUnit";
+import { checkAndNotifyProductLowStock } from "./productStockAlert";
 
 /**
  * Apply stock in/out on Product Master: updates `quantity` and syncs `amout`
@@ -22,46 +23,49 @@ export async function applyProductStockDelta(
   if (totals.size === 0) return;
 
   await Promise.all(
-    Array.from(totals.entries()).map(([pid, qty]) => {
+    Array.from(totals.entries()).map(async ([pid, qty]) => {
       const delta = qty * multiplier;
-      return Product.findByIdAndUpdate(
-        pid,
-        [
-          {
-            $set: {
-              quantity: {
-                $max: [
-                  0,
-                  { $add: [{ $ifNull: ["$quantity", 0] }, delta] },
-                ],
+      try {
+        await Product.findByIdAndUpdate(
+          pid,
+          [
+            {
+              $set: {
+                quantity: {
+                  $max: [
+                    0,
+                    { $add: [{ $ifNull: ["$quantity", 0] }, delta] },
+                  ],
+                },
               },
             },
-          },
-          {
-            $set: {
-              amout: {
-                $multiply: [
-                  "$quantity",
-                  {
-                    $cond: {
-                      if: {
-                        $and: [
-                          { $ne: ["$rate", null] },
-                          { $gt: [{ $ifNull: ["$rate", 0] }, 0] },
-                        ],
+            {
+              $set: {
+                amout: {
+                  $multiply: [
+                    "$quantity",
+                    {
+                      $cond: {
+                        if: {
+                          $and: [
+                            { $ne: ["$rate", null] },
+                            { $gt: [{ $ifNull: ["$rate", 0] }, 0] },
+                          ],
+                        },
+                        then: "$rate",
+                        else: { $ifNull: ["$billingRatePerUnit", 0] },
                       },
-                      then: "$rate",
-                      else: { $ifNull: ["$billingRatePerUnit", 0] },
                     },
-                  },
-                ],
+                  ],
+                },
               },
             },
-          },
-        ]
-      ).catch((err) => {
+          ]
+        );
+        await checkAndNotifyProductLowStock(pid);
+      } catch (err) {
         console.error("applyProductStockDelta failed", { pid, qty, multiplier, err });
-      });
+      }
     })
   );
 }

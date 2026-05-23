@@ -298,17 +298,16 @@ const LedgerTable = () => {
         return `<tr>${cells}</tr>`;
       })
       .join("");
-    const bodyHtml = `<p><strong>${ledgerTitle}</strong></p><p>${closingLine}</p>
+    const bodyHtml = `<p>${closingLine}</p>
       <table style="border-collapse:collapse;width:100%"><thead>${header}</thead><tbody>${body}</tbody></table>`;
-    const title = `Ledger — ${ledgerTitle}`;
-    const fullHtml = buildStandalonePrintableHtml(title, bodyHtml, {
+    const fullHtml = buildStandalonePrintableHtml(ledgerTitle, bodyHtml, {
       bodyPaddingPx: 10,
       bodyFontSizePx: 12,
       h1FontSizePx: 16,
       tableCellPaddingPx: 5,
     });
     try {
-      await downloadHtmlDocumentAsPdf(fullHtml, `${title}.pdf`);
+      await downloadHtmlDocumentAsPdf(fullHtml, `${ledgerTitle}.pdf`);
       toast.success("PDF downloaded successfully.");
     } catch (err) {
       console.error("PDF generation failed:", err);

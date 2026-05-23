@@ -9,12 +9,14 @@ import {
   accountsApi,
   manufacturingVouchersApi,
   quotationsApi,
+  cashVouchersApi,
 } from "../../services/api";
 import {
   buildPaymentReceiptData,
   receiptReceivedByFromParty,
 } from "../../utils/paymentReceipt";
 import dayjs from "dayjs";
+import { buildUploadUrl } from "../../utils/uploadUrl";
 import {
   findAccountByBusinessName,
 } from "../../utils/accountMappers";
@@ -288,4 +290,44 @@ export async function fetchPaymentDetail(id) {
     remarks: String(p.remarks || "").trim() || "—",
     status: p.status || "—",
   };
+}
+
+function attachmentDisplayName(storedPath) {
+  if (!storedPath) return "";
+  const parts = String(storedPath).replace(/\\/g, "/").split("/");
+  return decodeURIComponent(parts[parts.length - 1] || "");
+}
+
+/** Shape for `CashBankVoucherDetailsDrawer`. */
+async function fetchCashBankVoucherDetail(id, kind) {
+  const vRes = await cashVouchersApi.getById(id);
+  const v = vRes?.data;
+  if (!v || !v._id) return null;
+
+  const amt =
+    v.amount != null && Number.isFinite(Number(v.amount))
+      ? Number(v.amount)
+      : null;
+  const dateSource = v.voucherDate || v.createdAt;
+  const storedPath = v.attachmentsFile;
+
+  return {
+    kindLabel: kind === "bank" ? "Bank voucher" : "Cash voucher",
+    voucherNo: v.voucherNumber || "—",
+    dateLabel: dateSource ? dayjs(dateSource).format("DD MMM YYYY") : "—",
+    debitLabel: String(v.debitFrom || "").trim() || "—",
+    creditLabel: String(v.creditTo || "").trim() || "—",
+    amountLabel: amt != null ? fmtRupee(amt) : "—",
+    remarks: String(v.narration || v.particulars || "").trim() || "—",
+    attachmentUrl: storedPath ? buildUploadUrl(storedPath) : "",
+    attachmentName: attachmentDisplayName(storedPath),
+  };
+}
+
+export async function fetchCashVoucherDetail(id) {
+  return fetchCashBankVoucherDetail(id, "cash");
+}
+
+export async function fetchBankVoucherDetail(id) {
+  return fetchCashBankVoucherDetail(id, "bank");
 }

@@ -133,7 +133,7 @@ export async function applyTerritoryAssignmentToUser(
     ? new Types.ObjectId(String(opts.territoryId))
     : user.territoryId;
 
-  if (opts?.reResolveFromAddress && role === Role.user) {
+  if (opts?.reResolveFromAddress && role === Role.user && !opts?.territoryId) {
     const addr = normalizeStructuredAddress(
       user.toObject() as unknown as Record<string, unknown>
     );

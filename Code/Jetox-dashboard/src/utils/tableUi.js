@@ -31,7 +31,7 @@ const RIGHT_ALIGN_KEYS = new Set([
   "Debit (₹)",
   "Debit (Outflow)",
   "Credit (Inflow)",
-  "Debit From",
+  "Debit (Inflow)",
   "Credit (Outflow)",
   "Order Qty",
   "Re. Qty",
@@ -145,12 +145,12 @@ export const ORDER_TABLE_COL = {
   "Total Amount": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
   "Order Status": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
   Actions: {
-    th: "w-[13rem] min-w-[13rem] max-w-[13rem]",
-    td: "w-[13rem] min-w-[13rem] max-w-[13rem]",
+    th: "w-[16rem] min-w-[16rem] max-w-[16rem]",
+    td: "w-[16rem] min-w-[16rem] max-w-[16rem]",
   },
   Action: {
-    th: "w-[13rem] min-w-[13rem] max-w-[13rem]",
-    td: "w-[13rem] min-w-[13rem] max-w-[13rem]",
+    th: "w-[16rem] min-w-[16rem] max-w-[16rem]",
+    td: "w-[16rem] min-w-[16rem] max-w-[16rem]",
   },
 };
 

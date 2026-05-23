@@ -8,6 +8,7 @@ import { clearAuthSession, getStoredUser } from "../../utils/authSession";
 import { notificationsApi } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { getNotificationTargetPath } from "../../utils/notificationNavigation";
+import { notificationIconForType } from "../../utils/notificationIcons";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -55,6 +56,7 @@ const Header = ({
     time: n.createdAt ? dayjs(n.createdAt).fromNow() : "",
     read: n.read,
     raw: n,
+    icon: notificationIconForType(n.type),
   }));
 
   const userName =

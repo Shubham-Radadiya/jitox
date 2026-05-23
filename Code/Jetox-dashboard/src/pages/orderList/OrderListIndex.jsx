@@ -6,7 +6,7 @@ import { SearchBar, CommonDropdown, DateRangePicker } from "../../components/ui/
 import { TableContent } from "../../hooks/TableCustomHook";
 import { LuArrowUpDown } from "react-icons/lu";
 import { IoEyeOutline } from "react-icons/io5";
-import { CalendarDays, PackageMinus, Receipt, ScrollText } from "lucide-react";
+import { Check, PackageMinus, Receipt, ScrollText, X } from "lucide-react";
 import {
   dashboardUiApi,
   quotationsApi,
@@ -34,7 +34,7 @@ import {
   ORDER_SORT_OPTIONS,
   sortOrderRows,
 } from "../../utils/orderListSort";
-import { ORDER_STATUS_OPTIONS } from "../../constants/orderStatus";
+import { ORDER_STATUS_OPTIONS, normalizeOrderStatus } from "../../constants/orderStatus";
 
 /** Matches Product Master summary cards (gradient panel + value pill). */
 const ORDER_SUMMARY_METRIC_CARD = {
@@ -75,6 +75,7 @@ const OrderListIndex = () => {
     sourceRow: null,
   });
   const [returnBusyId, setReturnBusyId] = useState(null);
+  const [orderStatusBusyId, setOrderStatusBusyId] = useState(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptDraft, setReceiptDraft] = useState(null);
 
@@ -280,6 +281,40 @@ const OrderListIndex = () => {
     setSalesModal({ open: true, sourceRow: { _id: String(id) } });
   };
 
+  const updateOrderStatusFromList = async (row, nextStatus) => {
+    const id = row?._id || row?.["Order ID"];
+    const status = normalizeOrderStatus(nextStatus);
+    if (!id || !status) {
+      toast.error("This order has no id — cannot update status.");
+      return;
+    }
+    const current = normalizeOrderStatus(row["Order Status"]);
+    if (current === status) {
+      toast.error(`Order is already ${status}.`);
+      return;
+    }
+    const key = String(id);
+    setOrderStatusBusyId(key);
+    try {
+      await quotationsApi.setOrderStatus(key, status);
+      toast.success(`Order status updated to ${status}.`);
+      await queryClient.invalidateQueries({ queryKey: ["dashboard", "orders"] });
+      if (
+        selectedRow &&
+        String(selectedRow._id || selectedRow["Order ID"]) === key
+      ) {
+        setSelectedRow((prev) =>
+          prev ? { ...prev, "Order Status": status } : prev
+        );
+        await refreshOrderDetail(selectedRow);
+      }
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Could not update order status"));
+    } finally {
+      setOrderStatusBusyId(null);
+    }
+  };
+
   const openSalesReturnFromOrder = async (row) => {
     if (!row?._hasSale) {
       toast.error("Create a sales voucher for this order first.");
@@ -396,13 +431,13 @@ const OrderListIndex = () => {
             className="tabular-nums text-rose-800 dark:text-rose-200"
             title="Approved sales return (credit note) value"
           >
-            {value ?? "—"}
+            {value ?? "₹0"}
           </TruncatedText>
         </td>
       );
     }
     if (key === "Refund Due") {
-      const highlight = value && value !== "—";
+      const highlight = parseRupeeCell(value) > 0;
       return (
         <td key={key} className={orderTableTdClasses(key)}>
           <TruncatedText
@@ -414,7 +449,7 @@ const OrderListIndex = () => {
             }
             title="Cash still to pay back to customer"
           >
-            {value ?? "—"}
+            {value ?? "₹0"}
           </TruncatedText>
         </td>
       );
@@ -427,7 +462,7 @@ const OrderListIndex = () => {
             className="tabular-nums text-emerald-800 dark:text-emerald-200"
             title="Refund payment already posted"
           >
-            {value ?? "—"}
+            {value ?? "₹0"}
           </TruncatedText>
         </td>
       );
@@ -449,7 +484,14 @@ const OrderListIndex = () => {
     );
   };
 
-  const renderAction = (row) => (
+  const renderAction = (row) => {
+    const rowKey = String(row?._id || row?.["Order ID"] || "");
+    const statusBusy = orderStatusBusyId === rowKey;
+    const orderSt = normalizeOrderStatus(row["Order Status"]) || "Pending";
+    const canApprove = orderSt === "Pending";
+    const canCancel = !["Cancelled", "Return"].includes(orderSt);
+
+    return (
     <td className={orderTableTdClasses("Actions")}>
       <div className={TABLE_ACTIONS_ROW_DENSE}>
         <button
@@ -459,6 +501,24 @@ const OrderListIndex = () => {
           onClick={() => openDrawer(row)}
         >
           <IoEyeOutline size={14} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          title="Approve order"
+          className={`${TABLE_ACTION_ICON_BTN_DENSE} text-emerald-700 dark:text-emerald-300`}
+          disabled={!canApprove || statusBusy}
+          onClick={() => updateOrderStatusFromList(row, "Approved")}
+        >
+          <Check size={14} strokeWidth={2.5} />
+        </button>
+        <button
+          type="button"
+          title="Cancel order"
+          className={`${TABLE_ACTION_ICON_BTN_DENSE} text-rose-700 dark:text-rose-300`}
+          disabled={!canCancel || statusBusy}
+          onClick={() => updateOrderStatusFromList(row, "Cancelled")}
+        >
+          <X size={14} strokeWidth={2.5} />
         </button>
         <button
           type="button"
@@ -487,21 +547,15 @@ const OrderListIndex = () => {
               : "Create a sales voucher first"
           }
           className={TABLE_ACTION_ICON_BTN_DENSE}
-          disabled={returnBusyId === String(row?._id || row?.["Order ID"] || "")}
+          disabled={returnBusyId === rowKey}
           onClick={() => openSalesReturnFromOrder(row)}
         >
           <PackageMinus size={14} strokeWidth={2} />
         </button>
-        <button
-          type="button"
-          title="Schedule"
-          className={TABLE_ACTION_ICON_BTN_DENSE}
-        >
-          <CalendarDays size={14} strokeWidth={2} />
-        </button>
       </div>
     </td>
-  );
+    );
+  };
 
   const tabCounts = summary?.tabCounts || {
     all: 20,

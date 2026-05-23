@@ -27,6 +27,9 @@ export interface ISalesReturnVoucher extends Document {
   approvalStatus: SalesReturnApprovalStatus;
   approvedAt?: Date;
   rejectedAt?: Date;
+  rejectReason?: string;
+  rejectNotes?: string;
+  rejectProof?: string;
   sourceSalesId?: mongoose.Types.ObjectId;
   sourceQuotationId?: mongoose.Types.ObjectId;
   refundRequestId?: mongoose.Types.ObjectId;

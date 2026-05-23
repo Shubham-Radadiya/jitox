@@ -22,15 +22,23 @@ import {
   deleteDocumentEntry,
   getDashboardOverview,
   getReportsPage,
-  getTargetIncentive,
   getEmployees,
   getEmployeeTracking,
   getPurchaseFormMeta,
 } from "../controllers/dashboardUi.controller";
 import {
+  deleteTargetIncentiveAssignment,
+  getTargetIncentiveAssignMeta,
+  getTargetIncentiveAssignmentById,
   listTargetIncentiveAssignments,
   saveTargetIncentiveAssignment,
+  updateTargetIncentiveAssignment,
 } from "../controllers/targetIncentive.controller";
+import {
+  getTargetIncentivePayload,
+  listTargetAchievementPlans,
+  saveTargetAchievementPlans,
+} from "../controllers/targetAchievement.controller";
 import { uploadDocumentFile } from "../middleware/multerDocuments.middleware";
 
 const router = Router();
@@ -75,9 +83,15 @@ router.delete("/documents/entries/:id", deleteDocumentEntry);
 
 router.get("/overview", getDashboardOverview);
 router.get("/reports", getReportsPage);
-router.get("/target-incentive", getTargetIncentive);
+router.get("/target-incentive", getTargetIncentivePayload);
+router.get("/target-incentive/plans", listTargetAchievementPlans);
+router.post("/target-incentive/plans", saveTargetAchievementPlans);
+router.get("/target-incentive/assign-meta", getTargetIncentiveAssignMeta);
 router.get("/target-incentive/assignments", listTargetIncentiveAssignments);
+router.get("/target-incentive/assignments/:id", getTargetIncentiveAssignmentById);
 router.post("/target-incentive/assign", saveTargetIncentiveAssignment);
+router.put("/target-incentive/assign/:id", updateTargetIncentiveAssignment);
+router.delete("/target-incentive/assign/:id", deleteTargetIncentiveAssignment);
 router.get("/employees", getEmployees);
 router.get("/employees/:id/tracking", getEmployeeTracking);
 

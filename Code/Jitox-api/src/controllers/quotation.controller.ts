@@ -9,6 +9,7 @@ import {
   dashboardTabForOrderStatus,
   normalizeOrderStatus,
 } from "../constants/orderStatus";
+import { handleQuotationOrderNotifications } from "../services/orderNotification.service";
 
 async function computeNextQuotationVoucherNo(): Promise<string> {
   const docs = await Quotation.find().select("voucherNo").lean();
@@ -326,6 +327,12 @@ export const updateQuotation = async (
       }
     }
 
+    const docBefore = await Quotation.findById(id)
+      .select(
+        "addedToOrder dashboardOrderStatus voucherNo partyName invoiceNo transportDetails"
+      )
+      .lean();
+
     if (Object.prototype.hasOwnProperty.call(updateData, "addedToOrder")) {
       const rawFlag = updateData.addedToOrder;
       const added =
@@ -361,7 +368,6 @@ export const updateQuotation = async (
         );
       }
       updateData.dashboardOrderStatus = normalized;
-      const docBefore = await Quotation.findById(id).select("addedToOrder").lean();
       if (docBefore?.addedToOrder !== false) {
         updateData.dashboardTab = dashboardTabForOrderStatus(normalized);
       }
@@ -374,6 +380,11 @@ export const updateQuotation = async (
     if (!updatedQuotation) {
       throw new AppError(HttpStatusCode.NOT_FOUND, "No quotations found.");
     }
+
+    void handleQuotationOrderNotifications(
+      docBefore,
+      updatedQuotation.toObject()
+    ).catch((err) => console.error("Order notification failed:", err));
 
     sendSuccess(res, updatedQuotation, "Quotation updated successfully.");
   } catch (error) {

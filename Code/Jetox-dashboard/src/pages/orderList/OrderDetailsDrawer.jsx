@@ -323,15 +323,12 @@ export default function OrderDetailsDrawer({
               ) : null}
               {[
                 { label: "Total Amount", value: pay.totalAmount || pay.grandTotal },
-                pay.returnedAmount && pay.returnedAmount !== "—"
-                  ? { label: "Return amount", value: pay.returnedAmount }
-                  : null,
-                pay.refundDue && pay.refundDue !== "—"
-                  ? { label: "Refund due", value: pay.refundDue }
-                  : null,
-                pay.refunded && pay.refunded !== "—"
-                  ? { label: "Refunded (paid back)", value: pay.refunded }
-                  : null,
+                { label: "Return amount", value: pay.returnedAmount ?? "₹0" },
+                { label: "Refund due", value: pay.refundDue ?? "₹0" },
+                {
+                  label: "Refunded (paid back)",
+                  value: pay.refunded ?? "₹0",
+                },
                 pay.netReceivable
                   ? { label: "Net receivable", value: pay.netReceivable }
                   : null,

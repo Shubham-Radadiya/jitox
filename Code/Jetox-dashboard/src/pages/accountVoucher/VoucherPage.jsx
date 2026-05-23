@@ -56,6 +56,7 @@ import PurchaseVoucherModal from "./purchase/PurchaseVoucherModal";
 import PurchaseReturnModal from "./purchase/PurchaseReturnModal";
 import SalesVoucherModal from "./purchase/SalesVoucherModal";
 import SalesReturnModal from "./purchase/SalesReturnModal";
+import SalesReturnRejectModal from "./modals/SalesReturnRejectModal";
 import QuotationVoucherModal from "./purchase/QuotationVoucherModal";
 import {
   expenseVouchersApi,
@@ -592,6 +593,20 @@ const VoucherPage = () => {
     setSalesReturnModal({ open: false, sourceRow: null, mode: "create" });
   }, []);
 
+  const [salesReturnRejectModal, setSalesReturnRejectModal] = useState({
+    open: false,
+    sourceRow: null,
+  });
+  const openSalesReturnRejectModal = useCallback((sourceRow) => {
+    setSalesReturnRejectModal({
+      open: true,
+      sourceRow: sourceRow && typeof sourceRow === "object" ? sourceRow : null,
+    });
+  }, []);
+  const closeSalesReturnRejectModal = useCallback(() => {
+    setSalesReturnRejectModal({ open: false, sourceRow: null });
+  }, []);
+
   const deleteSalesReturnVoucher = useCallback(
     async (id) => {
       if (!id) return;
@@ -613,26 +628,15 @@ const VoucherPage = () => {
   );
 
   const rejectSalesReturnVoucher = useCallback(
-    async (row) => {
+    (row) => {
       const id = row?._id;
       if (!id) {
         toast.error("Missing return id.");
         return;
       }
-      if (!window.confirm("Reject this sales return? Stock and ledger will not change.")) {
-        return;
-      }
-      try {
-        await salesReturnVouchersApi.reject(String(id));
-        toast.success("Sales return rejected.");
-        await queryClient.invalidateQueries({
-          queryKey: ["voucher-list", "sales-return"],
-        });
-      } catch (e) {
-        toast.error(getApiErrorMessage(e, "Reject failed"));
-      }
+      openSalesReturnRejectModal(row);
     },
-    [queryClient]
+    [openSalesReturnRejectModal]
   );
 
   const deleteSalesVoucher = useCallback(
@@ -1699,12 +1703,27 @@ const VoucherPage = () => {
         )}
 
         {voucherSlug === "sales-return" && (
-          <SalesReturnModal
-            open={salesReturnModal.open}
-            onClose={closeSalesReturnModal}
-            sourceRow={salesReturnModal.sourceRow}
-            mode={salesReturnModal.mode}
-          />
+          <>
+            <SalesReturnModal
+              open={salesReturnModal.open}
+              onClose={closeSalesReturnModal}
+              sourceRow={salesReturnModal.sourceRow}
+              mode={salesReturnModal.mode}
+            />
+            <SalesReturnRejectModal
+              open={salesReturnRejectModal.open}
+              onClose={closeSalesReturnRejectModal}
+              sourceRow={salesReturnRejectModal.sourceRow}
+              onRejected={async () => {
+                await queryClient.invalidateQueries({
+                  queryKey: ["voucher-list", "sales-return"],
+                });
+                await queryClient.invalidateQueries({
+                  queryKey: ["dashboard", "orders"],
+                });
+              }}
+            />
+          </>
         )}
 
         {voucherSlug === "quotation" && (

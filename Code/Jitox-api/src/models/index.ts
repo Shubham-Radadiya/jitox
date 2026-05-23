@@ -26,6 +26,7 @@ import MarketingScheme from "./marketingScheme.model";
 import DocumentCategory from "./documentCategory.model";
 import DocumentEntry from "./documentEntry.model";
 import TargetIncentiveAssignment from "./targetIncentiveAssignment.model";
+import TargetAchievementPlan from "./targetAchievementPlan.model";
 import Territory from "./territory.model";
 
 export {
@@ -56,5 +57,6 @@ export {
   DocumentCategory,
   DocumentEntry,
   TargetIncentiveAssignment,
+  TargetAchievementPlan,
   Territory,
 };

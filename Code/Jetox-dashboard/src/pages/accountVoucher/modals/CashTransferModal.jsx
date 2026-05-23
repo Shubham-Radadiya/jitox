@@ -19,7 +19,9 @@ import {
   buildAccountPartyOptions,
   CASH_LEDGER_OPTION,
   partyLabelFromOptions,
+  partyValueFromLabel,
 } from "./cashBankPartyOptions";
+import { buildUploadUrl } from "../../../utils/uploadUrl";
 
 const ACCEPTED_PROOF_TYPES =
   ".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf";
@@ -50,7 +52,7 @@ const emptyForm = () => ({
   narration: "",
 });
 
-const CashTransferModal = ({ open, onClose }) => {
+const CashTransferModal = ({ open, onClose, voucher = null, readOnly = false }) => {
   const queryClient = useQueryClient();
   const { data: meta, isError: metaError } = usePurchaseFormMeta({
     enabled: open,
@@ -77,24 +79,50 @@ const CashTransferModal = ({ open, onClose }) => {
   }, [metaError]);
 
   useEffect(() => {
-    if (open) {
-      setForm({
-        ...emptyForm(),
-        voucherNumber: `CV-${Date.now()}`,
-        voucherDate: dayjs().format("YYYY-MM-DD"),
-      });
+    if (!open) {
+      setForm(emptyForm());
       setProofFile(null);
       setSaving(false);
       setIsDragging(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-    setForm(emptyForm());
+    if (readOnly && voucher) {
+      setProofFile(null);
+      setSaving(false);
+      setIsDragging(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setForm({
+      ...emptyForm(),
+      voucherNumber: `CV-${Date.now()}`,
+      voucherDate: dayjs().format("YYYY-MM-DD"),
+    });
     setProofFile(null);
     setSaving(false);
     setIsDragging(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [open]);
+  }, [open, readOnly, voucher?._id]);
+
+  useEffect(() => {
+    if (!open || !readOnly || !voucher) return;
+    setForm({
+      voucherNumber: String(voucher.voucherNumber || ""),
+      voucherDate: voucher.voucherDate
+        ? dayjs(voucher.voucherDate).format("YYYY-MM-DD")
+        : voucher.createdAt
+          ? dayjs(voucher.createdAt).format("YYYY-MM-DD")
+          : "",
+      debitFrom: CASH_LEDGER_OPTION.value,
+      creditTo: partyValueFromLabel(creditPartyOptions, voucher.creditTo),
+      amount:
+        voucher.amount != null && voucher.amount !== ""
+          ? String(voucher.amount)
+          : "",
+      narration: String(voucher.narration || voucher.particulars || ""),
+    });
+  }, [open, readOnly, voucher, creditPartyOptions]);
 
   useEffect(() => {
     if (!proofFile) {
@@ -194,7 +222,14 @@ const CashTransferModal = ({ open, onClose }) => {
     }
   };
 
-  const footer = (
+  const existingProofUrl =
+    readOnly && voucher?.attachmentsFile
+      ? buildUploadUrl(voucher.attachmentsFile)
+      : "";
+
+  const footer = readOnly ? (
+    <Button label="Close" variant="outline" className="w-28" onClick={onClose} />
+  ) : (
     <>
       <Button
         label="Cancel"
@@ -217,7 +252,7 @@ const CashTransferModal = ({ open, onClose }) => {
     <CommonModal
       open={open}
       onClose={onClose}
-      title="Cash to Bank Transfer"
+      title={readOnly ? "View Cash Voucher" : "Cash to Bank Transfer"}
       width="780px"
       footer={footer}
     >
@@ -228,12 +263,16 @@ const CashTransferModal = ({ open, onClose }) => {
             value={form.voucherNumber}
             onChange={(e) => updateField("voucherNumber", e.target.value)}
             placeholder="e.g. CV-001 (leave blank to auto-generate on save)"
+            readOnly={readOnly}
+            disabled={readOnly}
           />
           <InputField
             label="Date"
             type="date"
             value={form.voucherDate}
             onChange={(e) => updateField("voucherDate", e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
         </div>
 
@@ -258,6 +297,7 @@ const CashTransferModal = ({ open, onClose }) => {
                 : "Add accounts in Account Master"
             }
             menuPortal
+            disabled={readOnly}
           />
           <InputField
             label="Amount"
@@ -265,6 +305,8 @@ const CashTransferModal = ({ open, onClose }) => {
             value={form.amount}
             onChange={(e) => updateField("amount", e.target.value)}
             placeholder="Amount"
+            readOnly={readOnly}
+            disabled={readOnly}
           />
         </div>
 
@@ -275,8 +317,25 @@ const CashTransferModal = ({ open, onClose }) => {
           value={form.narration}
           onChange={(e) => updateField("narration", e.target.value)}
           placeholder="Textarea"
+          readOnly={readOnly}
+          disabled={readOnly}
         />
 
+        {readOnly ? (
+          existingProofUrl ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-dark">Attachment</span>
+              <a
+                href={existingProofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium text-primary underline-offset-2 hover:underline dark:text-emerald-400"
+              >
+                View attachment
+              </a>
+            </div>
+          ) : null
+        ) : (
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium text-dark">Attachment (optional)</span>
           <label
@@ -346,6 +405,7 @@ const CashTransferModal = ({ open, onClose }) => {
             </p>
           </label>
         </div>
+        )}
       </div>
     </CommonModal>
   );

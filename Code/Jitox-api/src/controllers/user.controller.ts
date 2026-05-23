@@ -484,10 +484,15 @@ export const updateUser = async (
       user.permissions = [];
     }
 
+    const territoryIdInBody =
+      req.body.territoryId !== undefined &&
+      req.body.territoryId !== null &&
+      String(req.body.territoryId).trim() !== "";
     await applyTerritoryAssignmentToUser(user, {
       territoryId: req.body.territoryId,
       managerId: req.body.managerId,
-      reResolveFromAddress: touchingAddr && user.role === Role.user,
+      reResolveFromAddress:
+        touchingAddr && user.role === Role.user && !territoryIdInBody,
     });
 
     const updatedUser = await user.save();

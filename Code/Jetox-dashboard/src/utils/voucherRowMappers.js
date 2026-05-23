@@ -271,9 +271,9 @@ export function mapCashVoucherRow(v) {
       ? dayjs(v.createdAt).format("YYYY-MM-DD")
       : "—",
     Particulars: v.particulars || v.narration || "—",
-    "Debit (Outflow)": amt,
-    "Credit (Inflow)": v.creditTo || v.debitFrom || "—",
-    Balance: "—",
+    "Debit (Outflow)": v.creditTo || "—",
+    "Credit (Inflow)": v.debitFrom || "Cash",
+    Balance: amt,
   };
 }
 
@@ -287,7 +287,7 @@ export function mapBankVoucherRow(v) {
       ? dayjs(v.createdAt).format("YYYY-MM-DD")
       : "—",
     Particulars: v.particulars || v.narration || "—",
-    "Debit From": v.debitFrom || "—",
+    "Debit (Inflow)": v.debitFrom || "—",
     "Credit (Outflow)": v.creditTo || "—",
     Balance: amt,
   };

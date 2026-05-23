@@ -4,6 +4,7 @@ import { validateAndRespond } from "../utils/validateAndRespond";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
+import { checkAndNotifyProductLowStock } from "../utils/productStockAlert";
 
 export const createProduct = async (
   req: Request,
@@ -24,6 +25,10 @@ export const createProduct = async (
 
     const product = new Product(productData);
     const savedProduct = await product.save();
+
+    void checkAndNotifyProductLowStock(String(savedProduct._id)).catch((err) =>
+      console.error("Low stock notification failed:", err)
+    );
 
     res.status(201).json({
       message: "Product created successfully.",
@@ -80,6 +85,10 @@ export const updateProduct = async (
     if (!updatedProduct) {
       throw new AppError(HttpStatusCode.NOT_FOUND, "No products found.");
     }
+
+    void checkAndNotifyProductLowStock(String(updatedProduct._id)).catch((err) =>
+      console.error("Low stock notification failed:", err)
+    );
 
     res.status(200).json({
       message: "Product updated successfully.",

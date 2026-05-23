@@ -57,21 +57,21 @@ function formatStatementDate(value) {
   return `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
 }
 
-/** Same rupee display as normal statement PDF cells (no ₹ prefix). */
+/** Rupee display for statement PDF debit/credit cells. */
 function fmtStatementCellAmount(n) {
   const x = Number(n);
   if (!Number.isFinite(x) || x === 0) return "";
-  return fmtRupee(x).replace("₹", "");
+  return fmtRupee(x);
 }
 
-/** Detail lines (products / tax) — thousands + 2 decimals like invoice snippet. */
+/** Detail lines (products / tax) — ₹ + thousands + 2 decimals. */
 function fmtStatementDetailTwoDecimals(n) {
   const x = Number(n);
   if (!Number.isFinite(x) || x === 0) return "";
-  return x.toLocaleString("en-IN", {
+  return `₹${x.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  });
+  })}`;
 }
 
 /** Matches detail PDF thead `background:#eee` for product / CGST / SGST sub-rows. */
@@ -132,6 +132,91 @@ function purchaseItemLabel(item) {
   const p = item?.product;
   if (p && typeof p === "object") return String(p.productName || "").trim() || "—";
   return "—";
+}
+
+/** Item lines + CGST/SGST for trade vouchers in statement detail PDF. */
+function appendTradeVoucherDetailRows(
+  detailRows,
+  {
+    dateStr,
+    particulars,
+    voucherType,
+    voucherNo,
+    summaryDebit,
+    summaryCredit,
+    items,
+    gst,
+    amountOn,
+  }
+) {
+  detailRows.push({
+    date: dateStr,
+    particulars,
+    voucherType,
+    voucherNo,
+    debit: summaryDebit,
+    credit: summaryCredit,
+  });
+
+  const itemList = Array.isArray(items) ? items : [];
+  if (itemList.length === 0) return;
+
+  const gstNum = Number(gst) || 0;
+  const half = gstNum / 2;
+
+  for (const item of itemList) {
+    const name = purchaseItemLabel(item);
+    const qty = Number(item.quantity) || 0;
+    const rate = Number(item.rateParUnit) || 0;
+    const sub = Number(item.subtotal);
+    const lineSub = Number.isFinite(sub) ? sub : qty * rate;
+    const unit = String(item.unit || "Kg").trim() || "Kg";
+    const rateTxt = `${rate.toLocaleString("en-IN", {
+      maximumFractionDigits: 2,
+    })}/${unit}`;
+    detailRows.push({
+      date: "",
+      plainParticulars: true,
+      particulars: name,
+      voucherType: `${qty.toLocaleString("en-IN")} ${unit}`,
+      voucherNo: rateTxt,
+      numericDetailColumns: true,
+      debit:
+        amountOn === "debit" ? fmtStatementDetailTwoDecimals(lineSub) : "",
+      credit:
+        amountOn === "credit" ? fmtStatementDetailTwoDecimals(lineSub) : "",
+      detailBandBg: true,
+    });
+  }
+
+  if (gstNum > 0) {
+    detailRows.push({
+      date: "",
+      plainParticulars: true,
+      particulars: "CGST",
+      voucherType: "",
+      voucherNo: "",
+      debit: amountOn === "debit" ? fmtStatementDetailTwoDecimals(half) : "",
+      credit: amountOn === "credit" ? fmtStatementDetailTwoDecimals(half) : "",
+      detailBandBg: true,
+    });
+    detailRows.push({
+      date: "",
+      plainParticulars: true,
+      particulars: "SGST",
+      voucherType: "",
+      voucherNo: "",
+      debit:
+        amountOn === "debit"
+          ? fmtStatementDetailTwoDecimals(gstNum - half)
+          : "",
+      credit:
+        amountOn === "credit"
+          ? fmtStatementDetailTwoDecimals(gstNum - half)
+          : "",
+      detailBandBg: true,
+    });
+  }
 }
 
 function dedupeVouchersById(list) {
@@ -434,6 +519,16 @@ const AccountIndex = () => {
         const purchaseReturnMatchedSummaries = dedupeVouchersById(
           ledgerSource.purchaseReturns.filter((v) => matchParty(v.partyName))
         );
+        const salesMatchedSummaries = dedupeVouchersById(
+          ledgerSource.sales.filter((v) => matchParty(v.partyName))
+        );
+        const salesReturnMatchedSummaries = dedupeVouchersById(
+          ledgerSource.salesReturns.filter(
+            (v) =>
+              matchParty(v.partyName) &&
+              String(v.approvalStatus || "") === "Approved"
+          )
+        );
 
         const purchaseVouchersFull = (
           await Promise.all(
@@ -455,11 +550,33 @@ const AccountIndex = () => {
             )
           )
         ).filter(Boolean);
+        const salesVouchersFull = (
+          await Promise.all(
+            salesMatchedSummaries.map((v) =>
+              salesVouchersApi
+                .getById(String(v._id))
+                .then((r) => r.data)
+                .catch(() => null)
+            )
+          )
+        ).filter(Boolean);
+        const salesReturnVouchersFull = (
+          await Promise.all(
+            salesReturnMatchedSummaries.map((v) =>
+              salesReturnVouchersApi
+                .getById(String(v._id))
+                .then((r) => r.data)
+                .catch(() => null)
+            )
+          )
+        ).filter(Boolean);
 
         ledgerSource = {
           ...ledgerSource,
           purchases: dedupeVouchersById(purchaseVouchersFull),
           purchaseReturns: dedupeVouchersById(purchaseReturnVouchersFull),
+          sales: dedupeVouchersById(salesVouchersFull),
+          salesReturns: dedupeVouchersById(salesReturnVouchersFull),
         };
       }
 
@@ -490,11 +607,11 @@ const AccountIndex = () => {
 
       const openingDebitStr =
         openingIsDebit && openingAmount
-          ? fmtRupee(openingAmount).replace("₹", "")
+          ? fmtStatementCellAmount(openingAmount)
           : "";
       const openingCreditStr =
         !openingIsDebit && openingAmount
-          ? fmtRupee(openingAmount).replace("₹", "")
+          ? fmtStatementCellAmount(openingAmount)
           : "";
 
       const companyName = "JETOX AGRO INDUSTRIES";
@@ -544,8 +661,8 @@ const AccountIndex = () => {
             particulars: e.particulars || "—",
             voucherType: e.voucherType || "—",
             voucherNo: e.voucherNo || "—",
-            debit: e.debit ? fmtRupee(e.debit).replace("₹", "") : "",
-            credit: e.credit ? fmtRupee(e.credit).replace("₹", "") : "",
+            debit: e.debit ? fmtStatementCellAmount(e.debit) : "",
+            credit: e.credit ? fmtStatementCellAmount(e.credit) : "",
           });
         });
 
@@ -555,9 +672,13 @@ const AccountIndex = () => {
           voucherType: "",
           voucherNo: "",
           debit:
-            running >= 0 ? fmtRupee(Math.abs(running)).replace("₹", "") : "",
+            running >= 0
+              ? fmtStatementCellAmount(Math.abs(running))
+              : "",
           credit:
-            running < 0 ? fmtRupee(Math.abs(running)).replace("₹", "") : "",
+            running < 0
+              ? fmtStatementCellAmount(Math.abs(running))
+              : "",
         });
 
         rowsHtml = buildStatementTableRowsHtml(printableRows);
@@ -585,7 +706,8 @@ const AccountIndex = () => {
             e.kind === "receipt" ||
             e.kind === "journal" ||
             e.kind === "expense" ||
-            e.kind === "cash"
+            e.kind === "cash" ||
+            e.kind === "bank"
           ) {
             detailRows.push({
               date: dateStr,
@@ -600,129 +722,66 @@ const AccountIndex = () => {
 
           if (e.kind === "purchase") {
             const pv = e.raw;
-            const gst = Number(pv.gstAmount) || 0;
-            const half = gst / 2;
-            const items = pv.items || [];
-
-            detailRows.push({
-              date: dateStr,
+            appendTradeVoucherDetailRows(detailRows, {
+              dateStr,
               particulars: "Purchase",
               voucherType: "Purchase",
               voucherNo: String(pv.voucherNo || "—"),
-              debit: "",
-              credit: cStr,
+              summaryDebit: "",
+              summaryCredit: cStr,
+              items: pv.items,
+              gst: pv.gstAmount,
+              amountOn: "credit",
             });
-
-            if (items.length > 0) {
-              for (const item of items) {
-                const name = purchaseItemLabel(item);
-                const qty = Number(item.quantity) || 0;
-                const rate = Number(item.rateParUnit) || 0;
-                const sub = Number(item.subtotal);
-                const lineSub = Number.isFinite(sub) ? sub : qty * rate;
-                const unit = String(item.unit || "Kg").trim() || "Kg";
-                const rateTxt = `${rate.toLocaleString("en-IN", {
-                  maximumFractionDigits: 2,
-                })}/${unit}`;
-                detailRows.push({
-                  date: "",
-                  plainParticulars: true,
-                  particulars: name,
-                  voucherType: `${qty.toLocaleString("en-IN")} ${unit}`,
-                  voucherNo: rateTxt,
-                  numericDetailColumns: true,
-                  debit: "",
-                  credit: fmtStatementDetailTwoDecimals(lineSub),
-                  detailBandBg: true,
-                });
-              }
-              if (gst > 0) {
-                detailRows.push({
-                  date: "",
-                  plainParticulars: true,
-                  particulars: "CGST",
-                  voucherType: "",
-                  voucherNo: "",
-                  debit: "",
-                  credit: fmtStatementDetailTwoDecimals(half),
-                  detailBandBg: true,
-                });
-                detailRows.push({
-                  date: "",
-                  plainParticulars: true,
-                  particulars: "SGST",
-                  voucherType: "",
-                  voucherNo: "",
-                  debit: "",
-                  credit: fmtStatementDetailTwoDecimals(gst - half),
-                  detailBandBg: true,
-                });
-              }
-            }
             continue;
           }
 
           if (e.kind === "purchaseReturn") {
             const pv = e.raw;
-            const gst = Number(pv.gstAmount) || 0;
-            const half = gst / 2;
-            const items = pv.items || [];
-
-            detailRows.push({
-              date: dateStr,
+            appendTradeVoucherDetailRows(detailRows, {
+              dateStr,
               particulars: "Purchase Return",
               voucherType: "Purchase Return",
               voucherNo: String(pv.voucherNo || "—"),
-              debit: dStr,
-              credit: "",
+              summaryDebit: dStr,
+              summaryCredit: "",
+              items: pv.items,
+              gst: pv.gstAmount,
+              amountOn: "debit",
             });
+            continue;
+          }
 
-            if (items.length > 0) {
-              for (const item of items) {
-                const name = purchaseItemLabel(item);
-                const qty = Number(item.quantity) || 0;
-                const rate = Number(item.rateParUnit) || 0;
-                const sub = Number(item.subtotal);
-                const lineSub = Number.isFinite(sub) ? sub : qty * rate;
-                const unit = String(item.unit || "Kg").trim() || "Kg";
-                const rateTxt = `${rate.toLocaleString("en-IN", {
-                  maximumFractionDigits: 2,
-                })}/${unit}`;
-                detailRows.push({
-                  date: "",
-                  plainParticulars: true,
-                  particulars: name,
-                  voucherType: `${qty.toLocaleString("en-IN")} ${unit}`,
-                  voucherNo: rateTxt,
-                  numericDetailColumns: true,
-                  debit: fmtStatementDetailTwoDecimals(lineSub),
-                  credit: "",
-                  detailBandBg: true,
-                });
-              }
-              if (gst > 0) {
-                detailRows.push({
-                  date: "",
-                  plainParticulars: true,
-                  particulars: "CGST",
-                  voucherType: "",
-                  voucherNo: "",
-                  debit: fmtStatementDetailTwoDecimals(half),
-                  credit: "",
-                  detailBandBg: true,
-                });
-                detailRows.push({
-                  date: "",
-                  plainParticulars: true,
-                  particulars: "SGST",
-                  voucherType: "",
-                  voucherNo: "",
-                  debit: fmtStatementDetailTwoDecimals(gst - half),
-                  credit: "",
-                  detailBandBg: true,
-                });
-              }
-            }
+          if (e.kind === "sales") {
+            const sv = e.raw;
+            appendTradeVoucherDetailRows(detailRows, {
+              dateStr,
+              particulars: "Sales",
+              voucherType: "Sales",
+              voucherNo: String(sv.voucherNo || "—"),
+              summaryDebit: dStr,
+              summaryCredit: "",
+              items: sv.items,
+              gst: sv.gstAmount,
+              amountOn: "debit",
+            });
+            continue;
+          }
+
+          if (e.kind === "salesReturn") {
+            const sv = e.raw;
+            appendTradeVoucherDetailRows(detailRows, {
+              dateStr,
+              particulars: "Sales Return",
+              voucherType: "Sales Return",
+              voucherNo: String(sv.voucherNo || "—"),
+              summaryDebit: "",
+              summaryCredit: cStr,
+              items: sv.items,
+              gst: sv.gstAmount,
+              amountOn: "credit",
+            });
+            continue;
           }
         }
 
@@ -733,11 +792,11 @@ const AccountIndex = () => {
           voucherNo: "",
           debit:
             runningDetail >= 0
-              ? fmtRupee(Math.abs(runningDetail)).replace("₹", "")
+              ? fmtStatementCellAmount(Math.abs(runningDetail))
               : "",
           credit:
             runningDetail < 0
-              ? fmtRupee(Math.abs(runningDetail)).replace("₹", "")
+              ? fmtStatementCellAmount(Math.abs(runningDetail))
               : "",
         });
 

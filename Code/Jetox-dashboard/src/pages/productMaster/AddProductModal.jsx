@@ -496,6 +496,19 @@ const AddProductModal = ({
         await productsApi.create(payload);
         toast.success("Product saved");
       }
+      const minLevel = parseFloat(String(form.minReorderLevel));
+      const savedQty = Number.isFinite(qty) ? qty : 0;
+      if (
+        form.stockEnabled &&
+        Number.isFinite(minLevel) &&
+        minLevel >= 0 &&
+        savedQty <= minLevel
+      ) {
+        toast(
+          `"${String(form.productName).trim() || "Product"}" is at or below reorder level (${savedQty} / ${minLevel}). Admins have been notified.`,
+          { icon: "⚠️", duration: 5000 }
+        );
+      }
       onSaved?.();
       onClose?.();
     } catch (e) {

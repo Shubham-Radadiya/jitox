@@ -55,6 +55,9 @@ const SalesReturnVoucherSchema = new Schema<ISalesReturnVoucher>(
     },
     approvedAt: { type: Date },
     rejectedAt: { type: Date },
+    rejectReason: { type: String, trim: true },
+    rejectNotes: { type: String, trim: true },
+    rejectProof: { type: String, trim: true },
     sourceSalesId: {
       type: Schema.Types.ObjectId,
       ref: "SalesVoucher",

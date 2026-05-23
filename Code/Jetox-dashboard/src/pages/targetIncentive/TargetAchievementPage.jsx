@@ -101,13 +101,33 @@ export default function TargetAchievementPage() {
   const [period, setPeriod] = useState("year");
   const [manager, setManager] = useState("all");
   const [dateRange, setDateRange] = useState(null);
+  const [dataSource, setDataSource] = useState("live");
   const [openMonth, setOpenMonth] = useState(null);
   const [openManager, setOpenManager] = useState(null);
 
+  const queryYear = useMemo(() => {
+    if (dateRange?.[0]) return Number(String(dateRange[0]).slice(0, 4));
+    return new Date().getFullYear();
+  }, [dateRange]);
+
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["target-incentive"],
+    queryKey: [
+      "target-incentive",
+      dataSource,
+      manager,
+      queryYear,
+      dateRange?.[0],
+      dateRange?.[1],
+    ],
     queryFn: async () => {
-      const { data: payload } = await dashboardUiApi.getTargetIncentive();
+      const params = {
+        source: dataSource,
+        manager,
+        year: queryYear,
+      };
+      if (dateRange?.[0]) params.dateFrom = dateRange[0];
+      if (dateRange?.[1]) params.dateTo = dateRange[1];
+      const { data: payload } = await dashboardUiApi.getTargetIncentive(params);
       return payload;
     },
   });
@@ -117,6 +137,9 @@ export default function TargetAchievementPage() {
       toast.error(getApiErrorMessage(error, "Could not load target data"));
     }
   }, [isError, error]);
+
+  const activeSource = data?.dataSource || dataSource;
+  const isDemoView = activeSource === "demo";
 
   const overviewKpis = data?.overviewKpis || [];
   const months = data?.months || [];
@@ -165,6 +188,15 @@ export default function TargetAchievementPage() {
             <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Target vs Achievement View
             </h1>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                isDemoView
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+              }`}
+            >
+              {isDemoView ? "Demo data" : "Live data"}
+            </span>
             <div className="inline-flex h-10 shrink-0 items-center rounded-lg border border-slate-200 p-0.5 dark:border-slate-600 md:hidden">
               {["month", "year"].map((p) => (
                 <button
@@ -183,6 +215,25 @@ export default function TargetAchievementPage() {
             </div>
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
+            <div className="inline-flex h-10 shrink-0 items-center rounded-lg border border-slate-200 p-0.5 dark:border-slate-600">
+              {[
+                { id: "live", label: "Live" },
+                { id: "demo", label: "Demo" },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setDataSource(opt.id)}
+                  className={`h-8 rounded-md px-3 text-xs font-medium ${
+                    dataSource === opt.id
+                      ? "bg-primary text-white"
+                      : "text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <div className="hidden h-10 shrink-0 items-center rounded-lg border border-slate-200 p-0.5 dark:border-slate-600 md:inline-flex">
               {["month", "year"].map((p) => (
                 <button
@@ -258,6 +309,7 @@ export default function TargetAchievementPage() {
                 />
                 <p className="text-xs text-slate-500 mt-2 dark:text-slate-400">
                   Light bars = target · Dark bars = achieved
+                  {isDemoView ? " · demo sample" : ""}
                 </p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -270,7 +322,8 @@ export default function TargetAchievementPage() {
                   color="#e11d48"
                 />
                 <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">
-                  Line = collection achieved (demo)
+                  Line = collection achieved
+                  {isDemoView ? " (demo)" : " (from receipt vouchers)"}
                 </p>
               </div>
             </div>

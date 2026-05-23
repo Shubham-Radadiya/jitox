@@ -18,6 +18,7 @@ import {
   type EmployeeSeed,
 } from "../data/employeeTracking.seed";
 import { productLineAmount, resolveProductUnit } from "../utils/productUnit";
+import { checkAndNotifyProductLowStock } from "../utils/productStockAlert";
 import { applyPaymentToAccountBalance } from "../utils/applyPaymentToAccountBalance";
 import {
   buildOrderFulfillment,
@@ -236,10 +237,9 @@ function paymentLabels(q: QuotationLean): {
     dueKind: refundDue > 0 ? "refund" : "collect",
     netTotal: formatInr(effective),
     grossTotal: formatInr(gross),
-    returnedTotal: returned > 0 ? formatInr(returned) : "—",
-    refundDueTotal: refundDue > 0 ? formatInr(refundDue) : "—",
-    refundPaidTotal:
-      customerRefunded > 0 ? formatInr(customerRefunded) : "—",
+    returnedTotal: formatInr(returned),
+    refundDueTotal: formatInr(refundDue),
+    refundPaidTotal: formatInr(customerRefunded),
     creditBalance: creditNum,
   };
 }
@@ -895,6 +895,9 @@ export async function createStockProductFromUi(body: Record<string, unknown>) {
       : undefined,
   });
   const saved = await doc.save();
+  void checkAndNotifyProductLowStock(String(saved._id)).catch((err) =>
+    console.error("Low stock notification failed:", err)
+  );
   const valueNum = productLineAmount(saved);
   const row = {
     product: saved.productName,

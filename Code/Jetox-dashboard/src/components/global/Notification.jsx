@@ -82,7 +82,9 @@ export const NotificationModal = ({
 
         <div className="max-h-[320px] overflow-y-auto space-y-2 px-3 pb-3 scrollbar-hide">
           {filteredNotifications.length > 0 ? (
-            filteredNotifications.map((item) => (
+            filteredNotifications.map((item) => {
+              const Icon = item.icon || Bell;
+              return (
               <button
                 type="button"
                 key={item.id || item.title}
@@ -96,7 +98,7 @@ export const NotificationModal = ({
                     : "bg-sky-50/50 border-sky-100 hover:bg-sky-50 dark:bg-sky-950/40 dark:border-sky-900 dark:hover:bg-sky-950/60"
                 }`}
               >
-                <Bell size={20} className="text-primary shrink-0 mt-0.5" />
+                <Icon size={20} className="text-primary shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-800 text-sm dark:text-slate-100">{item.title}</div>
                   <div className="text-xs text-gray-600 line-clamp-2 dark:text-slate-400">{item.subtitle}</div>
@@ -105,7 +107,8 @@ export const NotificationModal = ({
                   {item.time}
                 </div>
               </button>
-            ))
+            );
+            })
           ) : (
             <div className="text-center text-gray-500 text-sm py-6 dark:text-slate-400">
               No {activeTab.toLowerCase()} notifications.

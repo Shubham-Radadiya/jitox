@@ -20,6 +20,10 @@ import {
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
 import { buildPartyAddressesMap } from "../utils/partyVoucherAddress.util";
 import { dashboardTabForOrderStatus } from "../constants/orderStatus";
+import {
+  notifyOrderDispatched,
+  notifyOrderInvoiceGenerated,
+} from "../services/orderNotification.service";
 
 /** Fields accepted from PUT body when updating a sales voucher. */
 const SALES_VOUCHER_PATCH_KEYS = [
@@ -289,6 +293,31 @@ export const createSalesVoucher = async (
       totalAmount,
       "apply"
     );
+
+    if (linkedQuotationId) {
+      const linkedOrder = await Quotation.findById(linkedQuotationId)
+        .select("voucherNo partyName transportDetails")
+        .lean();
+      if (linkedOrder) {
+        const invNo = String(invoiceNo || savedVoucher.invoiceNo || "").trim();
+        if (invNo) {
+          void notifyOrderInvoiceGenerated({
+            quotationId: String(linkedQuotationId),
+            orderVoucherNo: String(linkedOrder.voucherNo || ""),
+            invoiceNo: invNo,
+            partyName: String(linkedOrder.partyName || partyName || ""),
+          }).catch((err) => console.error("Invoice notification failed:", err));
+        }
+        if (stockCutOn) {
+          void notifyOrderDispatched(
+            linkedOrder,
+            String(transportDetails || linkedOrder.transportDetails || "")
+          ).catch((err) =>
+            console.error("Dispatch notification failed:", err)
+          );
+        }
+      }
+    }
 
     sendCreated(res, savedVoucher, "Sales voucher created successfully.");
   } catch (error) {
