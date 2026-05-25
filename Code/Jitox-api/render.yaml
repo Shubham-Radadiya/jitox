@@ -19,6 +19,11 @@ services:
         value: "false"
       - key: EMAIL_PASS
         sync: false
+      # Required on Render FREE (SMTP ports blocked). Get key at https://resend.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET_KEY

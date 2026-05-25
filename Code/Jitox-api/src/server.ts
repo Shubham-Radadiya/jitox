@@ -13,7 +13,11 @@ import { globalErrorHandler } from "./common/errors/globalError";
 import { initSocketIO } from "./socket/io";
 import { getHealth } from "./controllers/health.controller";
 import { getEmailUser } from "./constants/emailConfig";
-import { isEmailConfigured, verifyEmailTransport } from "./helper/sendEmail";
+import {
+  getEmailProvider,
+  isEmailConfigured,
+  verifyEmailTransport,
+} from "./helper/sendEmail";
 
 const envFile =
   process.env.NODE_ENV === "production"
@@ -51,7 +55,7 @@ const start = async () => {
   await connectDB();
 
   console.log(
-    `[jitox-api] email sender=${getEmailUser()} configured=${isEmailConfigured()} jwt=${process.env.JWT_SECRET_KEY?.trim() ? "ok" : "MISSING"}`
+    `[jitox-api] email sender=${getEmailUser()} provider=${getEmailProvider() ?? "none"} configured=${isEmailConfigured()} jwt=${process.env.JWT_SECRET_KEY?.trim() ? "ok" : "MISSING"}`
   );
   await verifyEmailTransport();
 

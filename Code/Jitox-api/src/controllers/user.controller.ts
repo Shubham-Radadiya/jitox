@@ -83,7 +83,7 @@ const issueOtp = async (opts: {
       console.error("[email] Failed to send OTP:", err);
       throw new AppError(
         HttpStatusCode.SERVICE_UNAVAILABLE,
-        "Could not send verification email. Check EMAIL_USER / EMAIL_PASS or try again later."
+        "Could not send verification email. On Render free tier use RESEND_API_KEY (resend.com); otherwise check EMAIL_PASS or upgrade Render plan."
       );
     }
   } else if (process.env.NODE_ENV === "development") {
