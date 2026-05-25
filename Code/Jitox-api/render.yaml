@@ -1,4 +1,4 @@
-# Render Blueprint — Jitox API (set EMAIL_PASS in dashboard as a secret)
+# Render Blueprint — Jitox API (Gmail SMTP from code; no third-party email service)
 services:
   - type: web
     name: jitox-api
@@ -19,19 +19,9 @@ services:
         value: "false"
       - key: EMAIL_PASS
         sync: false
-      # Best for OTP to any Gmail: SendGrid Single Sender (no domain)
-      - key: SENDGRID_API_KEY
-        sync: false
-      - key: SENDGRID_FROM_EMAIL
-        value: shubhamradadiya@gmail.com
-      # Or Brevo / Resend (Resend test = one recipient only)
-      - key: BREVO_API_KEY
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: RESEND_FROM
-        sync: false
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET_KEY
         sync: false
+      - key: CORS_ORIGINS
+        value: https://jitox.vercel.app

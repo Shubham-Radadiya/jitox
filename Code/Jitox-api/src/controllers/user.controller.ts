@@ -94,7 +94,7 @@ const issueOtp = async (opts: {
     await otpService.clearOtp(email);
     throw new AppError(
       HttpStatusCode.SERVICE_UNAVAILABLE,
-      "Email service is not configured. Please try again later or contact support."
+      "Email is not configured. Set EMAIL_PASS (Gmail App Password for shubhamradadiya@gmail.com)."
     );
   }
 
