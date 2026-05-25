@@ -1,0 +1,25 @@
+# Render Blueprint — Jitox API (set EMAIL_PASS in dashboard as a secret)
+services:
+  - type: web
+    name: jitox-api
+    runtime: node
+    rootDir: Code/Jitox-api
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: EMAIL_USER
+        value: shubhamradadiya@gmail.com
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_SECURE
+        value: "false"
+      - key: EMAIL_PASS
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false

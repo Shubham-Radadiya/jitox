@@ -12,7 +12,8 @@
     "start": "node dist/server.js",
     "seed:demo": "cross-env NODE_ENV=development ts-node src/seed/runDemoSeed.ts",
     "seed:user-test": "cross-env NODE_ENV=development ts-node src/seed/runUserTestSeed.ts",
-    "migrate:address": "cross-env NODE_ENV=development ts-node src/migrations/migrateAddressFields.ts"
+    "migrate:address": "cross-env NODE_ENV=development ts-node src/migrations/migrateAddressFields.ts",
+    "test:email": "cross-env NODE_ENV=development ts-node scripts/sendTestOtp.ts"
   },
   "keywords": [],
   "author": "",

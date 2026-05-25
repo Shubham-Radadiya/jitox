@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
+import { getEmailUser } from "../constants/emailConfig";
 import { isEmailConfigured } from "../helper/sendEmail";
 
 export const getHealth = async (_req: Request, res: Response): Promise<void> => {
@@ -16,12 +17,13 @@ export const getHealth = async (_req: Request, res: Response): Promise<void> => 
       mongo: mongoReady ? "connected" : "disconnected",
       jwt: jwtConfigured ? "configured" : "missing",
       email: emailConfigured ? "configured" : "missing",
+      emailSender: getEmailUser(),
     },
     hints: {
       email:
         emailConfigured
           ? null
-          : "Set EMAIL_USER and EMAIL_PASS on Render (Gmail app password) to enable OTP emails.",
+          : `Set EMAIL_PASS on Render (Gmail app password for ${getEmailUser()}). EMAIL_USER defaults to shubhamradadiya@gmail.com.`,
       jwt:
         jwtConfigured
           ? null

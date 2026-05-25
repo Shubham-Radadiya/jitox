@@ -12,7 +12,8 @@ import { setupRoutes } from "./routes";
 import { globalErrorHandler } from "./common/errors/globalError";
 import { initSocketIO } from "./socket/io";
 import { getHealth } from "./controllers/health.controller";
-import { isEmailConfigured } from "./helper/sendEmail";
+import { getEmailUser } from "./constants/emailConfig";
+import { isEmailConfigured, verifyEmailTransport } from "./helper/sendEmail";
 
 const envFile =
   process.env.NODE_ENV === "production"
@@ -20,6 +21,7 @@ const envFile =
     : ".env.development";
 
 dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const app: Express = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -49,8 +51,9 @@ const start = async () => {
   await connectDB();
 
   console.log(
-    `[jitox-api] email=${isEmailConfigured() ? "configured" : "MISSING (OTP emails disabled)"} jwt=${process.env.JWT_SECRET_KEY?.trim() ? "ok" : "MISSING"}`
+    `[jitox-api] email sender=${getEmailUser()} configured=${isEmailConfigured()} jwt=${process.env.JWT_SECRET_KEY?.trim() ? "ok" : "MISSING"}`
   );
+  await verifyEmailTransport();
 
   const isDev = process.env.NODE_ENV === "development";
   const allowBootstrap = process.env.ALLOW_BOOTSTRAP_USERS === "true";

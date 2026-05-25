@@ -1,16 +1,21 @@
 import nodemailer from "nodemailer";
+import {
+  DEFAULT_OTP_SENDER_EMAIL,
+  getEmailPass,
+  getEmailUser,
+} from "../constants/emailConfig";
 
 export function isEmailConfigured(): boolean {
-  return Boolean(
-    process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim()
-  );
+  return Boolean(getEmailUser() && getEmailPass());
 }
 
 function createTransporter() {
-  const user = process.env.EMAIL_USER?.trim();
-  const pass = process.env.EMAIL_PASS?.trim();
-  if (!user || !pass) {
-    throw new Error("EMAIL_USER and EMAIL_PASS must be set to send email");
+  const user = getEmailUser();
+  const pass = getEmailPass();
+  if (!pass) {
+    throw new Error(
+      `EMAIL_PASS must be set (Gmail app password for ${user || DEFAULT_OTP_SENDER_EMAIL})`
+    );
   }
 
   const host = process.env.EMAIL_HOST?.trim() || "smtp.gmail.com";
@@ -26,6 +31,28 @@ function createTransporter() {
   });
 }
 
+/** Call once at startup — logs whether Gmail SMTP accepts the configured credentials. */
+export async function verifyEmailTransport(): Promise<boolean> {
+  if (!isEmailConfigured()) {
+    console.warn(
+      `[jitox-api] email=MISSING — set EMAIL_PASS (Gmail app password for ${getEmailUser()}) to send OTP emails`
+    );
+    return false;
+  }
+  try {
+    const transporter = createTransporter();
+    await transporter.verify();
+    console.log(`[jitox-api] email=ok sender=${getEmailUser()}`);
+    return true;
+  } catch (err) {
+    console.error(
+      `[jitox-api] email=FAILED sender=${getEmailUser()} — check EMAIL_PASS (use Gmail App Password, not login password):`,
+      err instanceof Error ? err.message : err
+    );
+    return false;
+  }
+}
+
 export const sendEmail = async ({
   to,
   subject,
@@ -35,11 +62,7 @@ export const sendEmail = async ({
   subject: string;
   text: string;
 }): Promise<void> => {
-  const fromUser = process.env.EMAIL_USER?.trim();
-  if (!fromUser) {
-    throw new Error("EMAIL_USER is not set");
-  }
-
+  const fromUser = getEmailUser();
   const transporter = createTransporter();
   await transporter.sendMail({
     from: `"Jitox System" <${fromUser}>`,
