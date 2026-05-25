@@ -29,12 +29,22 @@ export const loginUser = (data, { onSuccess } = {}) => {
   return async (dispatch) => {
     dispatch({ type: LOGIN_REQUEST });
     try {
-      const response = await authService.loginUser(data);
+      const response = await authService.loginUser({
+        ...data,
+        client: "web",
+      });
       const token = response.data.token;
+      const user = response.data.user;
+      const role = String(user?.role || "").trim().toLowerCase();
+      if (role === "user") {
+        throw new Error(
+          "This account is for the mobile field app only. Please use the Jitox mobile app."
+        );
+      }
       localStorage.setItem("token", token);
       localStorage.setItem("access_token", token);
-      if (response.data.user) {
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user));
       }
       toast.success(response?.data?.message || "User login successful");
       if (onSuccess) onSuccess(response);

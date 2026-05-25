@@ -7,4 +7,6 @@ export const userService = {
   create: (data) => usersApi.create(data),
   update: (id, data) => usersApi.update(id, data),
   delete: (id) => usersApi.delete(id),
+  approve: (id) => usersApi.approve(id),
+  reject: (id) => usersApi.reject(id),
 };

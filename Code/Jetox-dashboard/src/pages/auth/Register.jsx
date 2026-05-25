@@ -86,6 +86,11 @@ function Register() {
               onSubmit={handleSubmit}
               className="flex flex-col gap-4 sm:gap-5"
             >
+              <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
+                Registration creates a <strong>field user</strong> account for the
+                Jitox mobile app. Admin and Manager accounts are created by an
+                administrator in User Master.
+              </p>
               <div className="flex flex-col gap-4 sm:gap-5 max-h-[calc(100vh-20rem)] overflow-auto scrollbar-hide">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div>

@@ -51,8 +51,12 @@ export const isAuthenticated = (
 };
 
 export const authorizeRoles = (...roles: string[]) => {
+  const allowed = new Set(roles.map((r) => String(r).trim().toLowerCase()));
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    const role = String(req.user?.role ?? "")
+      .trim()
+      .toLowerCase();
+    if (!req.user || !allowed.has(role)) {
       return res.status(403).json({
         message: "You are not authorized to access this resource.",
       });

@@ -4,6 +4,7 @@ import 'package:jitox_agro_app/Constants/text_styles.dart';
 import 'package:jitox_agro_app/View/Screens/Auth/login_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Auth/otp_verification_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Auth/register_screen.dart';
+import 'package:jitox_agro_app/models/registration_draft.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
 enum _AuthPane { register, login, verifyEmail }
@@ -19,6 +20,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   late _AuthPane _pane;
+  RegistrationDraft? _registrationDraft;
 
   @override
   void initState() {
@@ -28,14 +30,25 @@ class _AuthScreenState extends State<AuthScreen> {
 
   int get _progressStep => _pane == _AuthPane.verifyEmail ? 2 : 1;
 
-  void _showRegister() => setState(() => _pane = _AuthPane.register);
-  void _showLogin() => setState(() => _pane = _AuthPane.login);
-  void _showOtp() => setState(() => _pane = _AuthPane.verifyEmail);
+  void _showRegister() => setState(() {
+        _pane = _AuthPane.register;
+        _registrationDraft = null;
+      });
+
+  void _showLogin() => setState(() {
+        _pane = _AuthPane.login;
+        _registrationDraft = null;
+      });
+
+  void _showOtp(RegistrationDraft draft) => setState(() {
+        _registrationDraft = draft;
+        _pane = _AuthPane.verifyEmail;
+      });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surfaceMuted,
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 4.w),
@@ -49,14 +62,34 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               _buildHeader(),
               Expanded(
-                child: _pane == _AuthPane.register
-                    ? RegisterScreen(
-                        onSwitchToLogin: _showLogin,
-                        onRegistrationComplete: _showOtp,
-                      )
-                    : _pane == _AuthPane.login
-                        ? LoginScreen(onSwitchToRegister: _showRegister)
-                        : const OtpVerificationScreen(),
+                child: Card(
+                  elevation: 0,
+                  margin: EdgeInsets.only(bottom: 2.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(4.w, 2.h, 4.w, 0),
+                    child: _pane == _AuthPane.register
+                        ? RegisterScreen(
+                            onSwitchToLogin: _showLogin,
+                            onOtpSent: _showOtp,
+                          )
+                        : _pane == _AuthPane.login
+                            ? LoginScreen(onSwitchToRegister: _showRegister)
+                            : _registrationDraft == null
+                                ? RegisterScreen(
+                                    onSwitchToLogin: _showLogin,
+                                    onOtpSent: _showOtp,
+                                  )
+                                : OtpVerificationScreen(
+                                    draft: _registrationDraft!,
+                                    onVerified: _showLogin,
+                                    onBackToRegister: _showRegister,
+                                  ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -84,7 +117,7 @@ class _AuthScreenState extends State<AuthScreen> {
       case _AuthPane.verifyEmail:
         title = 'Verify your Email Id';
         message =
-            'Please verify your email by clicking the link in the email we\'ve sent you or enter the code here.';
+            'Enter the 6-digit code we sent to ${_registrationDraft?.email ?? 'your email'}.';
         showBrand = false;
         break;
     }

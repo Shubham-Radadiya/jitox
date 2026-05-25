@@ -133,7 +133,8 @@ const UserSummaryIndex = () => {
   }, []);
 
   const displayUser = userData || summary?.profile || EMPTY_PROFILE;
-  const liveData = !!summary;
+  /** Per-user summary: never show static demo rows when a user is selected. */
+  const liveData = Boolean(userId);
 
   const canViewTeamScope = ["admin", "manager"].includes(
     String(displayUser.role || "").toLowerCase()
@@ -258,7 +259,7 @@ const UserSummaryIndex = () => {
             >
               <ChevronLeft size={18} className="text-slate-700 sm:size-5 dark:text-slate-200" />
             </button>
-            <h1 className="text-lg font-bold text-dark sm:text-xl !mb-0">User Summary</h1>
+            <h1 className="jitox-page-title !mb-0">User Summary</h1>
           </div>
         </div>
 
@@ -291,10 +292,10 @@ const UserSummaryIndex = () => {
                   />
                 </div>
                 <div className="min-w-0 flex flex-col gap-0.5">
-                  <div className="truncate text-sm font-bold text-slate-900 sm:text-base dark:text-slate-100">
+                  <div className="jitox-section-title truncate">
                     {displayUser.name}
                   </div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <div className="jitox-caption uppercase tracking-wider">
                     {displayUser.empId}
                   </div>
                 </div>
@@ -303,28 +304,28 @@ const UserSummaryIndex = () => {
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 sm:gap-x-4 sm:gap-y-2 sm:pr-1">
                 <div className="flex items-center gap-2">
                   <Phone size={16} className="shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
-                  <span className="truncate text-xs font-semibold text-slate-900 sm:text-sm dark:text-slate-100">
+                  <span className="jitox-body-sm truncate font-semibold text-slate-900 dark:text-slate-100">
                     {displayUser.phone}
                   </span>
                 </div>
                 <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-600" aria-hidden />
                 <div className="flex min-w-0 items-center gap-2">
                   <Mail size={16} className="shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
-                  <span className="truncate text-xs font-semibold text-slate-900 sm:text-sm dark:text-slate-100">
+                  <span className="jitox-body-sm truncate font-semibold text-slate-900 dark:text-slate-100">
                     {displayUser.email}
                   </span>
                 </div>
                 <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-600" aria-hidden />
                 <div className="flex items-center gap-2">
                   <Briefcase size={16} className="shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
-                  <span className="text-xs font-semibold text-slate-900 sm:text-sm dark:text-slate-100">
+                  <span className="jitox-body-sm font-semibold text-slate-900 dark:text-slate-100">
                     {displayUser.role}
                   </span>
                 </div>
                 <div className="hidden h-8 w-px bg-slate-200 sm:block dark:bg-slate-600" aria-hidden />
                 <div className="flex items-center gap-2">
                   <MapPin size={16} className="shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
-                  <span className="text-xs font-semibold text-slate-900 sm:text-sm dark:text-slate-100">
+                  <span className="jitox-body-sm font-semibold text-slate-900 dark:text-slate-100">
                     {displayUser.region}
                   </span>
                 </div>
@@ -348,7 +349,7 @@ const UserSummaryIndex = () => {
                     role="tab"
                     aria-selected={activeTab === t.id}
                     onClick={() => handleTabChange(t.id)}
-                    className={`min-h-8 shrink-0 whitespace-nowrap border-r border-slate-100 px-2 py-1 text-center text-[10px] font-semibold transition-colors last:border-r-0 sm:min-h-10 sm:px-4 sm:py-2 sm:text-[13px] lg:min-h-0 lg:min-w-0 lg:flex-1 lg:whitespace-normal lg:px-2.5 lg:py-2 dark:border-slate-700 ${
+                    className={`jitox-body-sm min-h-8 shrink-0 whitespace-nowrap border-r border-slate-100 px-2 py-1 text-center !text-[11px] font-semibold transition-colors last:border-r-0 sm:min-h-10 sm:px-4 sm:py-2 sm:!text-[13px] lg:min-h-0 lg:min-w-0 lg:flex-1 lg:whitespace-normal lg:px-2.5 lg:py-2 dark:border-slate-700 ${
                       activeTab === t.id
                         ? "bg-primary text-white"
                         : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800"

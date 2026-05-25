@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-import 'package:jitox_agro_app/Constants/asset_paths.dart';
+import 'package:jitox_agro_app/Constants/colors.dart';
+import 'package:jitox_agro_app/Constants/route_names.dart';
+import 'package:jitox_agro_app/services/auth_session.dart';
 import 'package:jitox_agro_app/View/Widgets/button.dart';
-import 'package:jitox_agro_app/View/Widgets/image.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
 class TurnOnNotification extends StatefulWidget {
@@ -13,6 +13,11 @@ class TurnOnNotification extends StatefulWidget {
 }
 
 class _TurnOnNotificationState extends State<TurnOnNotification> {
+  void _goHome() {
+    AuthSession.markOnboardSeen();
+    Navigator.pushNamedAndRemoveUntil(context, tabScreen, (r) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -44,9 +49,10 @@ class _TurnOnNotificationState extends State<TurnOnNotification> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                CustomAssetImage(
-                  imagePath: Images.threeDAnnouncement,
-                  height: 40.h,
+                Icon(
+                  Icons.campaign_outlined,
+                  size: 28.h,
+                  color: primaryColor,
                 ),
               ],
             ),
@@ -58,7 +64,7 @@ class _TurnOnNotificationState extends State<TurnOnNotification> {
               child: CustomButton(
                 isOutlined: false,
                 text: "Turn on Notification",
-                onPressed: () {},
+                onPressed: _goHome,
               ),
             ),
             SizedBox(
@@ -67,9 +73,12 @@ class _TurnOnNotificationState extends State<TurnOnNotification> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  "Not Now",
-                  style: TextStyle(fontSize: 16.sp),
+                GestureDetector(
+                  onTap: _goHome,
+                  child: Text(
+                    "Not Now",
+                    style: TextStyle(fontSize: 16.sp),
+                  ),
                 ),
               ],
             ),

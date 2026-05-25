@@ -52,7 +52,7 @@ export const defaultUsers = async () => {
       email: "testuser@gmail.com",
       password: testUserPassword,
       role: "User" as const,
-      permissions: ["dashboard", "accounts", "tasks"],
+      permissions: [] as string[],
       firstName: "Test",
       lastName: "User",
       fullAddressBackup: "456 User Ave",

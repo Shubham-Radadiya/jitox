@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { getFirstAllowedDashboardPath } from '../../constants/routePermissions';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import AuthLayout from '../../layouts/AuthLayout';
@@ -17,7 +18,9 @@ const validationSchema = Yup.object().shape({
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
+  const flashMessage = location.state?.message;
   const initialValues = {
     email: '',
     password: '',
@@ -26,8 +29,9 @@ function Login() {
   const handleSubmit = (values) => {
     dispatch(
       loginUser(values, {
-        onSuccess: () => {
-          navigate('/dashboard');
+        onSuccess: (response) => {
+          const user = response?.data?.user;
+          navigate(getFirstAllowedDashboardPath(user) || '/dashboard');
         },
       })
     );
@@ -54,6 +58,11 @@ function Login() {
               className="ds-stack-major"
               noValidate
             >
+              {flashMessage ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                  {flashMessage}
+                </p>
+              ) : null}
               <div>
                 <InputField
                   label="Email"
@@ -123,7 +132,10 @@ function Login() {
             <code className="text-[11px]">GET http://localhost:4000/users/get-users</code>
             <br />
             <code>admin@gmail.com</code> (Admin), <code>manager@gmail.com</code> (Manager),{' '}
-            <code>testuser@gmail.com</code> (User) — password <code>123456</code>
+            <code>testuser@gmail.com</code>, <code>rajesh.field@gmail.com</code>,{' '}
+            <code>priya.field@gmail.com</code> (Field) — password <code>123456</code>
+            <br />
+            Tracking test data: <code>npm run seed:user-test</code> in Jitox-api
           </p>
         )}
 

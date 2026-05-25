@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/app_theme.dart';
+import 'package:jitox_agro_app/Constants/app_typography.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 
 class CustomButton extends StatelessWidget {
   final String text;
@@ -33,15 +33,13 @@ class CustomButton extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         ),
-        padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.6.h),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       ),
       onPressed: onPressed,
       child: Text(
         text,
-        style: TextStyle(
+        style: AppTypography.buttonStyle(
           color: isOutlined ? borderColor : Colors.white,
-          fontSize: 16.sp,
-          fontWeight: FontWeight.w600,
         ),
       ),
     );

@@ -7,6 +7,7 @@ import connectDB from "./config/db.config";
 import { ensureDefaultUsers } from "./seed/ensureDefaultUsers";
 import { ensureDefaultTerritories } from "./seed/ensureDefaultTerritories";
 import { seedDemoData } from "./seed/seedDemoData";
+import { seedUserTestData } from "./seed/seedUserTestData";
 import { setupRoutes } from "./routes";
 import { globalErrorHandler } from "./common/errors/globalError";
 import { initSocketIO } from "./socket/io";
@@ -54,6 +55,13 @@ const start = async () => {
         await seedDemoData();
       } catch (e) {
         console.error("[seed-demo] Failed:", e);
+      }
+    }
+    if (isDev && process.env.SEED_USER_TEST_DATA !== "false") {
+      try {
+        await seedUserTestData();
+      } catch (e) {
+        console.error("[seed-user-test] Failed:", e);
       }
     }
   }

@@ -19,10 +19,12 @@ import notificationRouter from "./notification.routes";
 import customerRouter from "./customer.routes";
 import hrmApiRouter from "./hrm.api.routes";
 import territoryRouter from "./territory.routes";
+import trackingRouter from "./tracking.routes";
 import { Express } from "express";
 
 export const setupRoutes = (app: Express) => {
   app.use("/territories", territoryRouter);
+  app.use("/tracking", trackingRouter);
   app.use("/dashboard-ui", dashboardUiRouter);
   app.use("/api", hrmApiRouter);
   app.use("/users", userRouter);

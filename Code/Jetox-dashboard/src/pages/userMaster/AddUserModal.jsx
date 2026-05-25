@@ -121,6 +121,9 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
 
   const apiRole = mapRoleToApi(form.role);
   const isAdminRole = apiRole === "Admin";
+  const isManagerRole = apiRole === "Manager";
+  const isFieldUserRole = apiRole === "User";
+  const showModuleAccess = isManagerRole;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -193,7 +196,7 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
     const firstName = parts[0] || "";
     const lastName = parts.slice(1).join(" ") || firstName;
 
-    const permissions = isAdminRole ? [] : Array.from(selectedPerms);
+    const permissions = isAdminRole || isFieldUserRole ? [] : Array.from(selectedPerms);
 
     const payload = {
       firstName,
@@ -428,11 +431,17 @@ const AddUserModal = ({ open, onClose, onCreated }) => {
           </div>
         </div>
 
-        {!isAdminRole && (
+        {isFieldUserRole ? (
+          <p className="px-1 text-xs text-slate-600 dark:text-slate-400">
+            Field users use the Jitox mobile app only. They do not get dashboard access.
+          </p>
+        ) : null}
+
+        {showModuleAccess && (
           <div className={CARD}>
-            <div className={`${CARD_TITLE} mb-2`}>Module access</div>
+            <div className={`${CARD_TITLE} mb-2`}>Module access (Manager)</div>
             <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
-              Admin assigns which sidebar sections this Manager or User can open.
+              Admin assigns which sidebar sections this manager can open.
             </p>
             <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
               {MODULE_ACCESS_OPTIONS.map(({ key, label }) => (

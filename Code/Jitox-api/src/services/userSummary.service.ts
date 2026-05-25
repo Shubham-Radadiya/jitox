@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import {
   User,
   Task,
@@ -5,6 +6,7 @@ import {
   ExpenseVoucher,
   Employee,
 } from "../models/index";
+import FieldLocationPing from "../models/fieldLocationPing.model";
 import type { IUser } from "../types/user.type";
 
 function escapeRegex(s: string) {
@@ -74,7 +76,7 @@ export async function buildUserSummary(userId: string) {
         )
       : tasks;
 
-  const visitLog = visitSource.slice(0, 50).map((t, i) => ({
+  const taskVisitLog = visitSource.slice(0, 50).map((t, i) => ({
     "Visit ID": `VS${String(t._id).slice(-6).toUpperCase() || i + 1}`,
     "Client Name": (t.taskName || "Visit").replace(/^.*visit[:\s-]*/i, "").trim() || t.taskName,
     Date: fmtDate(t.setDate || t.dueDate || t.createdAt),
@@ -89,7 +91,39 @@ export async function buildUserSummary(userId: string) {
     Notes: (t.description || "—").slice(0, 80),
   }));
 
-  const sales = await SalesVoucher.find({ orderby: nameRx })
+  const gpsPings = await FieldLocationPing.find({
+    userId: new mongoose.Types.ObjectId(uid),
+    kind: { $in: ["visit", "day_start", "day_end"] },
+  })
+    .sort({ recordedAt: -1 })
+    .limit(200)
+    .lean();
+
+  const gpsVisitLog = gpsPings.map((p, i) => {
+    const kindLabel =
+      p.kind === "day_start"
+        ? "Day start"
+        : p.kind === "day_end"
+          ? "Day end"
+          : "Field visit";
+    return {
+      "Visit ID": `GPS${String(p._id).slice(-6).toUpperCase() || i + 1}`,
+      "Client Name": kindLabel,
+      Date: fmtDateTime(p.recordedAt),
+      Location:
+        p.address?.trim() ||
+        `${Number(p.lat).toFixed(4)}, ${Number(p.lng).toFixed(4)}`,
+      Purpose: kindLabel,
+      Outcomes: "GPS recorded",
+      Notes: p.kind,
+    };
+  });
+
+  const visitLog = gpsVisitLog.length > 0 ? gpsVisitLog : taskVisitLog;
+
+  const sales = await SalesVoucher.find({
+    $or: [{ createdByUserId: new mongoose.Types.ObjectId(uid) }, { orderby: nameRx }],
+  })
     .sort({ voucherDate: -1 })
     .limit(100)
     .lean();
@@ -118,9 +152,17 @@ export async function buildUserSummary(userId: string) {
     };
   });
 
-  const expenses = await ExpenseVoucher.find({
-    $or: [{ paidTo: nameRx }, { description: nameRx }],
-  })
+  const emailRx = user.email
+    ? new RegExp(escapeRegex(String(user.email)), "i")
+    : null;
+  const expenseMatch: Record<string, unknown>[] = [
+    { paidTo: nameRx },
+    { description: nameRx },
+  ];
+  if (emailRx) {
+    expenseMatch.push({ paidTo: emailRx }, { description: emailRx });
+  }
+  const expenses = await ExpenseVoucher.find({ $or: expenseMatch })
     .sort({ startDate: -1, createdAt: -1 })
     .limit(100)
     .lean();

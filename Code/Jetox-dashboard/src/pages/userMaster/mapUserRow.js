@@ -20,6 +20,13 @@ export function mapApiUserToRow(u) {
     [u.firstName, u.lastName].filter(Boolean).join(" ").trim() ||
     "-";
   const addr = addressFromUser(u);
+  const accountStatus = String(u.accountStatus || "approved").toLowerCase();
+  const statusLabel =
+    accountStatus === "pending"
+      ? "Pending approval"
+      : accountStatus === "rejected"
+        ? "Rejected"
+        : "Approved";
   return {
     _id: idStr,
     id: idStr,
@@ -54,7 +61,10 @@ export function mapApiUserToRow(u) {
     "Joining Date": u.createdAt
       ? new Date(u.createdAt).toISOString().slice(0, 10)
       : "-",
-    isActive: true,
+    accountStatus,
+    Status: statusLabel,
+    isActive: accountStatus === "approved",
+    isPendingApproval: accountStatus === "pending",
     image: u.profilePhoto ? buildUploadUrl(u.profilePhoto) : null,
     profilePhoto: u.profilePhoto,
     permissions: u.permissions || [],

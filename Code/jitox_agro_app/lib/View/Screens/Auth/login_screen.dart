@@ -36,7 +36,18 @@ class _LoginScreenState extends State<LoginScreen> {
         password: passwordController.text,
       );
       final token = data['token']?.toString() ?? '';
-      await AuthSession.saveSession(token);
+      final rawUser = data['user'];
+      final userMap =
+          rawUser is Map ? Map<String, dynamic>.from(rawUser) : null;
+      if (userMap != null && !AuthSession.isFieldRole(userMap)) {
+        throw Exception(
+          'Admin and Manager accounts must sign in on the web dashboard.',
+        );
+      }
+      await AuthSession.saveSession(
+        token,
+        user: userMap,
+      );
       if (!mounted) return;
       navigateToHome(context);
     } catch (e) {
@@ -60,10 +71,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 4.w),
-        child: Column(
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4.w),
+      child: Column(
           children: [
             SingleChildScrollView(
               child: Form(
@@ -154,7 +164,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 }

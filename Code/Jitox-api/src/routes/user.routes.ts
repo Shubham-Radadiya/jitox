@@ -11,8 +11,11 @@ import {
   updateUser,
   createAdminAndUser,
   sendOtp,
+  sendRegistrationOtp,
   verifyOtp,
   changePassword,
+  approveUser,
+  rejectUser,
 } from "../controllers/user.controller";
 import { adminAuthenticate } from "../utils/authRoles.utils";
 import { optionalUserPhotoUpload } from "../middleware/multer.middleware";
@@ -33,6 +36,8 @@ router.put(
   optionalUserPhotoUpload("photo"),
   updateUser
 );
+router.patch("/approve-user/:id", adminAuthenticate, approveUser);
+router.patch("/reject-user/:id", adminAuthenticate, rejectUser);
 router.delete("/delete-user/:id", adminAuthenticate, deleteUser);
 router.get("/", adminAuthenticate, getAllUsers);
 router.get("/get-users", (req, res) => {
@@ -53,6 +58,7 @@ router.get(
   getSubordinateUsers
 );
 
+router.post("/send-registration-otp", sendRegistrationOtp);
 router.post("/send-otp", sendOtp);
 router.post("/verify-otp", verifyOtp);
 router.post("/change-password", changePassword);

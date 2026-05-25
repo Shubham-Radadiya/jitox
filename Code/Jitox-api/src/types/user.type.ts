@@ -1,4 +1,5 @@
 import { Document, Types } from "mongoose";
+import type { AccountStatusValue } from "../constants/accountStatus";
 import type { AppRole } from "../constants/roles";
 
 export interface IUser extends Document {
@@ -6,6 +7,8 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: AppRole;
+  /** `pending` until admin approves mobile self-registration; admin-created users are `approved`. */
+  accountStatus?: AccountStatusValue;
   permissions?: string[];
   phone?: string;
   createdAt: Date;

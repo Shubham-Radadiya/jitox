@@ -35,7 +35,7 @@ function mapRoleToApi(value) {
 /**
  * Admin updates user; calls onSave(userId, payload) — parent runs PUT /users/update-user/:id
  */
-const EditUserModal = ({ open, onClose, user, onSave }) => {
+const EditUserModal = ({ open, onClose, user, onSave, isAdminViewer = false }) => {
   const [form, setForm] = useState({
     name: "",
     mobile: "",
@@ -141,6 +141,12 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
 
   const apiRole = mapRoleToApi(form.role);
   const isAdminRole = apiRole === "Admin";
+  const isFieldUserRole = apiRole === "User";
+  const roleOptions = isAdminViewer
+    ? ROLE_OPTIONS
+    : ROLE_OPTIONS.filter((o) => o.value !== "admin");
+  const showModuleAccess =
+    isAdminViewer && !isAdminRole && !isFieldUserRole;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -218,7 +224,8 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
       email: form.email.trim().toLowerCase(),
       role: apiRole,
       phone: form.mobile?.trim() || undefined,
-      permissions: isAdminRole ? [] : Array.from(selectedPerms),
+      permissions:
+        isAdminRole || isFieldUserRole ? [] : Array.from(selectedPerms),
       streetAddress: address.streetAddress.trim(),
       area: address.area.trim(),
       city: String(address.city || "").trim(),
@@ -358,7 +365,8 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
               addNavigateTo="/dashboard/user-master"
               value={form.role}
               onChange={(v) => setForm({ ...form, role: v })}
-              options={ROLE_OPTIONS}
+              options={roleOptions}
+              disabled={!isAdminViewer && isAdminRole}
             />
             <div className="flex flex-col">
               <label className="mb-1.5 text-left text-[12px] font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200">
@@ -429,9 +437,18 @@ const EditUserModal = ({ open, onClose, user, onSave }) => {
           </div>
         </div>
 
-        {!isAdminRole && (
+        {isFieldUserRole && isAdminViewer ? (
+          <p className="px-1 text-xs text-slate-600 dark:text-slate-400">
+            Field users sign in on the Jitox mobile app only (no dashboard modules).
+          </p>
+        ) : null}
+
+        {showModuleAccess && (
           <div className={CARD}>
-            <div className={`${CARD_TITLE} mb-2`}>Module access</div>
+            <div className={`${CARD_TITLE} mb-2`}>Module access (Manager)</div>
+            <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+              Admin chooses which dashboard sections this manager can open.
+            </p>
             <div className="grid max-h-48 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
               {MODULE_ACCESS_OPTIONS.map(({ key, label }) => (
                 <label

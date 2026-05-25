@@ -24,6 +24,7 @@ import {
   getReportsPage,
   getEmployees,
   getEmployeeTracking,
+  getFleetTracking,
   getPurchaseFormMeta,
 } from "../controllers/dashboardUi.controller";
 import {
@@ -40,6 +41,7 @@ import {
   saveTargetAchievementPlans,
 } from "../controllers/targetAchievement.controller";
 import { uploadDocumentFile } from "../middleware/multerDocuments.middleware";
+import { dashboardAuthenticate } from "../utils/authRoles.utils";
 
 const router = Router();
 
@@ -92,8 +94,9 @@ router.get("/target-incentive/assignments/:id", getTargetIncentiveAssignmentById
 router.post("/target-incentive/assign", saveTargetIncentiveAssignment);
 router.put("/target-incentive/assign/:id", updateTargetIncentiveAssignment);
 router.delete("/target-incentive/assign/:id", deleteTargetIncentiveAssignment);
-router.get("/employees", getEmployees);
-router.get("/employees/:id/tracking", getEmployeeTracking);
+router.get("/employees", ...dashboardAuthenticate, getEmployees);
+router.get("/tracking/fleet", ...dashboardAuthenticate, getFleetTracking);
+router.get("/employees/:id/tracking", ...dashboardAuthenticate, getEmployeeTracking);
 
 /** Master data for purchase voucher / invoice forms */
 router.get("/vouchers/purchase-form-meta", getPurchaseFormMeta);

@@ -377,7 +377,13 @@ const OrdersPlacedTab = ({
           </div>
       </SummaryFilterBar>
 
-      <DataTable columns={columns} data={filteredData} renderCustomRow={renderCustomRow} />
+      {liveData && filteredData.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
+          No orders placed by this user yet.
+        </p>
+      ) : (
+        <DataTable columns={columns} data={filteredData} renderCustomRow={renderCustomRow} />
+      )}
     </div>
   );
 };

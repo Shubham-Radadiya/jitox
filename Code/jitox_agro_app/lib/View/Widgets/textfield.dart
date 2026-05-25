@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:jitox_agro_app/Constants/app_typography.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 
 class CustomTextField extends StatefulWidget {
   final String hint;
@@ -56,36 +56,29 @@ class _CustomTextFieldState extends State<CustomTextField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        widget.label != ""
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: widget.label,
-                          style: TextStyle(
-                            fontSize: 15.sp,
-                            color: Colors.black,
-                            fontWeight: widget.fontWeight,
-                          ),
-                        ),
-                        TextSpan(
-                          text: "${widget.label2}",
-                          style: TextStyle(
-                            fontSize: 15.sp,
-                            color: widget.label2Color ??
-                                Colors.grey.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
+        if (widget.label.isNotEmpty) ...[
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: widget.label,
+                  style: AppTypography.bodyLgStyle(
+                    color: Colors.black,
+                    weight: widget.fontWeight ?? FontWeight.w600,
                   ),
-                  SizedBox(height: 1.h),
-                ],
-              )
-            : Container(),
+                ),
+                TextSpan(
+                  text: widget.label2,
+                  style: AppTypography.bodyLgStyle(
+                    color: widget.label2Color ??
+                        Colors.grey.withValues(alpha: 0.9),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         TextFormField(
           readOnly: widget.readOnly ?? false,
           focusNode: widget.focusNode,
@@ -96,37 +89,34 @@ class _CustomTextFieldState extends State<CustomTextField> {
           autovalidateMode: AutovalidateMode.onUserInteraction,
           onTapOutside: (event) => FocusScope.of(context).unfocus(),
           maxLines: widget.maxLines,
+          style: AppTypography.bodyLgStyle(),
           decoration: InputDecoration(
             hintText: widget.hint,
-            hintStyle: TextStyle(
-              color: lightFontColor,
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w400,
-            ),
+            hintStyle: AppTypography.bodyLgStyle(color: lightFontColor),
             contentPadding:
-                EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.7.h),
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
               borderSide:
-                  BorderSide(color: Colors.grey.withOpacity(0.5), width: 0.7),
+                  BorderSide(color: Colors.grey.withValues(alpha: 0.5), width: 0.7),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
               borderSide:
-                  BorderSide(color: Colors.grey.withOpacity(0.5), width: 0.7),
+                  BorderSide(color: Colors.grey.withValues(alpha: 0.5), width: 0.7),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
               borderSide:
-                  BorderSide(color: Colors.grey.withOpacity(0.5), width: 0.7),
+                  BorderSide(color: Colors.grey.withValues(alpha: 0.5), width: 0.7),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
-              borderSide: BorderSide(color: Colors.red, width: 1),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
-              borderSide: BorderSide(color: Colors.red, width: 2),
+              borderSide: const BorderSide(color: Colors.red, width: 2),
             ),
             suffixIcon: widget.obscureText
                 ? IconButton(

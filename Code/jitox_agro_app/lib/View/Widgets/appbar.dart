@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jitox_agro_app/Constants/colors.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
 PreferredSizeWidget customAppBar(String title, BuildContext context) =>
@@ -24,28 +25,34 @@ PreferredSizeWidget customAppBar(String title, BuildContext context) =>
                   ),
                 ),
               ),
-              SizedBox(width: 4.5.h),
+              SizedBox(width: 40),
             ],
           ),
         ),
       ),
     );
 
-Widget arrowBackButton(context) => GestureDetector(
-      onTap: () => Navigator.pop(context),
+/// Consistent back control — single tap target, always calls [Navigator.maybePop].
+Widget arrowBackButton(BuildContext context) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: () => Navigator.maybePop(context),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        height: 4.5.h,
-        width: 4.5.h,
+        height: 40,
+        width: 40,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            width: 1,
-            color: Color.fromARGB(255, 224, 224, 224),
-          ),
+          border: Border.all(color: AppColors.border),
         ),
-        child: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, size: 2.h),
-          onPressed: () {},
+        alignment: Alignment.center,
+        child: Icon(
+          Icons.arrow_back_ios_new,
+          size: 18,
+          color: AppColors.textPrimary,
         ),
       ),
-    );
+    ),
+  );
+}

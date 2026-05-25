@@ -2,23 +2,9 @@ import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
-import 'package:jitox_agro_app/View/Screens/Payment/payment_screen.dart';
+import 'package:jitox_agro_app/View/Screens/Payment/payment_models.dart';
 import 'package:jitox_agro_app/View/Widgets/button.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
-
-class PaymentReceiptArgs {
-  const PaymentReceiptArgs({
-    required this.total,
-    required this.paid,
-    required this.remaining,
-    required this.partial,
-  });
-
-  final double total;
-  final double paid;
-  final double remaining;
-  final bool partial;
-}
 
 void _closeReceipt(BuildContext context) {
   final nav = Navigator.of(context);

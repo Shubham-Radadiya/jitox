@@ -1,8 +1,8 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:jitox_agro_app/Constants/asset_paths.dart';
+import 'package:jitox_agro_app/Constants/route_names.dart';
 import 'package:jitox_agro_app/View/Widgets/appbar.dart';
-import 'package:jitox_agro_app/View/Widgets/image.dart';
+import 'package:jitox_agro_app/View/Widgets/button.dart';
+import 'package:jitox_agro_app/View/Widgets/ui/search_field.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
 const Color blueColor = Color(0xFF074785);
@@ -22,45 +22,7 @@ class ShareLocationScreen extends StatelessWidget {
             SizedBox(
               height: 1.h,
             ),
-            Container(
-              height: 6.5.h,
-              child: Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search Your location here...',
-                    hintStyle: TextStyle(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w400,
-                        color: Color.fromARGB(255, 146, 145, 145)),
-                    prefixIcon: Icon(
-                      CupertinoIcons.search,
-                      color: Color.fromARGB(255, 146, 145, 145),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(50),
-                      borderSide: BorderSide(
-                        color: Color.fromARGB(255, 238, 237, 237),
-                        width: 1,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(50),
-                      borderSide: BorderSide(
-                        color: Color.fromARGB(255, 238, 237, 237),
-                        width: 1,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(50),
-                      borderSide: BorderSide(
-                        color: Color.fromARGB(255, 238, 237, 237),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            AppSearchField(hint: 'Search your location…'),
             SizedBox(height: 3.h),
 
             Row(
@@ -68,10 +30,10 @@ class ShareLocationScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 2.9.h,
                   backgroundColor: const Color(0xFFEEF3FF),
-                  child: CustomAssetImage(
-                    imagePath: AppIcons.currentLocationIcon,
-                    height: 3.5.h,
-                    color: Color(0xFF242424),
+                  child: Icon(
+                    Icons.my_location,
+                    size: 22.sp,
+                    color: const Color(0xFF242424),
                   ),
                 ),
                 SizedBox(
@@ -127,6 +89,17 @@ class ShareLocationScreen extends StatelessWidget {
             ),
             const SavedAddressTile(
               address: '2972 Westheimer Rd. Santa Ana, Illinois 85486',
+            ),
+            SizedBox(height: 3.h),
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                isOutlined: false,
+                text: 'Continue',
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, turnOnNotificationScreen);
+                },
+              ),
             ),
           ],
         ),

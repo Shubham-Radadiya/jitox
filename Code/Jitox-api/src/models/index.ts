@@ -28,6 +28,7 @@ import DocumentEntry from "./documentEntry.model";
 import TargetIncentiveAssignment from "./targetIncentiveAssignment.model";
 import TargetAchievementPlan from "./targetAchievementPlan.model";
 import Territory from "./territory.model";
+import FieldLocationPing from "./fieldLocationPing.model";
 
 export {
   User,
@@ -59,4 +60,5 @@ export {
   TargetIncentiveAssignment,
   TargetAchievementPlan,
   Territory,
+  FieldLocationPing,
 };

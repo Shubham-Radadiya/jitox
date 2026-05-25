@@ -108,11 +108,11 @@ const Header = ({
           <div className="min-w-0 py-0.5">
             {pageTitle ? (
               <>
-                <div className="truncate text-[15px] font-semibold leading-tight tracking-tight text-gray-900 sm:text-[17px] dark:text-slate-100">
+                <div className="jitox-page-title truncate">
                   {pageTitle}
                 </div>
                 {pageSubtitle && (
-                  <div className="mt-0.5 truncate text-xs leading-tight text-gray-500 dark:text-slate-400">
+                  <div className="jitox-page-subtitle truncate">
                     {pageSubtitle}
                   </div>
                 )}
