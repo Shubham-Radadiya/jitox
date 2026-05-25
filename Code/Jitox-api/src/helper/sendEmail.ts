@@ -54,11 +54,20 @@ async function sendViaResend({
 
   const body = (await res.json().catch(() => ({}))) as {
     message?: string;
+    name?: string;
     id?: string;
   };
 
   if (!res.ok) {
-    throw new Error(body.message || `Resend API error (${res.status})`);
+    const detail =
+      body.message ||
+      body.name ||
+      `Resend API error (${res.status})`;
+    const hint =
+      res.status === 403
+        ? " Resend test mode only allows sending to your Resend account email until you verify a domain at resend.com/domains."
+        : "";
+    throw new Error(`${detail}${hint}`);
   }
 }
 

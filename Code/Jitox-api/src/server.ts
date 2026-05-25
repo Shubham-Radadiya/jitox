@@ -37,7 +37,17 @@ app.get("/", (_req, res) => {
 
 app.get("/health", getHealth);
 
-app.use(cors());
+const corsOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+app.use(
+  cors(
+    corsOrigins.length > 0
+      ? { origin: corsOrigins, credentials: true }
+      : undefined
+  )
+);
 
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
