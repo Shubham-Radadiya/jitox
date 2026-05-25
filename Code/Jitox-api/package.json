@@ -11,6 +11,7 @@
     "dev": "cross-env NODE_ENV=development nodemon src/server.ts",
     "start": "node dist/server.js",
     "seed:demo": "cross-env NODE_ENV=development ts-node src/seed/runDemoSeed.ts",
+    "seed:target-incentive": "cross-env NODE_ENV=development ts-node src/seed/runTargetIncentiveSeed.ts",
     "migrate:address": "cross-env NODE_ENV=development ts-node src/migrations/migrateAddressFields.ts"
   },
   "keywords": [],

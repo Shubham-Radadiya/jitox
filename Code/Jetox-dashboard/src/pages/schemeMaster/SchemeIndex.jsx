@@ -448,7 +448,7 @@ const SchemeIndex = () => {
                 </select>
                 <select
                   aria-label="Filter by type"
-                  className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-0 text-sm text-dark sm:min-w-[8.5rem] sm:flex-1 md:flex-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-0 text-sm text-dark sm:min-w-34 sm:flex-1 md:flex-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value)}
                 >

@@ -12,6 +12,11 @@ import {
 } from "../utils/applyPaymentToAccountBalance";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
 import { buildPartyAddressesMap } from "../utils/partyVoucherAddress.util";
+import {
+  SALES_RETURN_INVOICE_PREFIX,
+  bumpMaxFromInvoiceDoc,
+  nextInvoiceFieldsFromMax,
+} from "../utils/invoiceSeries.util";
 import { assertSalesReturnQuantitiesAllowed } from "../utils/validateSalesReturnQty";
 import {
   buildOrderFulfillment,
@@ -58,6 +63,17 @@ async function computeNextSalesReturnVoucherNo(): Promise<string> {
     }
   }
   return `JITOX-DEMO-SRT-${String(max + 1).padStart(3, "0")}`;
+}
+
+/** Next `RH-SR-24-25/###` return invoice no. */
+async function computeNextSalesReturnInvoiceFields() {
+  const prefix = SALES_RETURN_INVOICE_PREFIX;
+  let max = 0;
+  const docs = await SalesReturnVoucher.find().select("invoiceNo").lean();
+  for (const d of docs) {
+    max = bumpMaxFromInvoiceDoc(max, prefix, d);
+  }
+  return nextInvoiceFieldsFromMax(prefix, max);
 }
 
 async function resolveUniqueSalesReturnVoucherNo(
@@ -707,8 +723,23 @@ export const getSalesReturnFormMeta = async (
     parties.push({ value: name, label: name });
   }
 
+  let nextSalesReturnInvoicePrefix = SALES_RETURN_INVOICE_PREFIX;
+  let nextSalesReturnInvoiceNumber = "1";
+  let nextSalesReturnInvoiceNo = `${SALES_RETURN_INVOICE_PREFIX}1`;
+  try {
+    const inv = await computeNextSalesReturnInvoiceFields();
+    nextSalesReturnInvoicePrefix = inv.invoicePrefix;
+    nextSalesReturnInvoiceNumber = inv.invoiceNumber;
+    nextSalesReturnInvoiceNo = inv.invoiceNo;
+  } catch (e) {
+    console.error("computeNextSalesReturnInvoiceFields", e);
+  }
+
   sendSuccess(res, {
     nextSalesReturnVoucherNo: await computeNextSalesReturnVoucherNo(),
+    nextSalesReturnInvoicePrefix,
+    nextSalesReturnInvoiceNumber,
+    nextSalesReturnInvoiceNo,
     parties,
     partyAddresses: buildPartyAddressesMap(accounts),
   });

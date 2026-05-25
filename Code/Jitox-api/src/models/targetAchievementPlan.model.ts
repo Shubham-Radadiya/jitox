@@ -8,6 +8,8 @@ export interface ITargetAchievementPlan extends mongoose.Document {
   managerUserId?: string;
   salesTarget: number;
   collectionPlan: number;
+  /** Field-visit / customer-visit count target for the month */
+  visitsTarget: number;
   createdByUserId?: string;
 }
 
@@ -18,6 +20,7 @@ const targetAchievementPlanSchema = new Schema<ITargetAchievementPlan>(
     managerUserId: { type: String, trim: true, default: "" },
     salesTarget: { type: Number, default: 0, min: 0 },
     collectionPlan: { type: Number, default: 0, min: 0 },
+    visitsTarget: { type: Number, default: 0, min: 0 },
     createdByUserId: { type: String, trim: true },
   },
   { timestamps: true }

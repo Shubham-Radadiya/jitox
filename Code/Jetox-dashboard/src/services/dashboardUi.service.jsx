@@ -27,7 +27,7 @@ export const dashboardUiService = {
   patchDocumentEntry: (id, body) => dashboardUiApi.patchDocumentEntry(id, body),
   deleteDocumentEntry: (id) => dashboardUiApi.deleteDocumentEntry(id),
 
-  getOverview: () => dashboardUiApi.getOverview(),
+  getOverview: (params) => dashboardUiApi.getOverview(params),
   getTargetIncentive: () => dashboardUiApi.getTargetIncentive(),
   getReports: (params) => dashboardUiApi.getReports(params),
   getEmployees: () => dashboardUiApi.getEmployees(),

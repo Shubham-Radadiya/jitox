@@ -4,6 +4,7 @@ import { CalendarDays, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
 import TargetIncentiveSubNav from "./TargetIncentiveSubNav";
+import SetTargetPlanModal from "./SetTargetPlanModal";
 import { dashboardUiApi } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
 import {
@@ -83,11 +84,17 @@ export default function TargetTeamPage() {
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
   const [detail, setDetail] = useState(null);
+  const [setTargetsOpen, setSetTargetsOpen] = useState(false);
+
+  const queryYear = useMemo(() => new Date().getFullYear(), []);
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["target-incentive"],
+    queryKey: ["target-incentive", "team", queryYear],
     queryFn: async () => {
-      const { data: payload } = await dashboardUiApi.getTargetIncentive();
+      const { data: payload } = await dashboardUiApi.getTargetIncentive({
+        year: queryYear,
+        source: "live",
+      });
       return payload;
     },
   });
@@ -98,6 +105,7 @@ export default function TargetTeamPage() {
     }
   }, [isError, error]);
 
+  const teamLive = data?.teamDataSource === "live";
   const kpis = data?.teamSummaryKpis || [];
   const rows = data?.teamRows || [];
 
@@ -201,9 +209,28 @@ export default function TargetTeamPage() {
       <TargetIncentiveSubNav />
 
       <div className="flex flex-col gap-4">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Target vs Achievement View
-        </h1>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Team incentives
+            </h1>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                teamLive
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                  : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+              }`}
+            >
+              {teamLive ? "Live data" : "Demo data"}
+            </span>
+          </div>
+          <Button
+            label="Set targets"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => setSetTargetsOpen(true)}
+          />
+        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => (
@@ -338,6 +365,11 @@ export default function TargetTeamPage() {
           )}
         </div>
       </div>
+
+      <SetTargetPlanModal
+        open={setTargetsOpen}
+        onClose={() => setSetTargetsOpen(false)}
+      />
 
       <CommonModal
         open={Boolean(detail)}

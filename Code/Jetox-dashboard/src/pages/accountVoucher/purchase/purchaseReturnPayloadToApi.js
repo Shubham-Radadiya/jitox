@@ -1,4 +1,5 @@
 import { parseNum } from "./voucherFormConstants";
+import { composeInvoiceNo } from "./purchasePayloadToApi";
 
 function mapPaymentMode(termsPayment) {
   const s = String(termsPayment || "")
@@ -80,9 +81,12 @@ export function purchaseReturnPayloadToCreateBody(payload) {
   /** Legacy combined field: bill address only when ship-to is not a separate party. */
   const shipLine = sd ? shipRaw : billTo;
 
+  const invoiceNo = composeInvoiceNo(payload);
+
   return {
     partyName: String(payload.partyName || "").trim(),
     voucherNo: String(payload.voucherNo || "").trim(),
+    ...(invoiceNo ? { invoiceNo } : {}),
     voucherDate: payload.purchaseDate,
     transportDetails: String(payload.transporter || "").trim(),
     deliveryAt: String(payload.deliveryAt || "").trim(),

@@ -13,6 +13,9 @@ export const emptyMeta = {
   employees: [],
   nextPurchaseVoucherNo: null,
   nextQuotationVoucherNo: null,
+  nextPurchaseInvoicePrefix: null,
+  nextPurchaseInvoiceNumber: null,
+  nextPurchaseInvoiceNo: null,
   terms: [
     { value: "Cash", label: "Cash" },
     { value: "Credit", label: "Credit" },
@@ -63,6 +66,18 @@ export function usePurchaseFormMeta({ enabled = true } = {}) {
         nextQuotationVoucherNo:
           typeof data.nextQuotationVoucherNo === "string"
             ? data.nextQuotationVoucherNo
+            : null,
+        nextPurchaseInvoicePrefix:
+          typeof data.nextPurchaseInvoicePrefix === "string"
+            ? data.nextPurchaseInvoicePrefix
+            : null,
+        nextPurchaseInvoiceNumber:
+          typeof data.nextPurchaseInvoiceNumber === "string"
+            ? data.nextPurchaseInvoiceNumber
+            : null,
+        nextPurchaseInvoiceNo:
+          typeof data.nextPurchaseInvoiceNo === "string"
+            ? data.nextPurchaseInvoiceNo
             : null,
       };
     },

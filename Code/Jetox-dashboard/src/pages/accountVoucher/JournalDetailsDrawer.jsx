@@ -17,14 +17,14 @@ const JournalDetailsDrawer = ({ open, onClose, data }) => {
   } = data;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex justify-end">
+    <div className="fixed inset-0 z-1000 flex justify-end">
       <div
         className="absolute inset-0 bg-black/25 transition-opacity dark:bg-black/65"
         onClick={onClose}
         aria-hidden="true"
       />
       <aside className="relative flex h-full w-full max-w-xl flex-col border-l border-slate-200/90 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-white px-4 py-3.5 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200/90 bg-linear-to-r from-slate-50 to-white px-4 py-3.5 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary dark:text-emerald-400">
               Journal voucher

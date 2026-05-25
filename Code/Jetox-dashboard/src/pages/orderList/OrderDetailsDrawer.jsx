@@ -67,7 +67,7 @@ export default function OrderDetailsDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex justify-end">
+    <div className="fixed inset-0 z-1000 flex justify-end">
       <button
         type="button"
         className="absolute inset-0 bg-black/30"

@@ -19,6 +19,11 @@ import {
 } from "../utils/applyPaymentToAccountBalance";
 import { applyProductStockDelta } from "../utils/applyProductStockDelta";
 import { buildPartyAddressesMap } from "../utils/partyVoucherAddress.util";
+import {
+  SALES_INVOICE_PREFIX,
+  bumpMaxFromInvoiceDoc,
+  nextInvoiceFieldsFromMax,
+} from "../utils/invoiceSeries.util";
 import { dashboardTabForOrderStatus } from "../constants/orderStatus";
 import {
   notifyOrderDispatched,
@@ -71,6 +76,17 @@ async function computeNextSalesVoucherNo(): Promise<string> {
   }
   const next = max + 1;
   return `JITOX-DEMO-SL-${String(next).padStart(3, "0")}`;
+}
+
+/** Next `RH-S-24-25/###` sales invoice no. */
+async function computeNextSalesInvoiceFields() {
+  const prefix = SALES_INVOICE_PREFIX;
+  let max = 0;
+  const docs = await SalesVoucher.find().select("invoiceNo").lean();
+  for (const d of docs) {
+    max = bumpMaxFromInvoiceDoc(max, prefix, d);
+  }
+  return nextInvoiceFieldsFromMax(prefix, max);
 }
 
 /** Reserve the next free voucher no. — retries on race so two creates can't collide. */
@@ -614,9 +630,28 @@ export const getSalesFormMeta = async (
       console.error("computeNextSalesVoucherNo", e);
     }
 
+    let nextSalesInvoicePrefix = SALES_INVOICE_PREFIX;
+    let nextSalesInvoiceNumber = "1";
+    let nextSalesInvoiceNo = `${SALES_INVOICE_PREFIX}1`;
+    try {
+      const inv = await computeNextSalesInvoiceFields();
+      nextSalesInvoicePrefix = inv.invoicePrefix;
+      nextSalesInvoiceNumber = inv.invoiceNumber;
+      nextSalesInvoiceNo = inv.invoiceNo;
+    } catch (e) {
+      console.error("computeNextSalesInvoiceFields", e);
+    }
+
     const partyAddresses = buildPartyAddressesMap(accounts);
 
-    sendSuccess(res, { nextSalesVoucherNo, parties, partyAddresses });
+    sendSuccess(res, {
+      nextSalesVoucherNo,
+      nextSalesInvoicePrefix,
+      nextSalesInvoiceNumber,
+      nextSalesInvoiceNo,
+      parties,
+      partyAddresses,
+    });
   } catch (error) {
     console.error("getSalesFormMeta", error);
     res.status(500).json({ message: "Failed to load sales voucher form meta." });

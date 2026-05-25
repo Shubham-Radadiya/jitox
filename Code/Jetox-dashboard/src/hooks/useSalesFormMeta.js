@@ -17,12 +17,31 @@ export function useSalesFormMeta(enabled = true) {
           ? body.data
           : body;
       if (!payload || typeof payload !== "object") {
-        return { nextSalesVoucherNo: null, parties: [], partyAddresses: {} };
+        return {
+          nextSalesVoucherNo: null,
+          nextSalesInvoicePrefix: null,
+          nextSalesInvoiceNumber: null,
+          nextSalesInvoiceNo: null,
+          parties: [],
+          partyAddresses: {},
+        };
       }
       return {
         nextSalesVoucherNo:
           typeof payload.nextSalesVoucherNo === "string"
             ? payload.nextSalesVoucherNo
+            : null,
+        nextSalesInvoicePrefix:
+          typeof payload.nextSalesInvoicePrefix === "string"
+            ? payload.nextSalesInvoicePrefix
+            : null,
+        nextSalesInvoiceNumber:
+          typeof payload.nextSalesInvoiceNumber === "string"
+            ? payload.nextSalesInvoiceNumber
+            : null,
+        nextSalesInvoiceNo:
+          typeof payload.nextSalesInvoiceNo === "string"
+            ? payload.nextSalesInvoiceNo
             : null,
         parties: Array.isArray(payload.parties) ? payload.parties : [],
         partyAddresses:

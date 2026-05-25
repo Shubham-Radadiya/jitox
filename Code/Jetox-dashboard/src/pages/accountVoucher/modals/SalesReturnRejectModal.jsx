@@ -90,14 +90,14 @@ export default function SalesReturnRejectModal({
       <Button
         label="Cancel"
         variant="outline"
-        className="min-w-[6.5rem]"
+        className="min-w-26"
         onClick={onClose}
         disabled={saving}
       />
       <Button
         label={saving ? "Rejecting…" : "Reject Return"}
         variant="primary"
-        className="min-w-[8.5rem] text-white dark:text-white"
+        className="min-w-34 text-white"
         onClick={handleSubmit}
         disabled={saving}
       />

@@ -35,8 +35,31 @@ export function partyValueFromPartyNameLabel(label) {
   return String(label || "").trim();
 }
 
-/** Default quotation invoice prefix (matches purchase invoice series). */
+/** Default quotation / purchase invoice prefix (matches API purchase series). */
 export const QUOTATION_INVOICE_PREFIX = "RH-P-24-25/";
+
+/** Outward sales invoice series (matches API). */
+export const SALES_INVOICE_PREFIX = "RH-S-24-25/";
+
+/** Sales return credit note series (matches API). */
+export const SALES_RETURN_INVOICE_PREFIX = "RH-SR-24-25/";
+
+/** Parse `RH-…/###` style invoice numbers for a given prefix. */
+export function parseRhSeriesInvoiceNo(raw, prefix) {
+  const s = String(raw ?? "").trim();
+  const pfx = String(prefix ?? "").trim();
+  if (!pfx || !s.startsWith(pfx)) return null;
+  const tail = s.slice(pfx.length).trim();
+  const digits = tail.replace(/\D/g, "");
+  if (!digits) return null;
+  const n = parseInt(digits, 10);
+  if (!Number.isFinite(n)) return null;
+  return {
+    invoicePrefix: pfx,
+    invoiceNumber: String(n),
+    invoiceNo: `${pfx}${n}`,
+  };
+}
 
 /** Parse `QT-001` style quotation voucher numbers. */
 export function parseQtSeriesNo(raw) {
@@ -289,15 +312,28 @@ export function mapPurchaseApiDocToPrefill(doc) {
       ? String(doc.invoiceNo).trim()
       : `${invoicePrefix}${invoiceNumber}`.trim();
   const voucherNoStr = String(doc.voucherNo ?? "").trim();
-  const rhInvoice = parseRhQuotationInvoiceNo(invoiceNo);
+  const rhPurchase = parseRhQuotationInvoiceNo(invoiceNo);
+  const rhSales = parseRhSeriesInvoiceNo(invoiceNo, SALES_INVOICE_PREFIX);
+  const rhSalesReturn = parseRhSeriesInvoiceNo(
+    invoiceNo,
+    SALES_RETURN_INVOICE_PREFIX
+  );
   let resolvedPrefix = invoicePrefix || QUOTATION_INVOICE_PREFIX;
   let resolvedNumber = invoiceNumber;
   let resolvedInvoiceNo = invoiceNo;
 
-  if (rhInvoice) {
-    resolvedPrefix = rhInvoice.invoicePrefix;
-    resolvedNumber = rhInvoice.invoiceNumber;
-    resolvedInvoiceNo = rhInvoice.invoiceNo;
+  if (rhPurchase) {
+    resolvedPrefix = rhPurchase.invoicePrefix;
+    resolvedNumber = rhPurchase.invoiceNumber;
+    resolvedInvoiceNo = rhPurchase.invoiceNo;
+  } else if (rhSales) {
+    resolvedPrefix = rhSales.invoicePrefix;
+    resolvedNumber = rhSales.invoiceNumber;
+    resolvedInvoiceNo = rhSales.invoiceNo;
+  } else if (rhSalesReturn) {
+    resolvedPrefix = rhSalesReturn.invoicePrefix;
+    resolvedNumber = rhSalesReturn.invoiceNumber;
+    resolvedInvoiceNo = rhSalesReturn.invoiceNo;
   } else if (
     parseQtSeriesNo(voucherNoStr) &&
     (!invoiceNo || /-INV/i.test(invoiceNo) || parseQtSeriesNo(invoiceNo))

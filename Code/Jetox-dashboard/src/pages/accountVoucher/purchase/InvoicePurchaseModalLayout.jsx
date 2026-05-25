@@ -191,6 +191,7 @@ export default function InvoicePurchaseModalLayout({
   const isReturn = isPurchaseReturn;
   const isSales = formType === "sales";
   const isQuotation = formType === "quotation";
+  const isPurchase = formType === "purchase";
   const headerEyebrow = isQuotation
     ? "Quotation"
     : isSalesReturn
@@ -662,6 +663,12 @@ export default function InvoicePurchaseModalLayout({
                 <InputField
                   label="Invoice no."
                   value={invoiceNumber}
+                  readOnly={
+                    isPurchase ||
+                    isSales ||
+                    isSalesReturn ||
+                    isPurchaseReturn
+                  }
                   onChange={(e) => setInvoiceNumber(e.target.value)}
                   onBlur={
                     isQuotation
@@ -682,7 +689,14 @@ export default function InvoicePurchaseModalLayout({
                   }
                   placeholder={isQuotation ? "001" : undefined}
                   inputMode={isQuotation ? "numeric" : undefined}
-                  inputClassName="!text-[13px] !leading-tight"
+                  inputClassName={
+                    isPurchase ||
+                    isSales ||
+                    isSalesReturn ||
+                    isPurchaseReturn
+                      ? "!text-[13px] !leading-tight bg-slate-50 text-slate-600 cursor-not-allowed border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-600"
+                      : "!text-[13px] !leading-tight"
+                  }
                 />
               </div>
               <div className="min-w-0 sm:col-span-2 lg:col-span-1">

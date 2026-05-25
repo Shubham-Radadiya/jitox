@@ -17,6 +17,17 @@ import { uploadDocumentFile } from "../middleware/multerDocuments.middleware";
 import { sendSuccess } from "../utils/apiResponse";
 import { productLineAmount, resolveProductUnit } from "../utils/productUnit";
 import { buildPartyAddressesMap } from "../utils/partyVoucherAddress.util";
+import {
+  buildDashboardStockItems,
+  buildDashboardUserDistribution,
+  parseDashboardOverviewPeriod,
+} from "../utils/dashboardOverviewWidgets";
+import {
+  PURCHASE_INVOICE_PREFIX,
+  bumpMaxFromInvoiceDoc,
+  nextInvoiceFieldsFromMax,
+  parseRhInvoiceSuffix,
+} from "../utils/invoiceSeries.util";
 
 function parseRupeeAmount(s: string): number {
   const n = Number(
@@ -73,6 +84,34 @@ async function computeNextPurchaseVoucherNo(): Promise<string> {
   const next = max + 1;
   const width = Math.max(3, String(next).length);
   return `V${String(next).padStart(width, "0")}`;
+}
+
+/** Next `RH-P-24-25/###` invoice no. — purchase bills, returns, quotations. */
+async function computeNextPurchaseInvoiceFields() {
+  const prefix = PURCHASE_INVOICE_PREFIX;
+  let max = 0;
+
+  const purchases = await PurchaseVoucher.find()
+    .select("invoiceNo invoicePrefix invoiceNumber")
+    .lean();
+  for (const d of purchases) {
+    max = bumpMaxFromInvoiceDoc(max, prefix, d);
+  }
+
+  const returns = await PurchaseReturnVoucher.find()
+    .select("invoiceNo")
+    .lean();
+  for (const d of returns) {
+    max = bumpMaxFromInvoiceDoc(max, prefix, d);
+  }
+
+  const quotations = await Quotation.find().select("invoiceNo").lean();
+  for (const d of quotations) {
+    const n = parseRhInvoiceSuffix(String(d?.invoiceNo ?? ""), prefix);
+    if (n != null) max = Math.max(max, n);
+  }
+
+  return nextInvoiceFieldsFromMax(prefix, max);
 }
 
 /** Next quotation voucher no. in `QT-001` form (also scans demo-prefixed codes). */
@@ -567,6 +606,18 @@ export const getPurchaseFormMeta = async (
       console.error("computeNextQuotationVoucherNo", e);
     }
 
+    let nextPurchaseInvoicePrefix = PURCHASE_INVOICE_PREFIX;
+    let nextPurchaseInvoiceNumber = "1";
+    let nextPurchaseInvoiceNo = `${PURCHASE_INVOICE_PREFIX}1`;
+    try {
+      const inv = await computeNextPurchaseInvoiceFields();
+      nextPurchaseInvoicePrefix = inv.invoicePrefix;
+      nextPurchaseInvoiceNumber = inv.invoiceNumber;
+      nextPurchaseInvoiceNo = inv.invoiceNo;
+    } catch (e) {
+      console.error("computeNextPurchaseInvoiceFields", e);
+    }
+
     sendSuccess(res, {
       parties,
       partyAddresses,
@@ -581,6 +632,9 @@ export const getPurchaseFormMeta = async (
       gst,
       nextPurchaseVoucherNo,
       nextQuotationVoucherNo,
+      nextPurchaseInvoicePrefix,
+      nextPurchaseInvoiceNumber,
+      nextPurchaseInvoiceNo,
     });
   } catch (e) {
     console.error("getPurchaseFormMeta", e);
@@ -612,19 +666,7 @@ export const getEmployeeTracking = async (req: Request, res: Response) => {
   }
 };
 
-async function topStockItemsForDashboard(limit: number) {
-  const products = await Product.find()
-    .sort({ quantity: -1 })
-    .limit(limit)
-    .lean();
-  return products.map((p) => ({
-    name: p.productName,
-    qty: String(p.quantity ?? 0),
-    changePct: 0,
-  }));
-}
-
-export const getDashboardOverview = async (_req: Request, res: Response) => {
+export const getDashboardOverview = async (req: Request, res: Response) => {
   try {
     const recentOrders = await Dyn.recentOrdersFormatted(10);
     const payData = await Dyn.fetchPayablesList({});
@@ -672,7 +714,12 @@ export const getDashboardOverview = async (_req: Request, res: Response) => {
     );
     const orderListTotal = Math.round(salesFromOrders);
 
-    const stockItems = await topStockItemsForDashboard(9);
+    const stockPeriod = parseDashboardOverviewPeriod(req.query.stockPeriod);
+    const userPeriod = parseDashboardOverviewPeriod(req.query.userPeriod);
+    const [stockItems, userDistribution] = await Promise.all([
+      buildDashboardStockItems(stockPeriod, 9),
+      buildDashboardUserDistribution(userPeriod),
+    ]);
 
     res.json({
       monthlySales: {
@@ -809,21 +856,9 @@ export const getDashboardOverview = async (_req: Request, res: Response) => {
           path: "/dashboard/receivable",
         },
       ],
-      stockItems:
-        stockItems.length > 0
-          ? stockItems
-          : [
-              { name: "Stock", qty: "0", changePct: 0 },
-            ],
+      stockItems,
       attendance: { present: 50, absent: 12, lateIn: 5, earlyOut: 0 },
-      userDistribution: {
-        totalPct: 90.2,
-        rings: [
-          { label: "Managers", pct: 75, color: "#22c55e" },
-          { label: "Dealers", pct: 60, color: "#0ea5e9" },
-          { label: "Users", pct: 45, color: "#a855f7" },
-        ],
-      },
+      userDistribution,
     });
   } catch (e) {
     console.error("getDashboardOverview", e);

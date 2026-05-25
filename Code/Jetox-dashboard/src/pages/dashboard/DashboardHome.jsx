@@ -186,6 +186,100 @@ function DonutRing({ pct, color, size = 88, stroke = 10 }) {
   );
 }
 
+function donutSlicePath(cx, cy, innerR, outerR, startDeg, endDeg) {
+  const sweep = endDeg - startDeg;
+  if (sweep >= 359.99) {
+    return [
+      `M ${cx} ${cy - outerR}`,
+      `A ${outerR} ${outerR} 0 1 1 ${cx - 0.001} ${cy - outerR}`,
+      `M ${cx} ${cy - innerR}`,
+      `A ${innerR} ${innerR} 0 1 0 ${cx + 0.001} ${cy - innerR}`,
+      "Z",
+    ].join(" ");
+  }
+  const start = ((startDeg - 90) * Math.PI) / 180;
+  const end = ((endDeg - 90) * Math.PI) / 180;
+  const x1 = cx + outerR * Math.cos(start);
+  const y1 = cy + outerR * Math.sin(start);
+  const x2 = cx + outerR * Math.cos(end);
+  const y2 = cy + outerR * Math.sin(end);
+  const x3 = cx + innerR * Math.cos(end);
+  const y3 = cy + innerR * Math.sin(end);
+  const x4 = cx + innerR * Math.cos(start);
+  const y4 = cy + innerR * Math.sin(start);
+  const largeArc = sweep > 180 ? 1 : 0;
+  return `M ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4} ${y4} Z`;
+}
+
+/** Multi-segment donut — hover a segment to preview its share (Managers / Dealers / Users). */
+function SegmentedDonutRing({
+  segments,
+  hoveredLabel = null,
+  onSegmentEnter,
+  onSegmentLeave,
+  size = 92,
+  stroke = 11,
+}) {
+  const pad = 4;
+  const cx = size / 2;
+  const cy = size / 2;
+  const midR = (size - stroke) / 2;
+  const innerR = midR - stroke / 2;
+  const outerR = midR + stroke / 2;
+  const valid = (segments || []).filter((s) => Number(s.pct) > 0);
+  const totalPct = valid.reduce((sum, s) => sum + Number(s.pct), 0) || 1;
+
+  let startAngle = 0;
+  const slices = valid.map((seg, index) => {
+    const isLast = index === valid.length - 1;
+    const sweep = isLast
+      ? 360 - startAngle
+      : (Number(seg.pct) / totalPct) * 360;
+    const endAngle = startAngle + sweep;
+    const slice = {
+      ...seg,
+      startAngle,
+      endAngle,
+      path: donutSlicePath(cx, cy, innerR, outerR, startAngle, endAngle),
+    };
+    startAngle = endAngle;
+    return slice;
+  });
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`${-pad} ${-pad} ${size + pad * 2} ${size + pad * 2}`}
+      className="shrink-0 overflow-visible"
+      role="img"
+      aria-label="User distribution chart"
+      onMouseLeave={onSegmentLeave}
+    >
+      <path
+        d={donutSlicePath(cx, cy, innerR, outerR, 0, 360)}
+        fill="#e5e7eb"
+        className="dark:fill-slate-600"
+      />
+      {slices.map((seg) => {
+        const isHovered = hoveredLabel === seg.label;
+        const dimmed = hoveredLabel && !isHovered;
+        return (
+          <path
+            key={seg.label}
+            d={seg.path}
+            fill={seg.color}
+            className={`cursor-default transition-opacity duration-150 ${
+              dimmed ? "opacity-35" : "opacity-100"
+            }`}
+            onMouseEnter={() => onSegmentEnter?.(seg.label)}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 /** Small area + line chart for Total Revenue card (sparkline). */
 function RevenueSparkline({ series }) {
   const gradId = useId().replace(/:/g, "");
@@ -309,7 +403,7 @@ const defaultOverview = {
   actions: [],
   stockItems: [],
   attendance: { present: 0, absent: 0, lateIn: 0, earlyOut: 0 },
-  userDistribution: { totalPct: 0, rings: [] },
+  userDistribution: { total: 0, rings: [] },
   monthlySales: { label: "Monthly Sales", value: "—", changePct: 0 },
   monthlyPurchase: { label: "Monthly Purchase", value: "—", changePct: 0 },
 };
@@ -321,6 +415,8 @@ function DashboardHome() {
   const [rpView, setRpView] = useState("chart");
   const [stockPeriod, setStockPeriod] = useState("month");
   const [userPeriod, setUserPeriod] = useState("month");
+  /** User distribution donut: null → center 100%; hover label → that segment %. */
+  const [userDistHover, setUserDistHover] = useState(null);
   const [managerQ, setManagerQ] = useState("");
   const [orderQ, setOrderQ] = useState("");
   const [orderDates, setOrderDates] = useState(null);
@@ -444,9 +540,12 @@ function DashboardHome() {
     isError,
     error,
   } = useQuery({
-    queryKey: ["dashboard", "overview"],
+    queryKey: ["dashboard", "overview", stockPeriod, userPeriod],
     queryFn: async () => {
-      const { data } = await dashboardUiApi.getOverview();
+      const { data } = await dashboardUiApi.getOverview({
+        stockPeriod,
+        userPeriod,
+      });
       return { ...defaultOverview, ...data };
     },
   });
@@ -462,6 +561,10 @@ function DashboardHome() {
       toast.error(getApiErrorMessage(error, "Could not load dashboard"));
     }
   }, [isError, error]);
+
+  useEffect(() => {
+    setUserDistHover(null);
+  }, [userPeriod]);
 
   const ordersQueryKey = useMemo(
     () => [
@@ -1078,30 +1181,57 @@ function DashboardHome() {
               </span>
               <PeriodToggle value={userPeriod} onChange={setUserPeriod} />
             </div>
-            <div className="flex flex-1 flex-col items-center gap-4 sm:flex-row">
-              <div className="relative flex items-center justify-center w-[92px] h-[92px] shrink-0">
-                <DonutRing
-                  pct={overview.userDistribution?.totalPct || 0}
-                  color="#0d9488"
-                  size={92}
-                  stroke={11}
-                />
-                <span className="absolute text-xs font-semibold text-dark">
-                  {overview.userDistribution?.totalPct ?? 0}%
-                </span>
-              </div>
-              <div className="flex-1 min-w-0 space-y-2 text-xs leading-relaxed">
-                {(overview.userDistribution?.rings || []).map((r) => (
-                  <div key={r.label} className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: r.color }}
-                    />
-                    <span className="text-light truncate">{r.label}</span>
-                    <span className="ml-auto font-medium tabular-nums">{r.pct}%</span>
-                  </div>
-                ))}
-              </div>
+            <div
+              className="flex flex-1 flex-col items-center gap-4 sm:flex-row"
+              onMouseLeave={() => setUserDistHover(null)}
+            >
+              {(() => {
+                const distRings = overview.userDistribution?.rings || [];
+                const hoveredRing = distRings.find((r) => r.label === userDistHover);
+                const centerLabel = hoveredRing
+                  ? `${hoveredRing.pct ?? 0}%`
+                  : "100%";
+                return (
+                  <>
+                    <div className="relative flex items-center justify-center w-[92px] h-[92px] shrink-0 overflow-visible">
+                      <SegmentedDonutRing
+                        segments={distRings}
+                        hoveredLabel={userDistHover}
+                        onSegmentEnter={setUserDistHover}
+                        onSegmentLeave={() => setUserDistHover(null)}
+                        size={92}
+                        stroke={11}
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-dark tabular-nums pointer-events-none select-none">
+                        {centerLabel}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2 text-xs leading-relaxed">
+                      {distRings.map((r) => (
+                        <div
+                          key={r.label}
+                          role="presentation"
+                          onMouseEnter={() => setUserDistHover(r.label)}
+                          className={`flex w-full items-center gap-2 rounded-md px-1 py-0.5 transition ${
+                            userDistHover === r.label
+                              ? "bg-rowBg dark:bg-slate-800/80"
+                              : ""
+                          }`}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ background: r.color }}
+                          />
+                          <span className="text-light truncate">{r.label}</span>
+                          <span className="ml-auto font-medium tabular-nums">
+                            {r.pct}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -140,6 +140,11 @@ export default function TargetAchievementPage() {
 
   const activeSource = data?.dataSource || dataSource;
   const isDemoView = activeSource === "demo";
+  const liveMeta = data?.live?.meta;
+  const showSetTargetsHint =
+    !isDemoView &&
+    liveMeta?.hasLiveAchievement &&
+    !liveMeta?.hasLiveTargets;
 
   const overviewKpis = data?.overviewKpis || [];
   const months = data?.months || [];
@@ -273,6 +278,15 @@ export default function TargetAchievementPage() {
             />
           </div>
         </div>
+
+        {showSetTargetsHint ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-100">
+            Sales and collection targets are zero because none are saved for this year
+            (or they are saved for a manager only while this view sums all plans).
+            Use <strong>Team incentives → Set targets</strong> for each month and manager,
+            or choose <strong>Company-wide</strong> when setting company totals.
+          </p>
+        ) : null}
 
         {isLoading ? (
           <p className="text-sm text-slate-500 py-8">Loading…</p>

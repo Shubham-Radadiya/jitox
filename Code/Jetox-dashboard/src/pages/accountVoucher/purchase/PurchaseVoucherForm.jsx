@@ -37,6 +37,8 @@ import {
   emptyMeta,
   usePurchaseFormMeta,
 } from "../../../hooks/usePurchaseFormMeta";
+import { useSalesFormMeta } from "../../../hooks/useSalesFormMeta";
+import { useSalesReturnFormMeta } from "../../../hooks/useSalesReturnFormMeta";
 import {
   partyAddressFromMap,
   resolveShipToPartyNameFromDoc,
@@ -121,8 +123,8 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   const [returnPaidAmount, setReturnPaidAmount] = useState(0);
   const [gstRate, setGstRate] = useState("");
   const [productRows, setProductRows] = useState([emptyProductRow()]);
-  const [invoicePrefix, setInvoicePrefix] = useState("RH-P-24-25/");
-  const [invoiceNumber, setInvoiceNumber] = useState("51");
+  const [invoicePrefix, setInvoicePrefix] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
   const [originalInvNo, setOriginalInvNo] = useState("");
   const [ewayBill, setEwayBill] = useState("");
   const [termsText, setTermsText] = useState("");
@@ -135,7 +137,12 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
   const [newInvoiceTermsDraft, setNewInvoiceTermsDraft] = useState("");
 
   const { data: meta, isError: metaError } = usePurchaseFormMeta();
+  const { data: salesMeta } = useSalesFormMeta(formType === "sales");
+  const { data: salesReturnMeta } = useSalesReturnFormMeta(
+    formType === "sales-return"
+  );
   const nextVoucherAppliedRef = useRef(false);
+  const nextInvoiceAppliedRef = useRef(false);
   /** Snapshot of ship-to from API prefill / last edit while “different ship” is on — survives toggling the checkbox off/on. */
   const persistedShipToRef = useRef("");
   /**
@@ -195,6 +202,57 @@ const PurchaseVoucherForm = forwardRef(function PurchaseVoucherForm(
     }
     nextVoucherAppliedRef.current = true;
   }, [meta?.nextPurchaseVoucherNo, meta?.nextQuotationVoucherNo, formType, prefill]);
+
+  /** Auto invoice prefix + no. for new vouchers (purchase, sales, returns). */
+  useEffect(() => {
+    const autoTypes = ["purchase", "purchase-return", "sales", "sales-return"];
+    if (!autoTypes.includes(formType)) return;
+    if (editMode) return;
+    if (prefill?.invoicePrefix != null || prefill?.invoiceNumber != null) return;
+
+    let prefix;
+    let number;
+    let fullNo;
+    if (formType === "sales") {
+      prefix = salesMeta?.nextSalesInvoicePrefix;
+      number = salesMeta?.nextSalesInvoiceNumber;
+      fullNo = salesMeta?.nextSalesInvoiceNo;
+    } else if (formType === "sales-return") {
+      prefix = salesReturnMeta?.nextSalesReturnInvoicePrefix;
+      number = salesReturnMeta?.nextSalesReturnInvoiceNumber;
+      fullNo = salesReturnMeta?.nextSalesReturnInvoiceNo;
+    } else {
+      prefix = meta?.nextPurchaseInvoicePrefix;
+      number = meta?.nextPurchaseInvoiceNumber;
+      fullNo = meta?.nextPurchaseInvoiceNo;
+    }
+
+    if (typeof prefix !== "string" || !prefix.trim()) return;
+    if (typeof number !== "string" || !number.trim()) return;
+    if (nextInvoiceAppliedRef.current) return;
+    const p = prefix.trim();
+    const n = number.trim();
+    setInvoicePrefix(p);
+    setInvoiceNumber(n);
+    setInvoiceNo(
+      typeof fullNo === "string" && fullNo.trim() ? fullNo.trim() : `${p}${n}`
+    );
+    nextInvoiceAppliedRef.current = true;
+  }, [
+    formType,
+    editMode,
+    prefill?.invoicePrefix,
+    prefill?.invoiceNumber,
+    meta?.nextPurchaseInvoicePrefix,
+    meta?.nextPurchaseInvoiceNumber,
+    meta?.nextPurchaseInvoiceNo,
+    salesMeta?.nextSalesInvoicePrefix,
+    salesMeta?.nextSalesInvoiceNumber,
+    salesMeta?.nextSalesInvoiceNo,
+    salesReturnMeta?.nextSalesReturnInvoicePrefix,
+    salesReturnMeta?.nextSalesReturnInvoiceNumber,
+    salesReturnMeta?.nextSalesReturnInvoiceNo,
+  ]);
 
   const dropdownOptions = useMemo(() => {
     const gstBase = meta?.gst?.length ? meta.gst : emptyMeta.gst;

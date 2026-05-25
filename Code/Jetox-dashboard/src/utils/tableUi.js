@@ -129,18 +129,18 @@ export const ORDER_TABLE_COL = {
   Paid: { th: "min-w-[4.5rem]", td: "min-w-[4.5rem]" },
   Due: { th: "min-w-[4.5rem]", td: "min-w-[4.5rem]" },
   "Return Amt": {
-    th: "min-w-[6.5rem] hidden xl:table-cell",
-    td: "hidden min-w-[6.5rem] xl:table-cell",
+    th: "min-w-26 hidden xl:table-cell",
+    td: "hidden min-w-26 xl:table-cell",
   },
-  "Refund Due": { th: "min-w-[6.5rem]", td: "min-w-[6.5rem]" },
+  "Refund Due": { th: "min-w-26", td: "min-w-26" },
   Refunded: {
     th: "min-w-[6rem] hidden lg:table-cell",
     td: "hidden min-w-[6rem] lg:table-cell",
   },
   "Net Amount": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
   "Payment Status": {
-    th: "min-w-[8.5rem]",
-    td: "min-w-[8.5rem]",
+    th: "min-w-34",
+    td: "min-w-34",
   },
   "Total Amount": { th: "min-w-[8rem]", td: "min-w-[8rem]" },
   "Order Status": { th: "min-w-[8rem]", td: "min-w-[8rem]" },

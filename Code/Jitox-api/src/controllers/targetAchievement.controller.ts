@@ -5,7 +5,9 @@ import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { sendSuccess } from "../utils/apiResponse";
 import { getTargetIncentiveDemoPayload } from "../utils/targetIncentiveDemo";
 import {
+  buildLiveProductIncentiveView,
   buildLiveTargetAchievementView,
+  buildLiveTeamIncentiveView,
   upsertTargetAchievementPlans,
 } from "../services/targetAchievement.service";
 
@@ -73,6 +75,19 @@ export const getTargetIncentivePayload = async (
       source
     );
 
+    const queryYear = year || new Date().getFullYear();
+    const liveTeam = await buildLiveTeamIncentiveView({ year: queryYear });
+    const useLiveTeam = liveTeam.rows.length > 0;
+
+    const liveProduct = await buildLiveProductIncentiveView({
+      year,
+      managerId,
+      dateFrom,
+      dateTo,
+    });
+    const useLiveProduct =
+      liveProduct.hasSales || liveProduct.hasActiveRules;
+
     res.json({
       dataSource: useDemo ? "demo" : "live",
       overviewKpis: active.overviewKpis,
@@ -83,10 +98,16 @@ export const getTargetIncentivePayload = async (
       managers: active.managers,
       demo: demoView,
       live: liveView,
-      teamSummaryKpis: demo.teamSummaryKpis,
-      teamRows: demo.teamRows,
-      productIncentiveRows: demo.productIncentiveRows,
-      productIncentiveSummary: demo.productIncentiveSummary,
+      teamDataSource: useLiveTeam ? "live" : "demo",
+      teamSummaryKpis: useLiveTeam ? liveTeam.kpis : demo.teamSummaryKpis,
+      teamRows: useLiveTeam ? liveTeam.rows : demo.teamRows,
+      productDataSource: useLiveProduct ? "live" : "demo",
+      productIncentiveRows: useLiveProduct
+        ? liveProduct.rows
+        : demo.productIncentiveRows,
+      productIncentiveSummary: useLiveProduct
+        ? liveProduct.summary
+        : demo.productIncentiveSummary,
     });
   } catch (e) {
     console.error("getTargetIncentivePayload", e);

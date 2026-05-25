@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -15,11 +15,15 @@ function fmt(n) {
 
 export default function TargetProductIncentivePage() {
   const navigate = useNavigate();
+  const [year] = useState(() => new Date().getFullYear());
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["target-incentive"],
+    queryKey: ["target-incentive", "products", year],
     queryFn: async () => {
-      const { data: payload } = await dashboardUiApi.getTargetIncentive();
+      const { data: payload } = await dashboardUiApi.getTargetIncentive({
+        year,
+        source: "live",
+      });
       return payload;
     },
   });
@@ -30,6 +34,7 @@ export default function TargetProductIncentivePage() {
     }
   }, [isError, error]);
 
+  const productLive = data?.productDataSource === "live";
   const rows = data?.productIncentiveRows || [];
   const summary = data?.productIncentiveSummary || [];
 
@@ -47,7 +52,7 @@ export default function TargetProductIncentivePage() {
     () =>
       rows.reduce(
         (acc, r) => ({
-          qty: acc.qty + (Number(r.qty) || 0),
+          qty: acc.qty + (Number(r.qtyNumeric ?? r.qty) || 0),
           selling: acc.selling + (Number(r.sellingAmt) || 0),
           total: acc.total + (Number(r.total) || 0),
           incentive: acc.incentive + (Number(r.incentiveValue) || 0),
@@ -74,14 +79,25 @@ export default function TargetProductIncentivePage() {
     <DashboardLayout>
       <TargetIncentiveSubNav />
 
-      <button
-        type="button"
-        onClick={() => navigate("/dashboard/target-incentive")}
-        className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-primary mb-3 dark:text-slate-300"
-      >
-        <ArrowLeft size={18} />
-        Product Incentive Table
-      </button>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard/target-incentive")}
+          className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-primary dark:text-slate-300"
+        >
+          <ArrowLeft size={18} />
+          Product Incentive Table
+        </button>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+            productLive
+              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+              : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+          }`}
+        >
+          {productLive ? "Live data" : "Demo data"}
+        </span>
+      </div>
 
       {isLoading ? (
         <p className="text-sm text-slate-500 py-8">Loading…</p>
@@ -103,6 +119,18 @@ export default function TargetProductIncentivePage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {!rows.length && !isLoading ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="border border-slate-200 px-3 py-8 text-center text-sm text-slate-500 dark:border-slate-700"
+                      >
+                        {productLive
+                          ? "No product sales in this period. Add sales vouchers and Assign incentive rules."
+                          : "No rows to display."}
+                      </td>
+                    </tr>
+                  ) : null}
                   {rows.map((r) => (
                     <tr
                       key={r.id}

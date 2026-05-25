@@ -4,6 +4,7 @@ import {
   ReceiptVoucher,
   SalesVoucher,
   TargetAchievementPlan,
+  TargetIncentiveAssignment,
   User,
 } from "../models/index";
 import { productLineAmount } from "../utils/productUnit";
@@ -88,7 +89,7 @@ function monthPct(
   if (salesTarget > 0) parts.push((salesAchieved / salesTarget) * 100);
   if (collPlan > 0) parts.push((collAchieved / collPlan) * 100);
   if (!parts.length) {
-    if (salesAchieved > 0 || collAchieved > 0) return 100;
+    /** No targets saved — do not show 100% just because there is achievement. */
     return 0;
   }
   return Math.min(100, Math.round(parts.reduce((a, b) => a + b, 0) / parts.length));
@@ -152,10 +153,9 @@ async function loadPlansForYear(year: number, managerUserId?: string) {
   const filter: Record<string, unknown> = { year };
   if (managerUserId && managerUserId !== "all") {
     filter.managerUserId = managerUserId;
-  } else {
-    filter.$or = [{ managerUserId: "" }, { managerUserId: { $exists: false } }];
   }
-  return TargetAchievementPlan.find(filter).lean();
+  /** "All managers" → every plan row (company-wide + each manager) for monthly totals. */
+  return TargetAchievementPlan.find(filter).sort({ month: 1 }).lean();
 }
 
 async function aggregateMonthlyAchievement(
@@ -466,6 +466,7 @@ export async function upsertTargetAchievementPlans(body: {
     month: number;
     salesTarget?: number;
     collectionPlan?: number;
+    visitsTarget?: number;
     managerUserId?: string;
   }[];
   createdByUserId?: string;
@@ -481,12 +482,30 @@ export async function upsertTargetAchievementPlans(body: {
     const month = Number(row.month);
     if (!Number.isFinite(month) || month < 1 || month > 12) continue;
     const managerUserId = String(row.managerUserId || "").trim();
+    const existing = await TargetAchievementPlan.findOne({
+      year,
+      month,
+      managerUserId,
+    }).lean();
+    const salesTarget =
+      row.salesTarget !== undefined
+        ? Math.max(0, Number(row.salesTarget) || 0)
+        : Math.max(0, Number(existing?.salesTarget) || 0);
+    const collectionPlan =
+      row.collectionPlan !== undefined
+        ? Math.max(0, Number(row.collectionPlan) || 0)
+        : Math.max(0, Number(existing?.collectionPlan) || 0);
+    const visitsTarget =
+      row.visitsTarget !== undefined
+        ? Math.max(0, Number(row.visitsTarget) || 0)
+        : Math.max(0, Number(existing?.visitsTarget) || 0);
     const doc = await TargetAchievementPlan.findOneAndUpdate(
       { year, month, managerUserId },
       {
         $set: {
-          salesTarget: Math.max(0, Number(row.salesTarget) || 0),
-          collectionPlan: Math.max(0, Number(row.collectionPlan) || 0),
+          salesTarget,
+          collectionPlan,
+          visitsTarget,
           createdByUserId: body.createdByUserId,
         },
       },
@@ -496,6 +515,570 @@ export async function upsertTargetAchievementPlans(body: {
   }
 
   return results;
+}
+
+function parseIncentivePct(raw: unknown): number {
+  const s = String(raw ?? "")
+    .trim()
+    .replace(/%/g, "");
+  if (!s) return 0;
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 0;
+}
+
+function monthPeriodLabel(year: number, month: number): string {
+  const short = MONTH_SHORT[month - 1] || `M${month}`;
+  return `${short} ${year}`;
+}
+
+function fmtInrDisplay(n: number): string {
+  return `₹${Math.round(Number(n) || 0).toLocaleString("en-IN", {
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function fmtVisitsDisplay(n: number): string {
+  return `${Math.round(Number(n) || 0).toLocaleString("en-IN")} Visits`;
+}
+
+function assignmentAppliesToManager(
+  a: {
+    applicableTo?: string;
+    applicableUserIds?: string[];
+  },
+  managerUserId: string
+): boolean {
+  const mode = String(a.applicableTo || "all");
+  if (mode === "all") return true;
+  if (mode === "managers") {
+    const ids = Array.isArray(a.applicableUserIds) ? a.applicableUserIds : [];
+    return ids.map(String).includes(managerUserId);
+  }
+  return false;
+}
+
+function assignmentOverlapsMonth(
+  a: { fromDate?: string; toDate?: string },
+  year: number,
+  month: number
+): boolean {
+  const from = String(a.fromDate || "").trim();
+  const to = String(a.toDate || "").trim();
+  if (!from || !to) return false;
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return from <= end && to >= start;
+}
+
+function assignmentOverlapsRange(
+  a: { fromDate?: string; toDate?: string },
+  rangeStart: Date,
+  rangeEnd: Date
+): boolean {
+  const from = String(a.fromDate || "").trim();
+  const to = String(a.toDate || "").trim();
+  if (!from || !to) return false;
+  const startIso = rangeStart.toISOString().slice(0, 10);
+  const endInclusive = new Date(rangeEnd.getTime() - 1);
+  const endIso = endInclusive.toISOString().slice(0, 10);
+  return from <= endIso && to >= startIso;
+}
+
+function buildProductPctMap(
+  assignments: {
+    applicableTo?: string;
+    applicableUserIds?: string[];
+    fromDate?: string;
+    toDate?: string;
+    rows?: { product?: string; incentive?: string }[];
+  }[],
+  managerUserId: string,
+  year: number,
+  month: number
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const a of assignments) {
+    if (!assignmentOverlapsMonth(a, year, month)) continue;
+    if (!assignmentAppliesToManager(a, managerUserId)) continue;
+    const rows = Array.isArray(a.rows) ? a.rows : [];
+    for (const row of rows) {
+      const key = String(row.product || "").trim().toLowerCase();
+      if (!key) continue;
+      const pct = parseIncentivePct(row.incentive);
+      const prev = map.get(key) ?? 0;
+      if (pct > prev) map.set(key, pct);
+    }
+  }
+  return map;
+}
+
+function calcProductIncentiveForMonth(
+  salesVouchers: Awaited<ReturnType<typeof aggregateMonthlyAchievement>>["salesVouchers"],
+  productPct: Map<string, number>,
+  managerName: string,
+  monthIndex: number,
+  year: number
+): number {
+  if (!productPct.size) return 0;
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 1);
+  let total = 0;
+  for (const sv of salesVouchers) {
+    const d = sv.voucherDate as Date | undefined;
+    if (!d || d < monthStart || d >= monthEnd) continue;
+    if (!orderByMatchesManager(String(sv.orderby || ""), managerName)) continue;
+    const items = Array.isArray(sv.items) ? sv.items : [];
+    for (const it of items) {
+      const pop = (it as { product?: { productName?: string } | string }).product;
+      const pname =
+        typeof pop === "object" && pop && "productName" in pop
+          ? String(pop.productName || "").trim().toLowerCase()
+          : "";
+      if (!pname) continue;
+      const pct = productPct.get(pname) ?? 0;
+      if (pct <= 0) continue;
+      total += (parseAmount((it as { subtotal?: number }).subtotal) * pct) / 100;
+    }
+  }
+  return Math.round(total);
+}
+
+function managerSalesInMonth(
+  salesVouchers: Awaited<ReturnType<typeof aggregateMonthlyAchievement>>["salesVouchers"],
+  managerName: string,
+  monthIndex: number,
+  year: number
+): number {
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 1);
+  let total = 0;
+  for (const sv of salesVouchers) {
+    const d = sv.voucherDate as Date | undefined;
+    if (!d || d < monthStart || d >= monthEnd) continue;
+    if (!orderByMatchesManager(String(sv.orderby || ""), managerName)) continue;
+    total += parseAmount(sv.totalAmount);
+  }
+  return Math.round(total);
+}
+
+type ReceiptLeanRow = {
+  date?: Date;
+  amount?: unknown;
+  /** Populated sales voucher or raw ObjectId from lean(). */
+  sourceSalesId?: unknown;
+};
+
+function orderByFromPopulatedSale(source: unknown): string {
+  if (!source || typeof source !== "object") return "";
+  const rec = source as Record<string, unknown>;
+  if (!("orderby" in rec)) return "";
+  return String(rec.orderby ?? "").trim();
+}
+
+function managerCollectionInMonth(
+  receipts: ReceiptLeanRow[],
+  managerName: string,
+  monthIndex: number,
+  year: number
+): number {
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 1);
+  let total = 0;
+  for (const r of receipts) {
+    if (!r.date) continue;
+    const d = new Date(r.date as Date);
+    if (d < monthStart || d >= monthEnd) continue;
+    const orderBy = orderByFromPopulatedSale(r.sourceSalesId);
+    if (!orderBy || !orderByMatchesManager(orderBy, managerName)) continue;
+    total += parseAmount(r.amount);
+  }
+  return Math.round(total);
+}
+
+export type LiveTeamIncentiveRow = {
+  id: string;
+  user: string;
+  period: string;
+  targetType: string;
+  targetAmt: string;
+  achieved: string;
+  pctAchieved: number;
+  incentive: string;
+  status: "Achieved" | "Not Achieved";
+};
+
+/** Build Team incentives tab from plans, vouchers, and Assign incentive rules. */
+export async function buildLiveTeamIncentiveView(query: { year?: number }) {
+  const year = Number(query.year) || new Date().getFullYear();
+  const rangeStart = new Date(year, 0, 1);
+  const rangeEnd = new Date(year + 1, 0, 1);
+
+  const [plans, managers, assignments, salesVouchers, receipts] = await Promise.all([
+    TargetAchievementPlan.find({ year }).sort({ month: 1 }).lean(),
+    User.find({ role: { $in: ["Manager", "Admin"] } })
+      .select("name firstName lastName email")
+      .lean(),
+    TargetIncentiveAssignment.find().lean(),
+    SalesVoucher.find({
+      voucherDate: { $gte: rangeStart, $lt: rangeEnd },
+    })
+      .select("voucherDate totalAmount orderby items")
+      .populate({ path: "items.product", select: "productName" })
+      .lean(),
+    ReceiptVoucher.find({
+      date: { $gte: rangeStart, $lt: rangeEnd },
+    })
+      .select("date amount sourceSalesId")
+      .populate({ path: "sourceSalesId", select: "orderby" })
+      .lean(),
+  ]);
+
+  const managerById = new Map(
+    managers.map((m) => [String(m._id), userDisplayName(m)])
+  );
+
+  const rows: LiveTeamIncentiveRow[] = [];
+
+  for (const plan of plans) {
+    const month = Number(plan.month);
+    if (!Number.isFinite(month) || month < 1 || month > 12) continue;
+
+    const managerUserId = String(plan.managerUserId || "").trim();
+    const userLabel = managerUserId
+      ? managerById.get(managerUserId) || "Manager"
+      : "Company-wide";
+    const managerName = managerUserId ? userLabel : "";
+    const period = monthPeriodLabel(year, month);
+    const monthIndex = month - 1;
+
+    const productPct = managerUserId
+      ? buildProductPctMap(assignments, managerUserId, year, month)
+      : new Map<string, number>();
+    const productIncentive = managerUserId
+      ? calcProductIncentiveForMonth(
+          salesVouchers,
+          productPct,
+          managerName,
+          monthIndex,
+          year
+        )
+      : 0;
+
+    const salesTarget = Math.max(0, Number(plan.salesTarget) || 0);
+    if (salesTarget > 0) {
+      const achieved = managerUserId
+        ? managerSalesInMonth(salesVouchers, managerName, monthIndex, year)
+        : achievementSumSalesMonth(salesVouchers, monthIndex);
+      const pct = salesTarget > 0 ? Math.min(999, Math.round((achieved / salesTarget) * 100)) : 0;
+      const bonus = pct >= 100 ? Math.round(achieved * 0.06) : 0;
+      const incentive = Math.round(productIncentive + bonus);
+      rows.push({
+        id: `${managerUserId || "co"}-${month}-sales`,
+        user: userLabel,
+        period,
+        targetType: "Sales",
+        targetAmt: fmtInrDisplay(salesTarget),
+        achieved: fmtInrDisplay(achieved),
+        pctAchieved: pct,
+        incentive: fmtInrDisplay(incentive),
+        status: pct >= 100 ? "Achieved" : "Not Achieved",
+      });
+    }
+
+    const collTarget = Math.max(0, Number(plan.collectionPlan) || 0);
+    if (collTarget > 0) {
+      const achieved = managerUserId
+        ? managerCollectionInMonth(receipts, managerName, monthIndex, year)
+        : sumReceiptsMonth(receipts, monthIndex);
+      const pct = collTarget > 0 ? Math.min(999, Math.round((achieved / collTarget) * 100)) : 0;
+      const bonus = pct >= 100 ? Math.round(achieved * 0.06) : 0;
+      rows.push({
+        id: `${managerUserId || "co"}-${month}-coll`,
+        user: userLabel,
+        period,
+        targetType: "Collections",
+        targetAmt: fmtInrDisplay(collTarget),
+        achieved: fmtInrDisplay(achieved),
+        pctAchieved: pct,
+        incentive: fmtInrDisplay(Math.round(bonus)),
+        status: pct >= 100 ? "Achieved" : "Not Achieved",
+      });
+    }
+
+    const visitsTarget = Math.max(0, Number(plan.visitsTarget) || 0);
+    if (visitsTarget > 0) {
+      const achievedVisits = 0;
+      const pct =
+        visitsTarget > 0
+          ? Math.min(999, Math.round((achievedVisits / visitsTarget) * 100))
+          : 0;
+      rows.push({
+        id: `${managerUserId || "co"}-${month}-visits`,
+        user: userLabel,
+        period,
+        targetType: "Visits",
+        targetAmt: fmtVisitsDisplay(visitsTarget),
+        achieved: fmtVisitsDisplay(achievedVisits),
+        pctAchieved: pct,
+        incentive: fmtInrDisplay(0),
+        status: pct >= 100 ? "Achieved" : "Not Achieved",
+      });
+    }
+  }
+
+  let notAchieved = 0;
+  let pctSum = 0;
+  let incentiveSum = 0;
+  let targetSum = 0;
+  for (const r of rows) {
+    if (r.status !== "Achieved") notAchieved += 1;
+    pctSum += r.pctAchieved;
+    incentiveSum += parseAmount(r.incentive);
+    if (r.targetType !== "Visits") {
+      targetSum += parseAmount(r.targetAmt);
+    }
+  }
+
+  const kpis = rows.length
+    ? [
+        {
+          key: "totalTarget",
+          label: "Total Target",
+          value: formatInrCompact(targetSum),
+        },
+        {
+          key: "notAchieved",
+          label: "Not Achieved",
+          value: String(notAchieved),
+        },
+        {
+          key: "totalPct",
+          label: "Total Achievement%",
+          value: `${Math.round(pctSum / rows.length)}%`,
+        },
+        {
+          key: "totalIncentive",
+          label: "Total Incentive",
+          value: formatInrCompact(incentiveSum),
+        },
+      ]
+    : [];
+
+  return { year, rows, kpis, hasPlans: plans.length > 0 };
+}
+
+function achievementSumSalesMonth(
+  salesVouchers: { voucherDate?: Date; totalAmount?: unknown }[],
+  monthIndex: number
+): number {
+  let total = 0;
+  for (const sv of salesVouchers) {
+    const d = sv.voucherDate as Date | undefined;
+    if (!d || new Date(d).getMonth() !== monthIndex) continue;
+    total += parseAmount(sv.totalAmount);
+  }
+  return Math.round(total);
+}
+
+function sumReceiptsMonth(receipts: ReceiptLeanRow[], monthIndex: number): number {
+  let total = 0;
+  for (const r of receipts) {
+    if (!r.date || new Date(r.date as Date).getMonth() !== monthIndex) continue;
+    total += parseAmount(r.amount);
+  }
+  return Math.round(total);
+}
+
+export type LiveProductIncentiveRow = {
+  id: string;
+  prodGroup: string;
+  prodCategory: string;
+  prodName: string;
+  qty: string;
+  qtyNumeric: number;
+  sellingAmt: number;
+  total: number;
+  pctIncentive: string;
+  incentiveValue: number;
+};
+
+/** Product incentive table from sales lines + Assign incentive rules. */
+export async function buildLiveProductIncentiveView(query: TargetIncentiveQuery) {
+  const { year, rangeStart, rangeEnd } = resolveYearRange(query);
+  const managerId = String(query.managerId || "all").trim();
+
+  let managerName: string | undefined;
+  if (managerId && managerId !== "all") {
+    const mgr = await User.findById(managerId)
+      .select("name firstName lastName email")
+      .lean();
+    if (mgr) managerName = userDisplayName(mgr);
+  }
+
+  const [assignments, salesVouchers, distinctGroups] = await Promise.all([
+    TargetIncentiveAssignment.find().lean(),
+    SalesVoucher.find({
+      voucherDate: { $gte: rangeStart, $lt: rangeEnd },
+    })
+      .select("voucherDate orderby items")
+      .populate({
+        path: "items.product",
+        select: "productName group category unit",
+      })
+      .lean(),
+    Product.distinct("group"),
+  ]);
+
+  const productPct = new Map<string, number>();
+  const assignmentGroups = new Set<string>();
+  let hasActiveRules = false;
+
+  for (const a of assignments) {
+    if (!assignmentOverlapsRange(a, rangeStart, rangeEnd)) continue;
+    if (managerId !== "all" && !assignmentAppliesToManager(a, managerId)) continue;
+    hasActiveRules = true;
+    const aRows = Array.isArray(a.rows) ? a.rows : [];
+    for (const row of aRows) {
+      const g = String(row.group || "").trim();
+      if (g) assignmentGroups.add(g);
+      const pct = parseIncentivePct(row.incentive);
+      const nameKey = String(row.product || "").trim().toLowerCase();
+      if (nameKey) productPct.set(nameKey, Math.max(productPct.get(nameKey) ?? 0, pct));
+      const pid = String(row.productId || "").trim();
+      if (pid) {
+        productPct.set(`id:${pid}`, Math.max(productPct.get(`id:${pid}`) ?? 0, pct));
+      }
+    }
+  }
+
+  type ProductAgg = {
+    prodGroup: string;
+    prodCategory: string;
+    prodName: string;
+    productId: string;
+    qty: number;
+    total: number;
+    unit: string;
+  };
+
+  const agg = new Map<string, ProductAgg>();
+
+  for (const sv of salesVouchers) {
+    if (managerName && !orderByMatchesManager(String(sv.orderby || ""), managerName)) {
+      continue;
+    }
+    const items = Array.isArray(sv.items) ? sv.items : [];
+    for (const it of items) {
+      const line = it as {
+        group?: string;
+        category?: string;
+        unit?: string;
+        quantity?: number;
+        subtotal?: number;
+        rateParUnit?: number;
+        product?: { _id?: unknown; productName?: string; group?: string; category?: string; unit?: string };
+      };
+      const pop = line.product;
+      const productId =
+        pop && typeof pop === "object" && pop._id != null ? String(pop._id) : "";
+      const prodName =
+        (pop && typeof pop === "object" && String(pop.productName || "").trim()) ||
+        "Product";
+      const key = productId || prodName.toLowerCase();
+      const prodGroup =
+        String(line.group || "").trim() ||
+        (pop && typeof pop === "object" ? String(pop.group || "").trim() : "") ||
+        "Other";
+      const prodCategory =
+        String(line.category || "").trim() ||
+        (pop && typeof pop === "object" ? String(pop.category || "").trim() : "") ||
+        "";
+      const unit =
+        String(line.unit || "").trim() ||
+        (pop && typeof pop === "object" ? String(pop.unit || "").trim() : "") ||
+        "";
+      const qty = Number(line.quantity) || 0;
+      const sub = parseAmount(line.subtotal);
+
+      const prev = agg.get(key) || {
+        prodGroup,
+        prodCategory,
+        prodName,
+        productId,
+        qty: 0,
+        total: 0,
+        unit,
+      };
+      prev.qty += qty;
+      prev.total += sub;
+      if (unit && !prev.unit) prev.unit = unit;
+      agg.set(key, prev);
+    }
+  }
+
+  const rows: LiveProductIncentiveRow[] = [];
+  let idx = 0;
+  for (const [, a] of agg) {
+    const pct =
+      productPct.get(a.prodName.toLowerCase()) ??
+      (a.productId ? productPct.get(`id:${a.productId}`) ?? 0 : 0);
+    const incentiveValue = Math.round((a.total * pct) / 100);
+    const sellingAmt = a.qty > 0 ? Math.round(a.total / a.qty) : 0;
+    const qtyLabel =
+      a.qty > 0 ? (a.unit ? `${Math.round(a.qty)} ${a.unit}` : String(Math.round(a.qty))) : "0";
+
+    rows.push({
+      id: `live-p${idx++}`,
+      prodGroup: a.prodGroup,
+      prodCategory: a.prodCategory,
+      prodName: a.prodName,
+      qty: qtyLabel,
+      qtyNumeric: Math.round(a.qty),
+      sellingAmt,
+      total: Math.round(a.total),
+      pctIncentive: pct > 0 ? `${pct}%` : "—",
+      incentiveValue,
+    });
+  }
+
+  rows.sort((a, b) => b.total - a.total);
+
+  const summaryMap = new Map<string, { totalSales: number; incentiveEarned: number }>();
+  for (const r of rows) {
+    const g = r.prodGroup || "Other";
+    const prev = summaryMap.get(g) || { totalSales: 0, incentiveEarned: 0 };
+    prev.totalSales += r.total;
+    prev.incentiveEarned += r.incentiveValue;
+    summaryMap.set(g, prev);
+  }
+  for (const g of assignmentGroups) {
+    if (!summaryMap.has(g)) {
+      summaryMap.set(g, { totalSales: 0, incentiveEarned: 0 });
+    }
+  }
+  for (const g of distinctGroups) {
+    const name = String(g || "").trim();
+    if (name && !summaryMap.has(name)) {
+      summaryMap.set(name, { totalSales: 0, incentiveEarned: 0 });
+    }
+  }
+
+  const summary = [...summaryMap.entries()]
+    .sort((a, b) => b[1].totalSales - a[1].totalSales)
+    .map(([group, v]) => ({
+      group,
+      totalSales: Math.round(v.totalSales),
+      incentiveEarned: Math.round(v.incentiveEarned),
+    }));
+
+  return {
+    year,
+    rows,
+    summary,
+    hasActiveRules,
+    hasSales: rows.length > 0,
+  };
 }
 
 /** Stock snapshot for demo-style product drill-down when no sales lines exist. */

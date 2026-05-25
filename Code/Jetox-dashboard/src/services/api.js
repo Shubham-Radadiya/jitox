@@ -420,7 +420,7 @@ export const dashboardUiApi = {
   deleteDocumentEntry: (id) =>
     http.delete(`${DU}/documents/entries/${encodeURIComponent(id)}`),
 
-  getOverview: () => http.get(`${DU}/overview`),
+  getOverview: (params) => http.get(`${DU}/overview`, { params }),
   getTargetIncentive: (params) =>
     http.get(`${DU}/target-incentive`, { params }),
   saveTargetAchievementPlans: (body) =>

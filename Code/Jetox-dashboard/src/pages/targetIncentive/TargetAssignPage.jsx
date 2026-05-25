@@ -326,6 +326,11 @@ export default function TargetAssignPage() {
       await queryClient.invalidateQueries({
         queryKey: ["target-incentive-assignments"],
       });
+      await queryClient.invalidateQueries({ queryKey: ["target-incentive"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["target-incentive", "products"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["target-incentive", "team"] });
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Save failed"));
     } finally {
@@ -354,6 +359,11 @@ export default function TargetAssignPage() {
       await queryClient.invalidateQueries({
         queryKey: ["target-incentive-assignments"],
       });
+      await queryClient.invalidateQueries({ queryKey: ["target-incentive"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["target-incentive", "products"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["target-incentive", "team"] });
       setAssignmentId("");
       applyFormState({
         assignmentId: "",
