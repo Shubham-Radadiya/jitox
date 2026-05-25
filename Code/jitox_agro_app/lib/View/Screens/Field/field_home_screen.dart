@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:jitox_agro_app/Constants/app_theme.dart';
+import 'package:jitox_agro_app/Constants/app_typography.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
 import 'package:jitox_agro_app/Constants/route_names.dart';
 import 'package:jitox_agro_app/View/Widgets/mr/mr_app_bar.dart';
 import 'package:jitox_agro_app/View/Widgets/mr/mr_drawer.dart';
+import 'package:jitox_agro_app/View/Widgets/ui/app_card.dart';
+import 'package:jitox_agro_app/View/Widgets/ui/section_title.dart';
+import 'package:jitox_agro_app/services/auth_session.dart';
+import 'package:jitox_agro_app/services/location_tracking_service.dart';
+import 'package:jitox_agro_app/services/notifications_api.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
-/// Main dashboard — MR Employee Tracker style (reference videos).
 class FieldHomeScreen extends StatefulWidget {
   const FieldHomeScreen({super.key});
 
@@ -16,169 +22,330 @@ class FieldHomeScreen extends StatefulWidget {
 class _FieldHomeScreenState extends State<FieldHomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _dayStarted = false;
+  Map<String, dynamic>? _user;
+  int _unread = 0;
 
   static const _menuItems = [
-    _MenuItem('Dealer List', Icons.list_alt, dealerListScreen),
-    _MenuItem('Dealer Order', Icons.edit_note, orderDetailPage),
-    _MenuItem('Dealer Payment', Icons.payments_outlined, addDealerPaymentScreen),
+    _MenuItem('Tasks', Icons.task_alt_outlined, taskScreen),
+    _MenuItem('Dealer List', Icons.storefront_outlined, dealerListScreen),
+    _MenuItem('Dealer Order', Icons.edit_note_outlined, orderDetailPage),
+    _MenuItem('Payment', Icons.payments_outlined, addDealerPaymentScreen),
     _MenuItem('Dealer Visit', Icons.map_outlined, null),
-    _MenuItem('New Party(Dealer)', Icons.person_add_alt_1, null),
-    _MenuItem('Reminder', Icons.alarm, null),
-    _MenuItem('Customer(Farmer)', Icons.agriculture, null),
-    _MenuItem('Meeting Schedule', Icons.event_note, null),
+    _MenuItem('New Party', Icons.person_add_alt_1_outlined, null),
+    _MenuItem('Reminder', Icons.alarm_outlined, null),
+    _MenuItem('Farmer', Icons.agriculture_outlined, null),
+    _MenuItem('Meeting', Icons.event_note_outlined, null),
     _MenuItem('Product Demo', Icons.science_outlined, productDemoScreen),
-    _MenuItem('Expense', Icons.receipt_long, null),
-    _MenuItem('Calendar', Icons.calendar_month, null),
+    _MenuItem('Expense', Icons.receipt_long_outlined, null),
+    _MenuItem('Calendar', Icons.calendar_month_outlined, null),
     _MenuItem('Print', Icons.print_outlined, null),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+    _loadDayState();
+  }
+
+  Future<void> _loadDayState() async {
+    final active = await LocationTrackingService.instance.isActive();
+    if (mounted) setState(() => _dayStarted = active);
+  }
+
+  Future<void> _toggleDay() async {
+    if (_dayStarted) {
+      await LocationTrackingService.instance.endDay();
+      if (!mounted) return;
+      setState(() => _dayStarted = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Day ended — location tracking stopped')),
+      );
+      return;
+    }
+    final ok = await LocationTrackingService.instance.startDay();
+    if (!mounted) return;
+    if (ok) {
+      setState(() => _dayStarted = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Day started — sharing location with admin')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not start tracking. Enable location permission.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    final user = await AuthSession.getUser();
+    var unread = 0;
+    try {
+      unread = await NotificationsApi.unreadCount();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _user = user;
+        _unread = unread;
+      });
+    }
+  }
+
+  String _field(String key, [String fallback = '—']) {
+    final v = _user?[key];
+    if (v == null || v.toString().isEmpty) return fallback;
+    return v.toString();
+  }
+
   String _nowLabel() {
     final n = DateTime.now();
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
     final h = n.hour > 12 ? n.hour - 12 : (n.hour == 0 ? 12 : n.hour);
     final ampm = n.hour >= 12 ? 'PM' : 'AM';
     final m = n.minute.toString().padLeft(2, '0');
-    final s = n.second.toString().padLeft(2, '0');
-    return '${n.day.toString().padLeft(2, '0')}/${n.month.toString().padLeft(2, '0')}/${n.year} '
-        '${h.toString().padLeft(2, '0')}:$m:$s $ampm';
+    return '${n.day} ${months[n.month - 1]} ${n.year} · $h:$m $ampm';
   }
 
   @override
   Widget build(BuildContext context) {
+    final code = _field('employeeCode', _field('userCode', '—'));
+    final name = _field('name', 'Field user');
+    final mobile = _field('phone', _field('mobile', '—'));
+    final role = _field('role', 'Employee');
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
-      drawer: const MrDrawer(),
+      backgroundColor: AppColors.surfaceMuted,
+      drawer: MrDrawer(user: _user),
       appBar: MrAppBar(
-        title: 'MR Employee Tracker',
+        title: 'Jitox Field',
         onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+        unreadCount: _unread,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _loadProfile,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(4.w, 1.5.h, 4.w, 1.h),
+            AppCard(
+              padding: EdgeInsets.all(4.w),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: AppColors.mintHero,
+                    child: Text(
+                      initial,
+                      style: AppTypography.headlineStyle(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 3.5.w),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _infoLine('Code', 'KANT-10'),
-                        _infoLine('Name', 'Mr. Mayurkumar B. Shilu'),
-                        _infoLine('Mobile', '8141931512'),
                         Text(
-                          'Date : ${_nowLabel()}',
-                          style: TextStyle(
-                            fontSize: 11.sp,
-                            color: AppColors.textSecondary,
-                          ),
+                          name,
+                          style: AppTypography.titleSmStyle(),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          role,
+                          style: AppTypography.bodySmStyle(),
+                        ),
+                        SizedBox(height: 1.h),
+                        _MetaChip(icon: Icons.badge_outlined, label: code),
+                        SizedBox(height: 0.5.h),
+                        _MetaChip(icon: Icons.phone_outlined, label: mobile),
+                        SizedBox(height: 0.5.h),
+                        _MetaChip(icon: Icons.schedule, label: _nowLabel()),
                       ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => setState(() => _dayStarted = !_dayStarted),
-                    child: Container(
-                      width: 22.w,
-                      height: 22.w,
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: primaryColor.withOpacity(0.35),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _dayStarted ? 'DAY\nEND' : 'DAY\nSTART',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w800,
-                          height: 1.1,
-                        ),
-                      ),
-                    ),
+                  _DayStartButton(
+                    active: _dayStarted,
+                    onTap: _toggleDay,
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.5.h),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _QuickLink(
+            SizedBox(height: 2.h),
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionChip(
                     label: 'Live Feed',
                     icon: Icons.sensors,
                     onTap: () => Navigator.pushNamed(context, liveFeedScreen),
                   ),
-                  _QuickLink(
-                    label: 'Achievement',
-                    icon: Icons.emoji_events_outlined,
-                    onTap: () {},
+                ),
+                SizedBox(width: 2.5.w),
+                Expanded(
+                  child: _ActionChip(
+                    label: 'My Tasks',
+                    icon: Icons.task_alt,
+                    onTap: () => Navigator.pushNamed(context, taskScreen),
+                  ),
+                ),
+                if (_unread > 0) ...[
+                  SizedBox(width: 2.5.w),
+                  Expanded(
+                    child: _ActionChip(
+                      label: 'Alerts ($_unread)',
+                      icon: Icons.notifications_active,
+                      onTap: () =>
+                          Navigator.pushNamed(context, notificationScreen),
+                    ),
                   ),
                 ],
-              ),
+              ],
             ),
-            Divider(height: 1, color: Colors.grey.shade300),
-            Padding(
-              padding: EdgeInsets.fromLTRB(3.w, 1.5.h, 3.w, 2.h),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 1.5.h,
-                  crossAxisSpacing: 2.w,
-                  childAspectRatio: 0.92,
-                ),
-                itemCount: _menuItems.length,
-                itemBuilder: (context, index) {
-                  final item = _menuItems[index];
-                  return _MenuTile(
-                    label: item.label,
-                    icon: item.icon,
-                    onTap: () {
-                      if (item.route != null) {
-                        Navigator.pushNamed(context, item.route!);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('${item.label} — coming soon')),
-                        );
-                      }
-                    },
-                  );
-                },
+            const SectionTitle(title: 'Quick actions'),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 2.w,
+                crossAxisSpacing: 2.w,
+                childAspectRatio: 0.88,
               ),
+              itemCount: _menuItems.length,
+              itemBuilder: (context, index) {
+                final item = _menuItems[index];
+                return _MenuTile(
+                  label: item.label,
+                  icon: item.icon,
+                  onTap: () {
+                    if (item.route != null) {
+                      Navigator.pushNamed(context, item.route!);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${item.label} — coming soon'),
+                        ),
+                      );
+                    }
+                  },
+                );
+              },
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _infoLine(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 0.3.h),
-      child: RichText(
-        text: TextSpan(
-          style: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary),
-          children: [
-            TextSpan(
-              text: '$label : ',
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-            TextSpan(text: value),
-          ],
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: AppTypography.captionStyle(),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
+      ],
+    );
+  }
+}
+
+class _DayStartButton extends StatelessWidget {
+  const _DayStartButton({required this.active, required this.onTap});
+
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: active ? AppColors.error : AppColors.primary,
+      shape: const CircleBorder(),
+      elevation: 3,
+      shadowColor: AppColors.primary.withValues(alpha: 0.35),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 20.w,
+          height: 20.w,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                active ? Icons.stop_circle_outlined : Icons.play_circle_outline,
+                color: Colors.white,
+                size: 22,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                active ? 'END' : 'START',
+                style: AppTypography.captionStyle(color: Colors.white).copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.4.h),
+      onTap: onTap,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: AppColors.primary, size: 18),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              style: AppTypography.bodySmStyle(
+                color: AppColors.textPrimary,
+                weight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -205,77 +372,39 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFF8F8F8),
-      borderRadius: BorderRadius.circular(8),
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        side: const BorderSide(color: AppColors.border),
+      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 1.h),
+          padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 1.2.h),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: primaryColor, size: 28.sp),
-              SizedBox(height: 0.8.h),
+              Container(
+                padding: EdgeInsets.all(2.w),
+                decoration: BoxDecoration(
+                  color: AppColors.mintHero,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+                child: Icon(icon, color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(height: 8),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10.5.sp,
-                  fontWeight: FontWeight.w600,
+                style: AppTypography.captionStyle(
                   color: AppColors.textPrimary,
-                  height: 1.15,
-                ),
+                ).copyWith(fontWeight: FontWeight.w600, height: 1.2),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickLink extends StatelessWidget {
-  const _QuickLink({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.8.h),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: EdgeInsets.all(1.2.w),
-              decoration: BoxDecoration(
-                color: primaryColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: Colors.white, size: 18.sp),
-            ),
-            SizedBox(width: 2.w),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
         ),
       ),
     );

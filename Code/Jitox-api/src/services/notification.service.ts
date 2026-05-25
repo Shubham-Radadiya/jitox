@@ -134,6 +134,61 @@ export async function notifyAdminsTaskStatusFromAssignee(
   );
 }
 
+/** Notify all admins when a mobile user registers and awaits approval. */
+export async function notifyAdminsPendingRegistration(input: {
+  userId: string;
+  userName: string;
+  email: string;
+  district?: string;
+  city?: string;
+}): Promise<void> {
+  const adminIds = await getAdminUserIds();
+  if (!adminIds.length) return;
+
+  const location = [input.city, input.district].filter(Boolean).join(", ");
+  const locationPart = location ? ` (${location})` : "";
+  const body = `New field user "${input.userName}" (${input.email})${locationPart} registered on the mobile app. Approve or reject in User Master.`;
+
+  await Promise.all(
+    adminIds.map((uid) =>
+      createAndPushNotification({
+        userId: uid,
+        type: "user_registration_pending",
+        title: "New user awaiting approval",
+        body,
+        meta: {
+          pendingUserId: input.userId,
+          userName: input.userName,
+          email: input.email,
+          district: input.district || "",
+          city: input.city || "",
+        },
+      })
+    )
+  );
+  emitToAdmins("user:registration_pending", {
+    userId: input.userId,
+    email: input.email,
+  });
+}
+
+/** Mark pending-registration alerts read after admin approves or rejects the user. */
+export async function resolvePendingRegistrationNotifications(
+  pendingUserId: string
+): Promise<void> {
+  const id = String(pendingUserId || "").trim();
+  if (!id) return;
+
+  await Notification.updateMany(
+    {
+      type: "user_registration_pending",
+      read: false,
+      "meta.pendingUserId": id,
+    },
+    { $set: { read: true } }
+  );
+}
+
 /** Alert admins when a user's district is not listed on any territory. */
 export async function notifyAdminsUnmappedDistrict(input: {
   userId: string;

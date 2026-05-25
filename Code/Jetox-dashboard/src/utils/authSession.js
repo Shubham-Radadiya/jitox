@@ -7,23 +7,25 @@ export function getStoredUser() {
   }
 }
 
+/** Admin and Manager use the web dashboard; User uses the mobile app only. */
+export function isPanelUser(user = getStoredUser()) {
+  const r = getUserRole(user).toLowerCase();
+  return r === "admin" || r === "manager";
+}
+
+export function isFieldUser(user = getStoredUser()) {
+  return getUserRole(user).toLowerCase() === "user";
+}
+
 /**
- * Uses `permissions` from login (JWT payload mirrored in localStorage).
- * Admin with an empty permission list gets the full set from the API on login — but older
- * tokens may omit newer keys like `tasks`; Admin/Manager/User still see Tasks in the UI here.
+ * Module access from login permissions. Admin with empty list = full access (API fills on login).
  */
 export function canAccessModule(user, moduleKey) {
   if (!user || !moduleKey) return false;
+  if (isAdminUser(user)) return true;
   const perms = user.permissions;
   if (!Array.isArray(perms)) return false;
-  if (perms.includes(moduleKey)) return true;
-  if (moduleKey === "tasks") {
-    const r = getUserRole(user).toLowerCase();
-    if (r === "admin" || r === "manager" || r === "user" || r === "employee") {
-      return true;
-    }
-  }
-  return false;
+  return perms.includes(moduleKey);
 }
 
 export function clearAuthSession() {

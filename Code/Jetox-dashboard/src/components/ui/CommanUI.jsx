@@ -48,9 +48,7 @@ export const InputField = ({
     <div className={`flex flex-col relative ${className}`}>
       {label ? (
         <label
-          className={`text-left font-semibold leading-tight tracking-wide text-slate-800 dark:text-slate-200 ${
-            dense ? "mb-1 text-[11px]" : "mb-1.5 text-[12px]"
-          } ${labelClassName}`}
+          className={`jitox-label ${dense ? "mb-1 !text-[11px]" : "mb-1.5"} ${labelClassName}`}
         >
           {label}
         </label>

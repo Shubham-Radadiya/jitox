@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from "mongoose";
+import { AccountStatus } from "../constants/accountStatus";
 import { IUser } from "../types/user.type";
 
 const userSchema = new Schema<IUser>(
@@ -9,6 +10,11 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ["Admin", "Manager", "User"],
       default: "User",
+    },
+    accountStatus: {
+      type: String,
+      enum: Object.values(AccountStatus),
+      default: AccountStatus.APPROVED,
     },
     permissions: { type: [String], default: [] },
     phone: { type: String, trim: true },

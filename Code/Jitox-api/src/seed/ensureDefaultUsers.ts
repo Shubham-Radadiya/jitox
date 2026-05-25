@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { User } from "../models";
+import { User, Employee } from "../models";
 import { defaultUsers } from "../constants/defaultUsers";
 
 function toObjectId(id: unknown): mongoose.Types.ObjectId {
@@ -59,6 +59,38 @@ export async function ensureDefaultUsers(): Promise<void> {
       testUser.createdBy = toObjectId(admin?._id ?? manager._id);
     }
     await testUser.save();
+  }
+
+  const fieldUsers = await User.find({ role: "User" }).select("name email phone").lean();
+  for (const u of fieldUsers) {
+    const email = String(u.email || "").trim().toLowerCase();
+    if (!email) continue;
+
+    let emp = await Employee.findOne({ email });
+    if (!emp) {
+      emp = await Employee.create({
+        name: u.name || email,
+        email,
+        phone: u.phone || "",
+        roleDesignation: "Field Executive",
+        department: "Sales Department",
+        joiningDate: new Date(),
+        salaryStructure: { basic: 25000, allowances: [], deductions: [] },
+        status: "Active",
+        linkedUserId: toObjectId(u._id),
+      });
+      console.log(`[seed] Created HRM employee for field user ${email}`);
+    } else if (!emp.linkedUserId) {
+      emp.linkedUserId = toObjectId(u._id);
+      await emp.save();
+      console.log(`[seed] Linked employee ${email} to user ${email}`);
+    }
+  }
+
+  if (testUser?.role === "User" && (testUser.permissions?.length ?? 0) > 0) {
+    testUser.permissions = [];
+    await testUser.save();
+    console.log(`[seed] Cleared dashboard permissions for field user ${testUser.email}`);
   }
 
   await ensureTasksModuleOnUsers();

@@ -6,23 +6,30 @@ import 'package:jitox_agro_app/utils/app_navigator.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
 class MrDrawer extends StatelessWidget {
-  const MrDrawer({
-    super.key,
-    this.userCode = 'KANT-10',
-    this.userName = 'Mr. Mayurkumar B. Shilu',
-    this.userRole = 'Marketing Officer',
-  });
+  const MrDrawer({super.key, this.user});
 
-  final String userCode;
-  final String userName;
-  final String userRole;
+  final Map<String, dynamic>? user;
+
+  String _field(String key, [String fallback = '—']) {
+    final v = user?[key];
+    if (v == null || v.toString().isEmpty) return fallback;
+    return v.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final userCode = _field('employeeCode', _field('userCode', '—'));
+    final userName = _field('name', 'User');
+    final userRole = _field('role', 'Employee');
+
     final items = <_DrawerItem>[
       _DrawerItem(Icons.home_outlined, 'Home', () {
         Navigator.pop(context);
         Navigator.pushNamedAndRemoveUntil(context, tabScreen, (r) => false);
+      }),
+      _DrawerItem(Icons.task_alt_outlined, 'Tasks', () {
+        Navigator.pop(context);
+        Navigator.pushNamed(context, taskScreen);
       }),
       _DrawerItem(Icons.flight_outlined, 'My Tour', () => Navigator.pop(context)),
       _DrawerItem(Icons.inventory_2_outlined, 'Product List', () => Navigator.pop(context)),
@@ -52,7 +59,7 @@ class MrDrawer extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            color: const Color(0xFFF5F5F5),
+            color: AppColors.surfaceMuted,
             padding: EdgeInsets.fromLTRB(4.w, 5.h, 4.w, 2.h),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,7 +76,7 @@ class MrDrawer extends StatelessWidget {
                 ),
                 SizedBox(height: 0.5.h),
                 Text(
-                  'Name : $userName($userRole)',
+                  'Name : $userName ($userRole)',
                   style: TextStyle(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w500,
@@ -101,7 +108,7 @@ class MrDrawer extends StatelessWidget {
             child: ListView.separated(
               padding: EdgeInsets.zero,
               itemCount: items.length,
-              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade300),
+              separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border),
               itemBuilder: (context, i) {
                 final item = items[i];
                 return ListTile(

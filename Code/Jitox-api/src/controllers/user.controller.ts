@@ -5,15 +5,24 @@ import mongoose from "mongoose";
 import { User, Employee } from "../models/index";
 import type { AuthRequest } from "../middleware/authonticated.middleware";
 import { ensureDefaultUsers } from "../seed/ensureDefaultUsers";
-import { sendEmail } from "../helper/sendEmail";
+import { isEmailConfigured, sendEmail } from "../helper/sendEmail";
+import * as otpService from "../services/otp.service";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { validateAndRespond } from "../utils/validateAndRespond";
 import {
+  DEFAULT_MANAGER_PERMISSIONS,
   DEFAULT_SELF_REGISTER_PERMISSIONS,
+  assertClientAllowedForRole,
   effectivePermissions,
+  permissionsPayloadForClient,
   sanitizePermissionList,
+  type AuthClient,
 } from "../constants/permissions";
+import {
+  AccountStatus,
+  effectiveAccountStatus,
+} from "../constants/accountStatus";
 import { parseRole, Role } from "../constants/roles";
 import {
   assertRequiredAddressParts,
@@ -23,6 +32,10 @@ import {
 } from "../utils/address.util";
 import { toPublicUser } from "../utils/userAddress.dto";
 import { buildUserSummary } from "../services/userSummary.service";
+import {
+  notifyAdminsPendingRegistration,
+  resolvePendingRegistrationNotifications,
+} from "../services/notification.service";
 import { applyTerritoryAssignmentToUser } from "../services/territory.service";
 import type { IUser } from "../types/user.type";
 
@@ -43,7 +56,54 @@ function permissionsFromMultipart(raw: unknown): unknown {
   return raw;
 }
 
-const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
+const normalizeEmail = (email: unknown): string =>
+  String(email).trim().toLowerCase();
+
+const generateOtp = (): string =>
+  Math.floor(100000 + Math.random() * 900000).toString();
+
+/** Store OTP in MongoDB and deliver by email (registration must send; reset may skip in dev). */
+const issueOtp = async (opts: {
+  email: string;
+  subject: string;
+  bodyIntro: string;
+  requireDelivery: boolean;
+}): Promise<string> => {
+  const email = normalizeEmail(opts.email);
+  const otp = generateOtp();
+  await otpService.saveOtp(email, otp);
+
+  const emailConfigured = isEmailConfigured();
+
+  if (emailConfigured) {
+    try {
+      await sendEmail({
+        to: email,
+        subject: opts.subject,
+        text: `${opts.bodyIntro}\n\nYour verification code is: ${otp}\n\nThis code expires in 5 minutes.\n\nThank you,\nJitox System`,
+      });
+    } catch (err) {
+      await otpService.clearOtp(email);
+      console.error("[email] Failed to send OTP:", err);
+      const detail =
+        err instanceof Error ? err.message : "Email delivery failed.";
+      throw new AppError(
+        HttpStatusCode.SERVICE_UNAVAILABLE,
+        `Could not send verification email. ${detail}`
+      );
+    }
+  } else if (process.env.NODE_ENV === "development") {
+    console.warn(`[dev] OTP for ${email}: ${otp}`);
+  } else if (opts.requireDelivery) {
+    await otpService.clearOtp(email);
+    throw new AppError(
+      HttpStatusCode.SERVICE_UNAVAILABLE,
+      "Email is not configured. On Render set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN (see npm run gmail:oauth)."
+    );
+  }
+
+  return otp;
+};
 
 const displayName = (user: InstanceType<typeof User>): string => {
   if (user.name?.trim()) return user.name.trim();
@@ -81,7 +141,38 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       );
     }
 
+    const clientRaw = String(
+      req.body.client ?? req.query.client ?? "web"
+    ).toLowerCase();
+    const client: AuthClient = clientRaw === "mobile" ? "mobile" : "web";
+
+    try {
+      assertClientAllowedForRole(user.role, client);
+    } catch (e) {
+      throw new AppError(
+        HttpStatusCode.FORBIDDEN,
+        e instanceof Error ? e.message : "Login not allowed for this app"
+      );
+    }
+
+    if (client === "mobile" && user.role === Role.user) {
+      const status = effectiveAccountStatus(user.accountStatus);
+      if (status === AccountStatus.PENDING) {
+        throw new AppError(
+          HttpStatusCode.FORBIDDEN,
+          "Your account is pending admin approval. You will be able to log in after an administrator approves your registration."
+        );
+      }
+      if (status === AccountStatus.REJECTED) {
+        throw new AppError(
+          HttpStatusCode.FORBIDDEN,
+          "Your registration was not approved. Please contact your administrator."
+        );
+      }
+    }
+
     const permissions = effectivePermissions(user.role, user.permissions);
+    const accessMeta = permissionsPayloadForClient(user.role, permissions);
 
     const token = jwt.sign(
       { id: user._id, role: user.role, permissions },
@@ -97,10 +188,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         name: displayName(user),
         email: user.email,
         role: user.role,
-        permissions,
+        ...accessMeta,
         territoryId: user.territoryId,
         managerId: user.managerId,
         region: user.region,
+        accountStatus: effectiveAccountStatus(user.accountStatus),
       },
     });
   } catch (error) {
@@ -108,7 +200,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-/** Public self-registration — always `User` with default module access. */
+/** Public self-registration — always field `User` (mobile app; no dashboard modules). */
 export const registerUser = async (
   req: Request,
   res: Response
@@ -136,7 +228,8 @@ export const registerUser = async (
     }
     assertRequiredAddressParts(addr);
 
-    const emailNormalized = String(email).trim().toLowerCase();
+    const emailNormalized = normalizeEmail(email);
+
     const existingUser = await User.findOne({ email: emailNormalized });
     if (existingUser) {
       throw new AppError(HttpStatusCode.BAD_REQUEST, "User already exists.");
@@ -149,6 +242,7 @@ export const registerUser = async (
       email: emailNormalized,
       password: hashedPassword,
       role: Role.user,
+      accountStatus: AccountStatus.PENDING,
       permissions: [...DEFAULT_SELF_REGISTER_PERMISSIONS],
       ...(fullName ? { name: fullName } : {}),
       firstName,
@@ -167,16 +261,26 @@ export const registerUser = async (
     await applyTerritoryAssignmentToUser(user, { reResolveFromAddress: true });
     await user.save();
 
+    await notifyAdminsPendingRegistration({
+      userId: String(user._id),
+      userName: displayName(user),
+      email: user.email,
+      district: trimAddressPart(addr.district) || undefined,
+      city: trimAddressPart(addr.city) || undefined,
+    });
+
     const permissions = effectivePermissions(user.role, user.permissions);
     const pub = toPublicUser(user);
 
     res.status(201).json({
-      message: "User registered successfully",
+      message:
+        "Registration submitted. Please wait for admin approval before logging in.",
       user: {
         id: user._id,
         name: displayName(user),
         email: user.email,
         role: user.role,
+        accountStatus: user.accountStatus,
         permissions,
         firstName,
         lastName,
@@ -245,6 +349,10 @@ export const createUser = async (
     );
     if (parsedRole === Role.admin) {
       permissionsStored = [];
+    } else if (parsedRole === Role.manager && permissionsStored.length === 0) {
+      permissionsStored = [...DEFAULT_MANAGER_PERMISSIONS];
+    } else if (parsedRole === Role.user) {
+      permissionsStored = [];
     } else if (permissionsStored.length === 0) {
       permissionsStored = ["dashboard"];
     }
@@ -265,6 +373,7 @@ export const createUser = async (
       email: emailNormalized,
       password: hashedPassword,
       role: parsedRole,
+      accountStatus: AccountStatus.APPROVED,
       permissions: permissionsStored,
       ...(phone ? { phone: String(phone).trim() } : {}),
       ...(fullName ? { name: fullName } : {}),
@@ -374,7 +483,21 @@ export const updateUser = async (
       if (!parsed) {
         throw new AppError(HttpStatusCode.BAD_REQUEST, "Invalid role.");
       }
+      if (parsed === Role.admin) {
+        const authReq = req as AuthRequest;
+        if (authReq.user?.role !== Role.admin) {
+          throw new AppError(
+            HttpStatusCode.FORBIDDEN,
+            "Only admins can assign the Admin role."
+          );
+        }
+      }
       user.role = parsed;
+      if (parsed === Role.user) {
+        user.permissions = [];
+      } else if (parsed === Role.admin) {
+        user.permissions = [];
+      }
     }
     if (req.body.permissions !== undefined) {
       const raw = permissionsFromMultipart(req.body.permissions);
@@ -383,10 +506,16 @@ export const updateUser = async (
       );
       if (user.role === Role.admin) {
         user.permissions = [];
+      } else if (user.role === Role.user) {
+        user.permissions = [];
+      } else if (user.role === Role.manager) {
+        user.permissions =
+          nextPerms.length === 0
+            ? [...DEFAULT_MANAGER_PERMISSIONS]
+            : nextPerms;
+      } else if (nextPerms.length === 0) {
+        user.permissions = ["dashboard"];
       } else {
-        if (nextPerms.length === 0) {
-          nextPerms = ["dashboard"];
-        }
         user.permissions = nextPerms;
       }
     }
@@ -531,6 +660,106 @@ export const updateUser = async (
     });
   } catch (error) {
     console.error("Update User Error:", error);
+    throw error;
+  }
+};
+
+/** Admin approves a pending mobile self-registration. */
+export const approveUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      throw new AppError(HttpStatusCode.BAD_REQUEST, "Invalid user id.");
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "User not found.");
+    }
+
+    if (user.role !== Role.user) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Only field user accounts can be approved through this action."
+      );
+    }
+
+    const current = effectiveAccountStatus(user.accountStatus);
+    if (current === AccountStatus.APPROVED) {
+      throw new AppError(HttpStatusCode.BAD_REQUEST, "User is already approved.");
+    }
+
+    user.accountStatus = AccountStatus.APPROVED;
+    await user.save();
+    await resolvePendingRegistrationNotifications(String(user._id));
+
+    const pub = toPublicUser(user);
+    res.status(200).json({
+      message: "User approved successfully.",
+      user: {
+        id: user._id,
+        name: displayName(user),
+        email: user.email,
+        role: user.role,
+        accountStatus: user.accountStatus,
+        ...pub,
+      },
+    });
+  } catch (error) {
+    console.error("Approve User Error:", error);
+    throw error;
+  }
+};
+
+/** Admin rejects a pending mobile self-registration. */
+export const rejectUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      throw new AppError(HttpStatusCode.BAD_REQUEST, "Invalid user id.");
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      throw new AppError(HttpStatusCode.NOT_FOUND, "User not found.");
+    }
+
+    if (user.role !== Role.user) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "Only field user accounts can be rejected through this action."
+      );
+    }
+
+    const current = effectiveAccountStatus(user.accountStatus);
+    if (current === AccountStatus.REJECTED) {
+      throw new AppError(HttpStatusCode.BAD_REQUEST, "User is already rejected.");
+    }
+
+    user.accountStatus = AccountStatus.REJECTED;
+    await user.save();
+    await resolvePendingRegistrationNotifications(String(user._id));
+
+    const pub = toPublicUser(user);
+    res.status(200).json({
+      message: "User registration rejected.",
+      user: {
+        id: user._id,
+        name: displayName(user),
+        email: user.email,
+        role: user.role,
+        accountStatus: user.accountStatus,
+        ...pub,
+      },
+    });
+  } catch (error) {
+    console.error("Reject User Error:", error);
     throw error;
   }
 };
@@ -759,6 +988,50 @@ export const createAdminAndUser = async (req: Request, res: Response) => {
   }
 };
 
+/** Send OTP to verify email before self-registration (user must not exist yet). */
+export const sendRegistrationOtp = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    validateAndRespond(req.body, ["email"] as const, res);
+
+    const emailNormalized = normalizeEmail(email);
+    const existingUser = await User.findOne({ email: emailNormalized });
+    if (existingUser) {
+      throw new AppError(
+        HttpStatusCode.BAD_REQUEST,
+        "An account with this email already exists. Please log in."
+      );
+    }
+
+    const otp = await issueOtp({
+      email: emailNormalized,
+      subject: "Verify your email — Jitox Agro registration",
+      bodyIntro: "Hello,\n\nUse this code to verify your email and complete registration.",
+      requireDelivery: true,
+    });
+
+    const payload: Record<string, unknown> = {
+      message: "Verification code sent to your email.",
+    };
+
+    if (
+      process.env.NODE_ENV === "development" &&
+      process.env.EXPOSE_OTP_IN_DEV === "true"
+    ) {
+      payload.otp = otp;
+    }
+
+    res.status(200).json(payload);
+  } catch (error) {
+    console.error("Send Registration OTP Error:", error);
+    throw error;
+  }
+};
+
 export const sendOtp = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
@@ -767,28 +1040,20 @@ export const sendOtp = async (req: Request, res: Response): Promise<void> => {
 
     validateAndRespond(req.body, requiredFields, res);
 
-    const user = await User.findOne({ email });
+    const emailNormalized = normalizeEmail(email);
+    const user = await User.findOne({ email: emailNormalized });
     if (!user) {
       throw new AppError(HttpStatusCode.NOT_FOUND, "User not found.");
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = await issueOtp({
+      email: emailNormalized,
+      subject: "Your OTP Code for Password Reset",
+      bodyIntro: `Hello ${displayName(user)},\n\nUse this code to reset your password.`,
+      requireDelivery: false,
+    });
 
-    otpStore[email] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 };
-
-    const emailConfigured = Boolean(
-      process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim()
-    );
-
-    if (emailConfigured) {
-      await sendEmail({
-        to: email,
-        subject: "Your OTP Code for Password Reset",
-        text: `Hello ${displayName(user)},\n\nYour OTP code is: ${otp}\n\nThis code will expire in 5 minutes.\n\nThank you,\nJitox System`,
-      });
-    } else if (process.env.NODE_ENV === "development") {
-      console.warn(`[dev] Password reset OTP for ${email}: ${otp}`);
-    }
+    const emailConfigured = isEmailConfigured();
 
     const payload: Record<string, unknown> = {
       message: emailConfigured
@@ -818,27 +1083,10 @@ export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
 
     validateAndRespond(req.body, requiredFields, res);
 
-    const storedOtp = otpStore[email];
-    if (!storedOtp) {
-      throw new AppError(
-        HttpStatusCode.BAD_REQUEST,
-        "No OTP found for this email."
-      );
-    }
+    const emailNormalized = normalizeEmail(email);
+    const otpNormalized = String(otp).trim();
 
-    if (Date.now() > storedOtp.expiresAt) {
-      delete otpStore[email];
-      throw new AppError(
-        HttpStatusCode.BAD_REQUEST,
-        "OTP expired. Please request a new one."
-      );
-    }
-
-    if (storedOtp.otp !== otp) {
-      throw new AppError(HttpStatusCode.BAD_REQUEST, "Invalid OTP.");
-    }
-
-    otpStore[email].otp = "VERIFIED";
+    await otpService.verifyOtpCode(emailNormalized, otpNormalized);
 
     res.status(200).json({ message: "OTP verified successfully." });
   } catch (error) {
@@ -858,12 +1106,10 @@ export const changePassword = async (
 
     validateAndRespond(req.body, requiredFields, res);
 
-    const otpData = otpStore[email];
-    if (!otpData || otpData.otp !== "VERIFIED") {
-      throw new AppError(HttpStatusCode.BAD_REQUEST, "OTP not verified.");
-    }
+    const emailNormalized = normalizeEmail(email);
+    await otpService.assertPasswordResetVerified(emailNormalized);
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: emailNormalized });
     if (!user) {
       throw new AppError(HttpStatusCode.NOT_FOUND, "User not found.");
     }
@@ -872,7 +1118,7 @@ export const changePassword = async (
     user.password = hashedPassword;
     await user.save();
 
-    delete otpStore[email];
+    await otpService.clearOtp(emailNormalized);
 
     res.status(200).json({ message: "Password changed successfully." });
   } catch (error) {

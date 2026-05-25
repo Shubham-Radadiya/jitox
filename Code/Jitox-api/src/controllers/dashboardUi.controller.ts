@@ -644,7 +644,8 @@ export const getPurchaseFormMeta = async (
 
 export const getEmployees = async (_req: Request, res: Response) => {
   try {
-    const data = await Dyn.listEmployeesForTracking();
+    const Track = await import("../services/fieldTracking.service");
+    const data = await Track.listEmployeesForTracking();
     res.json(data);
   } catch (e) {
     console.error("getEmployees", e);
@@ -652,9 +653,21 @@ export const getEmployees = async (_req: Request, res: Response) => {
   }
 };
 
+export const getFleetTracking = async (req: Request, res: Response) => {
+  try {
+    const Track = await import("../services/fieldTracking.service");
+    const data = await Track.getFleetTracking(req.query as Record<string, unknown>);
+    res.json(data);
+  } catch (e) {
+    console.error("getFleetTracking", e);
+    res.status(500).json({ message: "Failed to load fleet tracking" });
+  }
+};
+
 export const getEmployeeTracking = async (req: Request, res: Response) => {
   try {
-    const data = await Dyn.buildEmployeeTrackingRows(
+    const Track = await import("../services/fieldTracking.service");
+    const data = await Track.buildEmployeeTrackingRows(
       req.params.id,
       req.query as Record<string, unknown>
     );

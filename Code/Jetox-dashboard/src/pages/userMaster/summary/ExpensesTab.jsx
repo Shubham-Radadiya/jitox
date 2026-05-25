@@ -101,6 +101,14 @@ const ExpensesTab = ({
     });
   }, [data, expenseTypeSearch, dateFilter, modeFilter]);
 
+  const totalExpenses = useMemo(() => {
+    return filteredData.reduce((sum, row) => {
+      const raw = String(row.Amount || "").replace(/[^\d.]/g, "");
+      const n = parseFloat(raw);
+      return sum + (Number.isFinite(n) ? n : 0);
+    }, 0);
+  }, [filteredData]);
+
   const renderRowCell = (colKey, value) => {
     const cell = `${tableTdClasses(colKey)} text-left!`;
 
@@ -263,19 +271,27 @@ const ExpensesTab = ({
           </div>
         </div>
 
-        <DataTable
-          columns={columns}
-          data={filteredData}
-          renderRowCell={renderRowCell}
-          renderAction={renderExpenseAction}
-          allCellsLeft
-          className="rounded-none border-0 shadow-none ring-0"
-        />
+        {liveData && filteredData.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            No expenses recorded for this user yet.
+          </p>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredData}
+            renderRowCell={renderRowCell}
+            renderAction={renderExpenseAction}
+            allCellsLeft
+            className="rounded-none border-0 shadow-none ring-0"
+          />
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/80 px-3 py-3 text-sm dark:border-slate-600 dark:bg-slate-800/50 sm:px-4">
           <div className="font-bold text-slate-900 dark:text-slate-100">
             Total Expenses Incurred:{" "}
-            <span className="tabular-nums italic">₹1,75,000</span>
+            <span className="tabular-nums italic">
+              ₹{totalExpenses.toLocaleString("en-IN")}
+            </span>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span>Results per page:</span>

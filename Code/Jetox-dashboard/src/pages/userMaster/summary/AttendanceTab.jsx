@@ -304,14 +304,20 @@ const AttendanceTab = ({
       </div>
 
       <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-900/4 dark:border-slate-600 dark:bg-slate-900 dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)] dark:ring-white/6">
-        <DataTable
-          columns={columns}
-          data={filteredData}
-          renderRowCell={renderRowCell}
-          renderAction={renderAction}
-          allCellsLeft
-          className="rounded-none border-0 shadow-none ring-0"
-        />
+        {liveData && filteredData.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            No attendance records for this user yet.
+          </p>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredData}
+            renderRowCell={renderRowCell}
+            renderAction={renderAction}
+            allCellsLeft
+            className="rounded-none border-0 shadow-none ring-0"
+          />
+        )}
       </div>
 
       {activeMenu &&

@@ -1,9 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:jitox_agro_app/Constants/asset_paths.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
-import 'package:jitox_agro_app/View/Screens/Home/home_screen.dart';
-import 'package:jitox_agro_app/View/Widgets/appbar.dart';
+import 'package:jitox_agro_app/View/Widgets/ui/empty_state.dart';
+import 'package:jitox_agro_app/View/Widgets/ui/page_header.dart';
+import 'package:jitox_agro_app/View/Widgets/ui/search_field.dart';
+import 'package:jitox_agro_app/View/Widgets/ui/task_card.dart';
+import 'package:jitox_agro_app/services/tasks_api.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
 class TaskScreen extends StatefulWidget {
@@ -14,170 +15,130 @@ class TaskScreen extends StatefulWidget {
 }
 
 class _TaskScreenState extends State<TaskScreen> {
-  String selected = "Dealer";
+  String _filter = 'All';
+  final _search = TextEditingController();
+  List<TaskItem> _tasks = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final list = await TasksApi.list();
+      if (!mounted) return;
+      setState(() {
+        _tasks = list;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  List<TaskItem> get _visible {
+    final q = _search.text.trim().toLowerCase();
+    return _tasks.where((t) {
+      if (_filter == 'Pending' && t.isCompleted) return false;
+      if (_filter == 'Completed' && !t.isCompleted) return false;
+      if (q.isEmpty) return true;
+      return t.title.toLowerCase().contains(q) ||
+          t.description.toLowerCase().contains(q);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(7.h),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 4.w),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-          ),
-          child: SafeArea(
-            child: Row(
-              children: [
-                arrowBackButton(context),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      "Task List",
-                      style: TextStyle(
-                        fontSize: 17.sp,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-                Container(
-                  width: 4.5.h,
-                  height: 4.5.h,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: const Icon(
-                    Icons.more_vert_outlined,
-                    color: Colors.black,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body: Padding(
-        padding: EdgeInsets.all(4.w),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  buildButton("All"),
-                  buildButton("Dealer"),
-                  buildButton("Farmer"),
-                  buildButton("Other"),
-                ],
-              ),
-              SizedBox(
-                height: 3.h,
-              ),
-              Container(
-                height: 6.5.h,
-                child: Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search here...',
-                      hintStyle: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w400,
-                          color: Color.fromARGB(255, 68, 67, 67)),
-                      prefixIcon: Icon(
-                        CupertinoIcons.search,
-                        color: Color.fromARGB(255, 146, 145, 145),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(50),
-                        borderSide: BorderSide(
-                          color: Color.fromARGB(255, 238, 237, 237),
-                          width: 1,
+      backgroundColor: AppColors.surfaceMuted,
+      appBar: const PageHeader(title: 'Tasks'),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(4.w, 2.h, 4.w, 3.h),
+          children: [
+            Row(
+              children: ['All', 'Pending', 'Completed'].map((label) {
+                final selected = _filter == label;
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: label != 'Completed' ? 2.w : 0),
+                    child: InkWell(
+                      onTap: () => setState(() => _filter = label),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: selected ? AppColors.primary : AppColors.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: selected ? AppColors.primary : AppColors.border,
+                          ),
                         ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(50),
-                        borderSide: BorderSide(
-                          color: Color.fromARGB(255, 238, 237, 237),
-                          width: 1,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(50),
-                        borderSide: BorderSide(
-                          color: Color.fromARGB(255, 238, 237, 237),
-                          width: 1,
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w600,
+                            color: selected ? Colors.white : AppColors.textPrimary,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              SizedBox(
-                height: 3.h,
-              ),
-              ListView.builder(
-                physics: NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: todayActivities.length,
-                itemBuilder: (context, index) {
-                  return activity(
-                    title: todayActivities[index]["title"],
-                    status: todayActivities[index]["status"],
-                    icon: todayActivities[index]["location"] != ""
-                        ? AppIcons.locationIcon
-                        : todayActivities[index]["phone"] != ""
-                            ? AppIcons.phoneIcon
-                            : todayActivities[index]["crmSystem"] != ""
-                                ? AppIcons.crmIcon
-                                : AppIcons.userIcon,
-                    designation: todayActivities[index]["designation"],
-                    time: todayActivities[index]["time"],
-                    location: todayActivities[index]["location"],
-                    phone: todayActivities[index]["phone"],
-                    crmSystem: todayActivities[index]["crmSystem"],
-                    userName: todayActivities[index]["userName"],
-                    isCompleted: true,
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget buildButton(String label) {
-    final isSelected = selected == label;
-    return SizedBox(
-      height: 4.3.h,
-      width: (100.w - (8.w + 6.w)) / 4,
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            selected = label;
-          });
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: isSelected ? primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isSelected ? primaryColor : Colors.grey.shade300,
+                );
+              }).toList(),
             ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w400,
-              color: isSelected ? Colors.white : Colors.black,
+            SizedBox(height: 2.h),
+            AppSearchField(
+              hint: 'Search tasks…',
+              controller: _search,
             ),
-          ),
+            SizedBox(height: 2.h),
+            if (_loading)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.h),
+                child: const Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              EmptyState(
+                title: 'Could not load tasks',
+                subtitle: _error,
+                icon: Icons.cloud_off_outlined,
+                actionLabel: 'Retry',
+                onAction: _load,
+              )
+            else if (_visible.isEmpty)
+              const EmptyState(
+                title: 'No tasks yet',
+                subtitle: 'Assigned tasks from your manager will appear here.',
+                icon: Icons.task_alt_outlined,
+              )
+            else
+              ..._visible.map((t) => TaskCard(task: t)),
+          ],
         ),
       ),
     );

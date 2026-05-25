@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:jitox_agro_app/Constants/app_typography.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 
 class CustomDropdown extends StatelessWidget {
   final String? value;
@@ -29,81 +29,71 @@ class CustomDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        label != ""
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: label,
-                          style: TextStyle(
-                            fontSize: 15.sp,
-                            color: Colors.black,
-                          ),
-                        ),
-                        TextSpan(
-                          text: " $label2",
-                          style: TextStyle(
-                            fontSize: 15.sp,
-                            color: label2Color ?? Colors.grey.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
+        if (label.isNotEmpty) ...[
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: label,
+                  style: AppTypography.bodyLgStyle(color: Colors.black),
+                ),
+                TextSpan(
+                  text: " $label2",
+                  style: AppTypography.bodyLgStyle(
+                    color: label2Color ?? Colors.grey.withValues(alpha: 0.9),
                   ),
-                  SizedBox(
-                    height: 1.h,
-                  ),
-                ],
-              )
-            : Container(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         DropdownButtonFormField<String>(
           value: value,
           validator: validator,
           isExpanded: true,
           autovalidateMode: AutovalidateMode.onUserInteraction,
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16.sp,
-          ),
+          style: AppTypography.bodyLgStyle(color: Colors.black),
           decoration: InputDecoration(
             isDense: true,
             contentPadding:
-                EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.7.h),
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             hintText: hint,
-            hintStyle: TextStyle(
-              color: lightFontColor,
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w400,
-            ),
+            hintStyle: AppTypography.bodyLgStyle(color: lightFontColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
-              borderSide:
-                  BorderSide(color: Colors.grey.withOpacity(0.5), width: 0.7),
+              borderSide: BorderSide(
+                color: Colors.grey.withValues(alpha: 0.5),
+                width: 0.7,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
-              borderSide:
-                  BorderSide(color: Colors.grey.withOpacity(0.5), width: 0.7),
+              borderSide: BorderSide(
+                color: Colors.grey.withValues(alpha: 0.5),
+                width: 0.7,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
-              borderSide:
-                  BorderSide(color: Colors.grey.withOpacity(0.5), width: 0.7),
+              borderSide: BorderSide(
+                color: Colors.grey.withValues(alpha: 0.5),
+                width: 0.7,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
-              borderSide: BorderSide(color: Colors.red, width: 1),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
-              borderSide: BorderSide(color: Colors.red, width: 1.5),
+              borderSide: const BorderSide(color: Colors.red, width: 1.5),
             ),
           ),
-          icon: Icon(Icons.keyboard_arrow_down_rounded,
-              color: Colors.grey.shade600),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Colors.grey.shade600,
+          ),
           items: items.map((e) {
             return DropdownMenuItem(value: e, child: Text(e));
           }).toList(),

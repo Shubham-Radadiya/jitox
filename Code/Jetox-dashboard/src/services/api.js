@@ -82,6 +82,10 @@ export const usersApi = {
   },
   delete: (id) =>
     http.delete(`/users/delete-user/${encodeURIComponent(id)}`),
+  approve: (id) =>
+    http.patch(`/users/approve-user/${encodeURIComponent(id)}`),
+  reject: (id) =>
+    http.patch(`/users/reject-user/${encodeURIComponent(id)}`),
 };
 
 export const productsApi = {
@@ -445,6 +449,8 @@ export const dashboardUiApi = {
     http.get(`${DU}/employees/${encodeURIComponent(id)}/tracking`, {
       params,
     }),
+  getFleetTracking: (params) =>
+    http.get(`${DU}/tracking/fleet`, { params }),
 
   /** Parties, products, GST, etc. for purchase voucher forms */
   getPurchaseFormMeta: () => http.get(`${DU}/vouchers/purchase-form-meta`),

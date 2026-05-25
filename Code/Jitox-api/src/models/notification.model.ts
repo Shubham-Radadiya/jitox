@@ -21,6 +21,7 @@ const notificationSchema = new Schema<INotification>(
         "order_dispatched",
         "order_invoice_generated",
         "order_returned",
+        "user_registration_pending",
       ],
     },
     title: { type: String, required: true, trim: true },

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import nodataImg from "../../assets/nodata.png";
 import DashboardLayout from "../../layouts/DashboardLayout";
@@ -18,7 +18,11 @@ import UserUpdatedSuccessModal from "./UserUpdatedSuccessModal";
 import CommonDeleteModal from "../../components/ui/modals/CommonDeleteModal";
 import CommonDeleteSuccessModal from "../../components/ui/modals/CommonDeleteSuccessModal";
 import { userService } from "../../services/user.services";
-import { getStoredUser, canAccessModule } from "../../utils/authSession";
+import {
+  getStoredUser,
+  canAccessModule,
+  isAdminUser,
+} from "../../utils/authSession";
 import { MODULE_ACCESS_OPTIONS } from "../../constants/accessModules";
 import { AddressTableCell } from "../../components/address/AddressDisplay";
 import { TABLE_ACTION_ICON_BTN, tableTdClasses } from "../../utils/tableUi";
@@ -48,6 +52,8 @@ function pickPayloadPermissions(payload) {
 }
 
 const UserMasterIndex = () => {
+  const sessionUser = getStoredUser();
+  const adminCanManageUsers = isAdminUser(sessionUser);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -63,7 +69,39 @@ const UserMasterIndex = () => {
   const [searchUser, setSearchUser] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [regionFilter, setRegionFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [approvalBusyId, setApprovalBusyId] = useState(null);
+  const [highlightUserId, setHighlightUserId] = useState("");
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const status = searchParams.get("status");
+    const userId = searchParams.get("userId");
+    if (!status && !userId) return;
+
+    if (status === "pending") setStatusFilter("pending");
+    if (userId) setHighlightUserId(userId);
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("userId");
+        next.delete("status");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!highlightUserId || loading) return;
+    const row = users.find((u) => String(u._id) === highlightUserId);
+    if (row) {
+      toast(`Pending approval: ${row["User Name"] || row.Email}`, { icon: "👤" });
+      setHighlightUserId("");
+    }
+  }, [highlightUserId, users, loading]);
 
   const baseColumns = [
     "Employee ID",
@@ -71,6 +109,7 @@ const UserMasterIndex = () => {
     "Email",
     "Phone No",
     "Role",
+    "Status",
     "Total Users",
     "Region",
     "Area",
@@ -83,6 +122,7 @@ const UserMasterIndex = () => {
     "Email",
     "Phone No",
     "Role",
+    "Status",
     "Total Users",
   ]);
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
@@ -240,6 +280,38 @@ const UserMasterIndex = () => {
     setIsEditSuccessOpen(true);
   };
 
+  const handleApprove = async (row) => {
+    if (!row?._id) return;
+    setApprovalBusyId(row._id);
+    try {
+      await userService.approve(row._id);
+      toast.success(`${row["User Name"] || "User"} approved`);
+      await loadUsers();
+    } catch (e) {
+      toast.error(
+        e?.response?.data?.message || e?.message || "Approval failed"
+      );
+    } finally {
+      setApprovalBusyId(null);
+    }
+  };
+
+  const handleReject = async (row) => {
+    if (!row?._id) return;
+    setApprovalBusyId(row._id);
+    try {
+      await userService.reject(row._id);
+      toast.success(`${row["User Name"] || "User"} rejected`);
+      await loadUsers();
+    } catch (e) {
+      toast.error(
+        e?.response?.data?.message || e?.message || "Reject failed"
+      );
+    } finally {
+      setApprovalBusyId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!selectedUser?._id) return;
     try {
@@ -318,8 +390,18 @@ const UserMasterIndex = () => {
     if (regionFilter) {
       list = list.filter((u) => String(u.Region ?? "") === regionFilter);
     }
+    if (statusFilter) {
+      list = list.filter(
+        (u) => String(u.accountStatus ?? "approved") === statusFilter
+      );
+    }
     return list;
-  }, [users, searchUser, roleFilter, regionFilter]);
+  }, [users, searchUser, roleFilter, regionFilter, statusFilter]);
+
+  const pendingCount = useMemo(
+    () => users.filter((u) => u.isPendingApproval).length,
+    [users]
+  );
 
   const renderRowCell = (key, value, row) => {
     if (key === "Employee ID") {
@@ -344,9 +426,15 @@ const UserMasterIndex = () => {
                 )}
               </div>
               <span
-                className="pointer-events-none absolute -bottom-px -right-px z-2 box-border size-2.5 rounded-full border-2 border-white bg-primary shadow-sm ring-1 ring-primary/15 dark:border-slate-900 dark:ring-primary/25"
+                className={`pointer-events-none absolute -bottom-px -right-px z-2 box-border size-2.5 rounded-full border-2 border-white shadow-sm dark:border-slate-900 ${
+                  row.isPendingApproval
+                    ? "bg-amber-400 ring-1 ring-amber-400/30"
+                    : row.accountStatus === "rejected"
+                      ? "bg-red-500 ring-1 ring-red-500/25"
+                      : "bg-primary ring-1 ring-primary/15 dark:ring-primary/25"
+                }`}
                 aria-hidden
-                title="Active"
+                title={row.Status || "Status"}
               />
             </div>
             <span className="text-light">{value}</span>
@@ -358,6 +446,23 @@ const UserMasterIndex = () => {
       return (
         <td key={key} className={`${tableTdClasses("Role")} text-light`}>
           <span>{value}</span>
+        </td>
+      );
+    }
+    if (key === "Status") {
+      const tone =
+        row.accountStatus === "pending"
+          ? "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-800"
+          : row.accountStatus === "rejected"
+            ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-100 dark:border-red-800"
+            : "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-100 dark:border-emerald-800";
+      return (
+        <td key={key} className={tableTdClasses("Status")}>
+          <span
+            className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium sm:text-xs ${tone}`}
+          >
+            {value}
+          </span>
         </td>
       );
     }
@@ -427,30 +532,66 @@ const UserMasterIndex = () => {
         >
           <IoEyeOutline size={18} />
         </button>
-        <button
-          type="button"
-          title="Edit user"
-          className={TABLE_ACTION_ICON_BTN}
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedUser(row);
-            setIsEditModalOpen(true);
-          }}
-        >
-          <TbEdit size={18} />
-        </button>
-        <button
-          type="button"
-          title="Delete user"
-          className={`${TABLE_ACTION_ICON_BTN} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-300`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedUser(row);
-            setIsDeleteModalOpen(true);
-          }}
-        >
-          <IoTrashOutline size={18} />
-        </button>
+        {adminCanManageUsers &&
+        row.roleLower === "user" &&
+        row.accountStatus !== "approved" ? (
+          <>
+            <button
+              type="button"
+              title="Approve user"
+              disabled={approvalBusyId === row._id}
+              className={`${TABLE_ACTION_ICON_BTN} hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40`}
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleApprove(row);
+              }}
+            >
+              <span className="text-[10px] font-bold sm:text-xs">OK</span>
+            </button>
+            {row.isPendingApproval ? (
+              <button
+                type="button"
+                title="Reject user"
+                disabled={approvalBusyId === row._id}
+                className={`${TABLE_ACTION_ICON_BTN} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleReject(row);
+                }}
+              >
+                <span className="text-[10px] font-bold sm:text-xs">X</span>
+              </button>
+            ) : null}
+          </>
+        ) : null}
+        {adminCanManageUsers ? (
+          <button
+            type="button"
+            title="Edit user"
+            className={TABLE_ACTION_ICON_BTN}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedUser(row);
+              setIsEditModalOpen(true);
+            }}
+          >
+            <TbEdit size={18} />
+          </button>
+        ) : null}
+        {adminCanManageUsers ? (
+          <button
+            type="button"
+            title="Delete user"
+            className={`${TABLE_ACTION_ICON_BTN} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-300`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedUser(row);
+              setIsDeleteModalOpen(true);
+            }}
+          >
+            <IoTrashOutline size={18} />
+          </button>
+        ) : null}
         <div className="relative">
           <button
             type="button"
@@ -523,11 +664,13 @@ const UserMasterIndex = () => {
                 Start by adding your first Users to assign regions, areas, and
                 dealer responsibilities.
               </p>
-              <Button
-                label="Add users"
-                {...mergePageAddButton({ className: "w-full max-w-xs" })}
-                onClick={() => setIsAddModalOpen(true)}
-              />
+              {adminCanManageUsers ? (
+                <Button
+                  label="Add users"
+                  {...mergePageAddButton({ className: "w-full max-w-xs" })}
+                  onClick={() => setIsAddModalOpen(true)}
+                />
+              ) : null}
             </div>
           </div>
         ) : (
@@ -535,6 +678,11 @@ const UserMasterIndex = () => {
             <div className="flex min-w-0 flex-nowrap items-center justify-between gap-2 sm:gap-3">
               <h1 className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-semibold tracking-tight text-dark sm:text-lg sm:font-bold">
                 Total Users ({users.length})
+                {pendingCount > 0 ? (
+                  <span className="ml-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                    · {pendingCount} pending
+                  </span>
+                ) : null}
               </h1>
               <div className="jitox-header-pill shrink-0 gap-1.5 whitespace-nowrap px-2 py-1 text-[11px] leading-none sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm sm:leading-normal">
                 <span className="shrink-0">20 Jan, 2:30 PM</span>
@@ -600,16 +748,31 @@ const UserMasterIndex = () => {
                     </select>
                   </div>
 
-                  <Button
-                    type="button"
-                    label="Add users"
-                    {...mergePageAddButton({
-                      size: "sm",
-                      className:
-                        "w-full sm:w-full md:w-auto min-h-9! shrink-0 px-3! py-1.5! text-xs! gap-1 sm:min-h-10! sm:px-4! sm:text-sm!",
-                    })}
-                    onClick={() => setIsAddModalOpen(true)}
-                  />
+                  <div className="relative min-w-0 sm:w-full md:w-40">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-light-border bg-white px-2 text-[13px] text-dark dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                    >
+                      <option value="">Approval status</option>
+                      <option value="pending">Pending approval</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+
+                  {adminCanManageUsers ? (
+                    <Button
+                      type="button"
+                      label="Add users"
+                      {...mergePageAddButton({
+                        size: "sm",
+                        className:
+                          "w-full sm:w-full md:w-auto min-h-9! shrink-0 px-3! py-1.5! text-xs! gap-1 sm:min-h-10! sm:px-4! sm:text-sm!",
+                      })}
+                      onClick={() => setIsAddModalOpen(true)}
+                    />
+                  ) : null}
                 </div>
               </div>
 
@@ -743,6 +906,7 @@ const UserMasterIndex = () => {
           onClose={() => setIsEditModalOpen(false)}
           user={selectedUser}
           onSave={handleUpdate}
+          isAdminViewer={adminCanManageUsers}
         />
 
         <UserUpdatedSuccessModal

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { getStoredUser, canAccessModule, isAdminUser } from "../utils/authSession";
+import DashboardGate from "../components/auth/DashboardGate";
 
 function TasksIndexRedirect() {
   const u = getStoredUser();
@@ -107,6 +108,7 @@ function RouteTree() {
       <Route path="/verify-code" element={<VerifyCode />} />
       <Route path="/message-box" element={<MessageBox />} />
 
+      <Route element={<DashboardGate />}>
       <Route path="/dashboard" element={<DashboardHome />} />
       <Route path="/dashboard/account" element={<AccountIndex />} />
       <Route path="/dashboard/account/ledger" element={<LedgerTable />} />
@@ -213,6 +215,7 @@ function RouteTree() {
         path="/dashboard/notifications"
         element={<Navigate to="/dashboard/tasks/notifications" replace />}
       />
+      </Route>
 
       <Route path="/" element={<Navigate to="/login" replace />} />
 

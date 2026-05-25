@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
 import 'package:jitox_agro_app/Constants/text_styles.dart';
 import 'package:jitox_agro_app/View/Screens/Auth/login_screen.dart';
-import 'package:jitox_agro_app/View/Screens/Auth/otp_verification_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Auth/register_screen.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
-enum _AuthPane { register, login, verifyEmail }
+enum _AuthPane { register, login }
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, this.openLogin = false});
@@ -26,16 +25,14 @@ class _AuthScreenState extends State<AuthScreen> {
     _pane = widget.openLogin ? _AuthPane.login : _AuthPane.register;
   }
 
-  int get _progressStep => _pane == _AuthPane.verifyEmail ? 2 : 1;
-
   void _showRegister() => setState(() => _pane = _AuthPane.register);
+
   void _showLogin() => setState(() => _pane = _AuthPane.login);
-  void _showOtp() => setState(() => _pane = _AuthPane.verifyEmail);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surfaceMuted,
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 4.w),
@@ -44,19 +41,28 @@ class _AuthScreenState extends State<AuthScreen> {
             children: [
               SizedBox(height: 1.h),
               StepProgressIndicator(
-                totalSteps: 3,
-                currentStep: _progressStep,
+                totalSteps: 2,
+                currentStep: _pane == _AuthPane.register ? 1 : 2,
               ),
               _buildHeader(),
               Expanded(
-                child: _pane == _AuthPane.register
-                    ? RegisterScreen(
-                        onSwitchToLogin: _showLogin,
-                        onRegistrationComplete: _showOtp,
-                      )
-                    : _pane == _AuthPane.login
-                        ? LoginScreen(onSwitchToRegister: _showRegister)
-                        : const OtpVerificationScreen(),
+                child: Card(
+                  elevation: 0,
+                  margin: EdgeInsets.only(bottom: 2.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(4.w, 2.h, 4.w, 0),
+                    child: _pane == _AuthPane.register
+                        ? RegisterScreen(
+                            onSwitchToLogin: _showLogin,
+                            onRegistered: _showLogin,
+                          )
+                        : LoginScreen(onSwitchToRegister: _showRegister),
+                  ),
+                ),
               ),
             ],
           ),
@@ -66,34 +72,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildHeader() {
-    String title;
-    String message;
-    bool showBrand;
-
-    switch (_pane) {
-      case _AuthPane.register:
-        title = 'Register Account to';
-        message = 'Hello there, Register to continue';
-        showBrand = true;
-        break;
-      case _AuthPane.login:
-        title = 'Welcome Back to';
-        message = 'Hello there, Login to continue';
-        showBrand = true;
-        break;
-      case _AuthPane.verifyEmail:
-        title = 'Verify your Email Id';
-        message =
-            'Please verify your email by clicking the link in the email we\'ve sent you or enter the code here.';
-        showBrand = false;
-        break;
-    }
-
+    final isRegister = _pane == _AuthPane.register;
     return Column(
       children: [
         SizedBox(height: 2.h),
         Text(
-          title,
+          isRegister ? 'Register Account to' : 'Welcome Back to',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 18.sp,
@@ -101,13 +85,12 @@ class _AuthScreenState extends State<AuthScreen> {
             color: AppColors.textPrimary,
           ),
         ),
-        if (showBrand) ...[
-          Text('Jitox Agro', style: authScreensTitle),
-          SizedBox(height: 0.8.h),
-        ] else
-          SizedBox(height: 1.h),
+        Text('Jitox Agro', style: authScreensTitle),
+        SizedBox(height: 0.8.h),
         Text(
-          message,
+          isRegister
+              ? 'Hello there, Register to continue'
+              : 'Hello there, Login to continue',
           textAlign: TextAlign.center,
           style: authScreenMessage,
         ),

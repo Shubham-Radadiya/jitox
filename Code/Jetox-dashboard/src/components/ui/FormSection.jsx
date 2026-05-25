@@ -18,10 +18,10 @@ export function FormSection({
   const pad = book ? "p-2 sm:p-2.5" : dense ? "p-3" : "p-3 sm:p-3.5";
   const head = dense ? "mb-2 pb-1.5" : "mb-2 pb-1.5";
   const titleCls = book
-    ? "text-sm font-extrabold leading-snug tracking-wide text-slate-900 dark:text-slate-50"
+    ? "jitox-section-title !text-sm !font-extrabold tracking-wide"
     : dense
-      ? "text-[13px] font-bold leading-snug text-slate-900 dark:text-slate-100"
-      : "text-base font-bold leading-tight text-slate-900 dark:text-slate-100";
+      ? "jitox-section-title !text-[13px]"
+      : "jitox-page-title !text-base sm:!text-base";
   const stack = book ? "space-y-1.5" : dense ? "space-y-2" : "space-y-2.5";
 
   const headerShell = book
@@ -49,7 +49,7 @@ export function FormSection({
           >
             {title}
             {hint ? (
-              <span className="ml-1.5 text-[11px] font-medium normal-case tracking-normal text-slate-500 dark:text-slate-400">
+              <span className="jitox-caption ml-1.5 normal-case tracking-normal">
                 {hint}
               </span>
             ) : null}

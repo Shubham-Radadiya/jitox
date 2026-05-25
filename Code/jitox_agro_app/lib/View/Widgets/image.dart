@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jitox_agro_app/Constants/icon_fallbacks.dart';
 
 class CustomAssetImage extends StatelessWidget {
   final String imagePath;
@@ -13,6 +14,7 @@ class CustomAssetImage extends StatelessWidget {
   final BoxShape shape;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
+  final IconData? fallbackIcon;
 
   const CustomAssetImage({
     super.key,
@@ -28,7 +30,18 @@ class CustomAssetImage extends StatelessWidget {
     this.shape = BoxShape.rectangle,
     this.padding,
     this.margin,
+    this.fallbackIcon,
   });
+
+  Widget _fallback() {
+    final icon = fallbackIcon ?? iconFallbackForAsset(imagePath);
+    final size = width ?? height ?? 24.0;
+    return Icon(
+      icon,
+      size: size,
+      color: color ?? Colors.grey.shade700,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +62,7 @@ class CustomAssetImage extends StatelessWidget {
           color: color,
           colorBlendMode: colorBlendMode,
           alignment: alignment,
+          errorBuilder: (_, __, ___) => _fallback(),
         ),
       ),
     );

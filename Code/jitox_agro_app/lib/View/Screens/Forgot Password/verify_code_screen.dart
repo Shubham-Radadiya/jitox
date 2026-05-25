@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:jitox_agro_app/Constants/route_names.dart';
 import 'package:jitox_agro_app/View/Screens/Auth/otp_verification_screen.dart';
 import 'package:jitox_agro_app/View/Widgets/appbar.dart';
 import 'package:jitox_agro_app/View/Widgets/button.dart';
@@ -122,7 +123,9 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                     child: CustomButton(
                       isOutlined: false,
                       text: "Verify",
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.pushNamed(context, resetPasswordScreen);
+                      },
                     ),
                   ),
                 ],

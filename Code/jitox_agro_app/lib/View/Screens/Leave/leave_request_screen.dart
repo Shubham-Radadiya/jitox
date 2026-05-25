@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
+import 'package:jitox_agro_app/Constants/route_names.dart';
 import 'package:jitox_agro_app/View/Widgets/appbar.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
@@ -69,16 +70,23 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
                       ),
                     ),
                   ),
-                  Container(
-                    width: 4.5.h,
-                    height: 4.5.h,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
+                  InkWell(
+                    onTap: () => Navigator.pushNamed(
+                      context,
+                      notificationScreen,
                     ),
-                    child: const Icon(
-                      Icons.notifications_none,
-                      color: Colors.black,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 4.5.h,
+                      height: 4.5.h,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: const Icon(
+                        Icons.notifications_none,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
                 ],
@@ -145,16 +153,20 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen>
                   ],
                 ),
                 Spacer(),
-                Container(
-                  width: 4.5.h,
-                  height: 4.5.h,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.black,
+                InkWell(
+                  onTap: () => Navigator.maybePop(context),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 4.5.h,
+                    height: 4.5.h,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.black,
+                    ),
                   ),
                 ),
                 SizedBox(width: 3.w),

@@ -4,16 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
 import 'package:jitox_agro_app/Constants/route_names.dart';
 import 'package:jitox_agro_app/View/Widgets/appbar.dart';
+import 'package:jitox_agro_app/View/Screens/Payment/payment_models.dart';
 import 'package:jitox_agro_app/View/Widgets/button.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
-
-/// Formats INR with aligned decimals (mockup-style).
-String fmtInr(num value) {
-  final v = value.toDouble();
-  final sign = v < 0 ? '-' : '';
-  final abs = v.abs();
-  return '$sign₹${abs.toStringAsFixed(2)}';
-}
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});

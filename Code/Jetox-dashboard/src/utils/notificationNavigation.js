@@ -20,6 +20,13 @@ export function getNotificationTargetPath(raw) {
     "task_overdue",
   ]);
 
+  if (type === "user_registration_pending") {
+    const userId = raw.meta?.pendingUserId;
+    const q = new URLSearchParams({ status: "pending" });
+    if (userId) q.set("userId", String(userId));
+    return `/dashboard/user-master?${q.toString()}`;
+  }
+
   if (type === "territory_unmapped_district") {
     const district = raw.meta?.district;
     const q = district

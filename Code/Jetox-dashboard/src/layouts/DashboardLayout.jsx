@@ -64,9 +64,11 @@ function DashboardLayout({ children }) {
             }
           >
             {isFullBleed ? (
-              children
+              <div className="jitox-page min-h-full w-full min-w-0">{children}</div>
             ) : (
-              <div className="mx-auto w-full min-w-0 max-w-[1280px]">{children}</div>
+              <div className="jitox-page mx-auto w-full min-w-0 max-w-[1280px] ds-stack-page">
+                {children}
+              </div>
             )}
           </div>
         </main>

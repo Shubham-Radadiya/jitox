@@ -87,10 +87,10 @@ export function getCellTextAlign(columnKey) {
 }
 
 const TABLE_FOOTER_TD_BASE_DEFAULT =
-  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-[15px] font-semibold text-gray-900 dark:bg-slate-800/80 dark:text-slate-100`;
+  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-[13px] font-semibold text-gray-900 dark:bg-slate-800/80 dark:text-slate-100`;
 
 const TABLE_FOOTER_TD_BASE_HEAD =
-  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-[15px] font-semibold text-dark dark:bg-slate-800/80 dark:text-slate-100`;
+  `px-2 py-1.5 align-middle ${TABLE_CELL_BORDER} bg-slate-50 text-[13px] font-semibold text-dark dark:bg-slate-800/80 dark:text-slate-100`;
 
 /**
  * Consistent `<tfoot>` cell styling; alignment follows {@link getTableCellAlignClass}.
@@ -265,7 +265,7 @@ export function tableTdClasses(columnKey, { dense = false } = {}) {
   const clip =
     columnKey === "Actions" || columnKey === "Action" ? "" : "min-w-0";
   return [
-    "whitespace-nowrap px-2 text-[15px] align-middle text-slate-800 leading-snug dark:text-slate-100",
+    "whitespace-nowrap px-2 text-[13px] align-middle text-slate-800 leading-snug dark:text-slate-100",
     py,
     TABLE_CELL_BORDER,
     "transition-colors duration-150",

@@ -189,7 +189,7 @@ void showProfileAddedSuccessAlertDialog(BuildContext context) {
                 text: "Go to Home Screen",
                 onPressed: () {
                   Navigator.pushNamedAndRemoveUntil(
-                      context, authScreen, (route) => false);
+                      context, tabScreen, (route) => false);
                 },
               ),
             ),

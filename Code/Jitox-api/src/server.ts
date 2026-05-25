@@ -7,9 +7,17 @@ import connectDB from "./config/db.config";
 import { ensureDefaultUsers } from "./seed/ensureDefaultUsers";
 import { ensureDefaultTerritories } from "./seed/ensureDefaultTerritories";
 import { seedDemoData } from "./seed/seedDemoData";
+import { seedUserTestData } from "./seed/seedUserTestData";
 import { setupRoutes } from "./routes";
 import { globalErrorHandler } from "./common/errors/globalError";
 import { initSocketIO } from "./socket/io";
+import { getHealth } from "./controllers/health.controller";
+import { getEmailUser } from "./constants/emailConfig";
+import {
+  getEmailProvider,
+  isEmailConfigured,
+  verifyEmailTransport,
+} from "./helper/sendEmail";
 
 const envFile =
   process.env.NODE_ENV === "production"
@@ -17,6 +25,7 @@ const envFile =
     : ".env.development";
 
 dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const app: Express = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -26,7 +35,19 @@ app.get("/", (_req, res) => {
   res.json({ ok: true, service: "jitox-api" });
 });
 
-app.use(cors());
+app.get("/health", getHealth);
+
+const corsOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+app.use(
+  cors(
+    corsOrigins.length > 0
+      ? { origin: corsOrigins, credentials: true }
+      : undefined
+  )
+);
 
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
@@ -43,6 +64,11 @@ const start = async () => {
   );
   await connectDB();
 
+  console.log(
+    `[jitox-api] email sender=${getEmailUser()} provider=${getEmailProvider() ?? "none"} configured=${isEmailConfigured()} jwt=${process.env.JWT_SECRET_KEY?.trim() ? "ok" : "MISSING"}`
+  );
+  await verifyEmailTransport();
+
   const isDev = process.env.NODE_ENV === "development";
   const allowBootstrap = process.env.ALLOW_BOOTSTRAP_USERS === "true";
 
@@ -54,6 +80,13 @@ const start = async () => {
         await seedDemoData();
       } catch (e) {
         console.error("[seed-demo] Failed:", e);
+      }
+    }
+    if (isDev && process.env.SEED_USER_TEST_DATA !== "false") {
+      try {
+        await seedUserTestData();
+      } catch (e) {
+        console.error("[seed-user-test] Failed:", e);
       }
     }
   }
