@@ -3,26 +3,35 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:jitox_agro_app/Constants/api_config.dart';
 import 'package:jitox_agro_app/services/auth_session.dart';
+import 'package:jitox_agro_app/services/http_errors.dart';
 
 class ApiClient {
   static Future<dynamic> get(String path, {Map<String, String>? query}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$path').replace(queryParameters: query);
-    final res = await http
-        .get(uri, headers: await _headers())
-        .timeout(const Duration(seconds: 45));
-    return _parse(res);
+    try {
+      final res = await http
+          .get(uri, headers: await _headers())
+          .timeout(ApiConfig.liveTimeout);
+      return _parse(res);
+    } catch (e) {
+      throw Exception(friendlyHttpError(e));
+    }
   }
 
   static Future<dynamic> post(String path, {Map<String, dynamic>? body}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
-    final res = await http
-        .post(
-          uri,
-          headers: await _headers(),
-          body: jsonEncode(body ?? {}),
-        )
-        .timeout(const Duration(seconds: 45));
-    return _parse(res);
+    try {
+      final res = await http
+          .post(
+            uri,
+            headers: await _headers(),
+            body: jsonEncode(body ?? {}),
+          )
+          .timeout(ApiConfig.liveTimeout);
+      return _parse(res);
+    } catch (e) {
+      throw Exception(friendlyHttpError(e));
+    }
   }
 
   static Future<Map<String, String>> _headers() async {

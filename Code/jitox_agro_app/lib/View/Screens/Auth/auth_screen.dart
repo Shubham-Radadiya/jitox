@@ -3,6 +3,7 @@ import 'package:jitox_agro_app/Constants/colors.dart';
 import 'package:jitox_agro_app/Constants/text_styles.dart';
 import 'package:jitox_agro_app/View/Screens/Auth/login_screen.dart';
 import 'package:jitox_agro_app/View/Screens/Auth/register_screen.dart';
+import 'package:jitox_agro_app/services/live_api.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 
 enum _AuthPane { register, login }
@@ -23,6 +24,7 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _pane = widget.openLogin ? _AuthPane.login : _AuthPane.register;
+    warmLiveServer();
   }
 
   void _showRegister() => setState(() => _pane = _AuthPane.register);

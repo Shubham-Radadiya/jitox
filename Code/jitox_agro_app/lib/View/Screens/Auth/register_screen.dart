@@ -370,14 +370,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               width: double.infinity,
               child: CustomButton(
                 isOutlined: !isFormValid || _loading,
-                text: _loading ? 'Submitting…' : 'Register',
+                text: _loading ? 'Connecting to live server…' : 'Register',
                 outlineColor: lightFontColor,
                 onPressed: isFormValid && !_loading ? _submit : () {},
               ),
             ),
             SizedBox(height: 1.h),
             Text(
-              'An administrator will review your account before you can log in.',
+              'Uses live server (jitox.onrender.com). Admin must approve before login.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13.sp, color: Colors.black54),
             ),

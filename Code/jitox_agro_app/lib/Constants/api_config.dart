@@ -1,16 +1,18 @@
-/// Live API used for client test APK builds.
-/// Override at build time:
-/// `flutter build apk --dart-define=API_BASE_URL=https://your-api.example.com`
+/// Live API — default production host on Render.
+/// Override at build: `flutter build apk --dart-define=API_BASE_URL=https://...`
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'https://jitox.onrender.com',
   );
 
+  /// Render free tier may cold-start; allow long first request.
+  static const int liveTimeoutSeconds = 90;
+
+  static Duration get liveTimeout =>
+      const Duration(seconds: liveTimeoutSeconds);
+
+  static String get health => '$baseUrl/health';
   static String get usersLogin => '$baseUrl/users/login';
   static String get usersRegister => '$baseUrl/users/register';
-  static String get usersSendRegistrationOtp =>
-      '$baseUrl/users/send-registration-otp';
-  static String get usersVerifyOtp => '$baseUrl/users/verify-otp';
-  static String get usersSendOtp => '$baseUrl/users/send-otp';
 }

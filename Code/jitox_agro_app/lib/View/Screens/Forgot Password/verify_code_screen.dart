@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/route_names.dart';
-import 'package:jitox_agro_app/View/Screens/Auth/otp_verification_screen.dart';
+import 'package:jitox_agro_app/View/Widgets/custom_otp_field.dart';
 import 'package:jitox_agro_app/View/Widgets/appbar.dart';
 import 'package:jitox_agro_app/View/Widgets/button.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';

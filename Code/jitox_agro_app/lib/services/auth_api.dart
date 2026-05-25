@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:jitox_agro_app/Constants/api_config.dart';
+import 'package:jitox_agro_app/services/http_errors.dart';
 
 class AuthApi {
   static Future<Map<String, dynamic>> _decodeResponse(http.Response res) async {
@@ -24,24 +25,28 @@ class AuthApi {
     required String email,
     required String password,
   }) async {
-    final res = await http
-        .post(
-          Uri.parse(ApiConfig.usersLogin),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'email': email.trim().toLowerCase(),
-            'password': password,
-            'client': 'mobile',
-          }),
-        )
-        .timeout(const Duration(seconds: 45));
+    try {
+      final res = await http
+          .post(
+            Uri.parse(ApiConfig.usersLogin),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email.trim().toLowerCase(),
+              'password': password,
+              'client': 'mobile',
+            }),
+          )
+          .timeout(ApiConfig.liveTimeout);
 
-    final body = await _decodeResponse(res);
-    final token = body['token']?.toString();
-    if (token == null || token.isEmpty) {
-      throw Exception('Login succeeded but no token was returned.');
+      final body = await _decodeResponse(res);
+      final token = body['token']?.toString();
+      if (token == null || token.isEmpty) {
+        throw Exception('Login succeeded but no token was returned.');
+      }
+      return body;
+    } catch (e) {
+      throw Exception(friendlyHttpError(e));
     }
-    return body;
   }
 
   static Future<Map<String, dynamic>> register(
@@ -52,14 +57,18 @@ class AuthApi {
       body['email'] = body['email'].toString().trim().toLowerCase();
     }
 
-    final res = await http
-        .post(
-          Uri.parse(ApiConfig.usersRegister),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 45));
+    try {
+      final res = await http
+          .post(
+            Uri.parse(ApiConfig.usersRegister),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(ApiConfig.liveTimeout);
 
-    return _decodeResponse(res);
+      return _decodeResponse(res);
+    } catch (e) {
+      throw Exception(friendlyHttpError(e));
+    }
   }
 }
