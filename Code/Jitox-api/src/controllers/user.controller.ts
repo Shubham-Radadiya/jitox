@@ -5,7 +5,8 @@ import mongoose from "mongoose";
 import { User, Employee } from "../models/index";
 import type { AuthRequest } from "../middleware/authonticated.middleware";
 import { ensureDefaultUsers } from "../seed/ensureDefaultUsers";
-import { sendEmail } from "../helper/sendEmail";
+import { isEmailConfigured, sendEmail } from "../helper/sendEmail";
+import * as otpService from "../services/otp.service";
 import { AppError } from "../common/errors/AppError";
 import { HttpStatusCode } from "../common/errors/httpStatusCode";
 import { validateAndRespond } from "../utils/validateAndRespond";
@@ -51,28 +52,13 @@ function permissionsFromMultipart(raw: unknown): unknown {
   return raw;
 }
 
-const otpStore: Record<string, { otp: string; expiresAt: number }> = {};
-
 const normalizeEmail = (email: unknown): string =>
   String(email).trim().toLowerCase();
 
 const generateOtp = (): string =>
   Math.floor(100000 + Math.random() * 900000).toString();
 
-const isEmailConfigured = (): boolean =>
-  Boolean(process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim());
-
-const assertOtpVerified = (email: string): void => {
-  const stored = otpStore[email];
-  if (!stored || stored.otp !== "VERIFIED") {
-    throw new AppError(
-      HttpStatusCode.BAD_REQUEST,
-      "Email not verified. Please verify the OTP sent to your email."
-    );
-  }
-};
-
-/** Store OTP and deliver by email (registration must send; reset may skip in dev). */
+/** Store OTP in MongoDB and deliver by email (registration must send; reset may skip in dev). */
 const issueOtp = async (opts: {
   email: string;
   subject: string;
@@ -81,20 +67,29 @@ const issueOtp = async (opts: {
 }): Promise<string> => {
   const email = normalizeEmail(opts.email);
   const otp = generateOtp();
-  otpStore[email] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 };
+  await otpService.saveOtp(email, otp);
 
   const emailConfigured = isEmailConfigured();
 
   if (emailConfigured) {
-    await sendEmail({
-      to: email,
-      subject: opts.subject,
-      text: `${opts.bodyIntro}\n\nYour verification code is: ${otp}\n\nThis code expires in 5 minutes.\n\nThank you,\nJitox System`,
-    });
+    try {
+      await sendEmail({
+        to: email,
+        subject: opts.subject,
+        text: `${opts.bodyIntro}\n\nYour verification code is: ${otp}\n\nThis code expires in 5 minutes.\n\nThank you,\nJitox System`,
+      });
+    } catch (err) {
+      await otpService.clearOtp(email);
+      console.error("[email] Failed to send OTP:", err);
+      throw new AppError(
+        HttpStatusCode.SERVICE_UNAVAILABLE,
+        "Could not send verification email. Check EMAIL_USER / EMAIL_PASS or try again later."
+      );
+    }
   } else if (process.env.NODE_ENV === "development") {
     console.warn(`[dev] OTP for ${email}: ${otp}`);
   } else if (opts.requireDelivery) {
-    delete otpStore[email];
+    await otpService.clearOtp(email);
     throw new AppError(
       HttpStatusCode.SERVICE_UNAVAILABLE,
       "Email service is not configured. Please try again later or contact support."
@@ -228,7 +223,7 @@ export const registerUser = async (
     assertRequiredAddressParts(addr);
 
     const emailNormalized = normalizeEmail(email);
-    assertOtpVerified(emailNormalized);
+    await otpService.assertOtpVerified(emailNormalized);
 
     const existingUser = await User.findOne({ email: emailNormalized });
     if (existingUser) {
@@ -261,7 +256,7 @@ export const registerUser = async (
     await applyTerritoryAssignmentToUser(user, { reResolveFromAddress: true });
     await user.save();
 
-    delete otpStore[emailNormalized];
+    await otpService.clearOtp(emailNormalized);
 
     const permissions = effectivePermissions(user.role, user.permissions);
     const pub = toPublicUser(user);
@@ -1078,27 +1073,7 @@ export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
     const emailNormalized = normalizeEmail(email);
     const otpNormalized = String(otp).trim();
 
-    const storedOtp = otpStore[emailNormalized];
-    if (!storedOtp) {
-      throw new AppError(
-        HttpStatusCode.BAD_REQUEST,
-        "No OTP found for this email."
-      );
-    }
-
-    if (Date.now() > storedOtp.expiresAt) {
-      delete otpStore[emailNormalized];
-      throw new AppError(
-        HttpStatusCode.BAD_REQUEST,
-        "OTP expired. Please request a new one."
-      );
-    }
-
-    if (storedOtp.otp !== otpNormalized) {
-      throw new AppError(HttpStatusCode.BAD_REQUEST, "Invalid OTP.");
-    }
-
-    otpStore[emailNormalized].otp = "VERIFIED";
+    await otpService.verifyOtpCode(emailNormalized, otpNormalized);
 
     res.status(200).json({ message: "OTP verified successfully." });
   } catch (error) {
@@ -1119,10 +1094,7 @@ export const changePassword = async (
     validateAndRespond(req.body, requiredFields, res);
 
     const emailNormalized = normalizeEmail(email);
-    const otpData = otpStore[emailNormalized];
-    if (!otpData || otpData.otp !== "VERIFIED") {
-      throw new AppError(HttpStatusCode.BAD_REQUEST, "OTP not verified.");
-    }
+    await otpService.assertPasswordResetVerified(emailNormalized);
 
     const user = await User.findOne({ email: emailNormalized });
     if (!user) {
@@ -1133,7 +1105,7 @@ export const changePassword = async (
     user.password = hashedPassword;
     await user.save();
 
-    delete otpStore[emailNormalized];
+    await otpService.clearOtp(emailNormalized);
 
     res.status(200).json({ message: "Password changed successfully." });
   } catch (error) {

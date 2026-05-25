@@ -11,6 +11,8 @@ import { seedUserTestData } from "./seed/seedUserTestData";
 import { setupRoutes } from "./routes";
 import { globalErrorHandler } from "./common/errors/globalError";
 import { initSocketIO } from "./socket/io";
+import { getHealth } from "./controllers/health.controller";
+import { isEmailConfigured } from "./helper/sendEmail";
 
 const envFile =
   process.env.NODE_ENV === "production"
@@ -26,6 +28,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 app.get("/", (_req, res) => {
   res.json({ ok: true, service: "jitox-api" });
 });
+
+app.get("/health", getHealth);
 
 app.use(cors());
 
@@ -43,6 +47,10 @@ const start = async () => {
     `[jitox-api] starting NODE_ENV=${process.env.NODE_ENV} PORT=${PORT} MONGO_URI=${process.env.MONGO_URI ? "set" : "MISSING"}`
   );
   await connectDB();
+
+  console.log(
+    `[jitox-api] email=${isEmailConfigured() ? "configured" : "MISSING (OTP emails disabled)"} jwt=${process.env.JWT_SECRET_KEY?.trim() ? "ok" : "MISSING"}`
+  );
 
   const isDev = process.env.NODE_ENV === "development";
   const allowBootstrap = process.env.ALLOW_BOOTSTRAP_USERS === "true";
