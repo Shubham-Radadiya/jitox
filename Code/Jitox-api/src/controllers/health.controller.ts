@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import { getEmailUser } from "../constants/emailConfig";
 import {
   getEmailProvider,
+  getTransactionalFromEmail,
   isEmailConfigured,
 } from "../helper/sendEmail";
 
@@ -17,10 +17,13 @@ export const getHealth = async (_req: Request, res: Response): Promise<void> => 
   let emailHint: string | null = null;
   if (!emailConfigured) {
     emailHint =
-      "Set RESEND_API_KEY (recommended on Render free — SMTP is blocked) or EMAIL_PASS for paid/local SMTP.";
+      "Set SENDGRID_API_KEY (best: verify Gmail only, send to any address, no domain) or BREVO_API_KEY. Resend test mode only reaches your signup email.";
+  } else if (provider === "resend") {
+    emailHint =
+      "Resend test sender: OTP only to your Resend account email. For any Gmail use SENDGRID_API_KEY + Single Sender verification.";
   } else if (provider === "smtp") {
     emailHint =
-      "Using Gmail SMTP. On Render FREE tier outbound SMTP is blocked — add RESEND_API_KEY from resend.com instead.";
+      "Gmail SMTP blocked on Render FREE — use SENDGRID_API_KEY instead.";
   }
 
   res.status(ok ? 200 : 503).json({
@@ -31,7 +34,7 @@ export const getHealth = async (_req: Request, res: Response): Promise<void> => 
       jwt: jwtConfigured ? "configured" : "missing",
       email: emailConfigured ? "configured" : "missing",
       emailProvider: provider ?? "none",
-      emailSender: getEmailUser(),
+      emailSender: getTransactionalFromEmail(),
     },
     hints: {
       email: emailHint,

@@ -19,7 +19,14 @@ services:
         value: "false"
       - key: EMAIL_PASS
         sync: false
-      # Required on Render FREE (SMTP ports blocked). Get key at https://resend.com
+      # Best for OTP to any Gmail: SendGrid Single Sender (no domain)
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM_EMAIL
+        value: shubhamradadiya@gmail.com
+      # Or Brevo / Resend (Resend test = one recipient only)
+      - key: BREVO_API_KEY
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM
