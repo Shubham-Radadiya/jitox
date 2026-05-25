@@ -13,7 +13,8 @@ export type NotificationType =
   | "order_cancelled"
   | "order_dispatched"
   | "order_invoice_generated"
-  | "order_returned";
+  | "order_returned"
+  | "user_registration_pending";
 
 export interface INotification extends Document {
   userId: string;

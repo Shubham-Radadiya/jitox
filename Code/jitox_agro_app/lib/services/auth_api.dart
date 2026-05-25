@@ -44,34 +44,6 @@ class AuthApi {
     return body;
   }
 
-  static Future<void> sendRegistrationOtp({required String email}) async {
-    final res = await http
-        .post(
-          Uri.parse(ApiConfig.usersSendRegistrationOtp),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email.trim().toLowerCase()}),
-        )
-        .timeout(const Duration(seconds: 45));
-    await _decodeResponse(res);
-  }
-
-  static Future<void> verifyOtp({
-    required String email,
-    required String otp,
-  }) async {
-    final res = await http
-        .post(
-          Uri.parse(ApiConfig.usersVerifyOtp),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'email': email.trim().toLowerCase(),
-            'otp': otp.trim(),
-          }),
-        )
-        .timeout(const Duration(seconds: 45));
-    await _decodeResponse(res);
-  }
-
   static Future<Map<String, dynamic>> register(
     Map<String, dynamic> payload,
   ) async {

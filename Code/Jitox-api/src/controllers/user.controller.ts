@@ -32,6 +32,10 @@ import {
 } from "../utils/address.util";
 import { toPublicUser } from "../utils/userAddress.dto";
 import { buildUserSummary } from "../services/userSummary.service";
+import {
+  notifyAdminsPendingRegistration,
+  resolvePendingRegistrationNotifications,
+} from "../services/notification.service";
 import { applyTerritoryAssignmentToUser } from "../services/territory.service";
 import type { IUser } from "../types/user.type";
 
@@ -94,7 +98,7 @@ const issueOtp = async (opts: {
     await otpService.clearOtp(email);
     throw new AppError(
       HttpStatusCode.SERVICE_UNAVAILABLE,
-      "Email is not configured. Set EMAIL_PASS (Gmail App Password for shubhamradadiya@gmail.com)."
+      "Email is not configured. On Render set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN (see npm run gmail:oauth)."
     );
   }
 
@@ -225,7 +229,6 @@ export const registerUser = async (
     assertRequiredAddressParts(addr);
 
     const emailNormalized = normalizeEmail(email);
-    await otpService.assertOtpVerified(emailNormalized);
 
     const existingUser = await User.findOne({ email: emailNormalized });
     if (existingUser) {
@@ -258,7 +261,13 @@ export const registerUser = async (
     await applyTerritoryAssignmentToUser(user, { reResolveFromAddress: true });
     await user.save();
 
-    await otpService.clearOtp(emailNormalized);
+    await notifyAdminsPendingRegistration({
+      userId: String(user._id),
+      userName: displayName(user),
+      email: user.email,
+      district: trimAddressPart(addr.district) || undefined,
+      city: trimAddressPart(addr.city) || undefined,
+    });
 
     const permissions = effectivePermissions(user.role, user.permissions);
     const pub = toPublicUser(user);
@@ -685,6 +694,7 @@ export const approveUser = async (
 
     user.accountStatus = AccountStatus.APPROVED;
     await user.save();
+    await resolvePendingRegistrationNotifications(String(user._id));
 
     const pub = toPublicUser(user);
     res.status(200).json({
@@ -734,6 +744,7 @@ export const rejectUser = async (
 
     user.accountStatus = AccountStatus.REJECTED;
     await user.save();
+    await resolvePendingRegistrationNotifications(String(user._id));
 
     const pub = toPublicUser(user);
     res.status(200).json({

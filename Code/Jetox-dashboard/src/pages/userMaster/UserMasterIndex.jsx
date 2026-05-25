@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import nodataImg from "../../assets/nodata.png";
 import DashboardLayout from "../../layouts/DashboardLayout";
@@ -71,7 +71,37 @@ const UserMasterIndex = () => {
   const [regionFilter, setRegionFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [approvalBusyId, setApprovalBusyId] = useState(null);
+  const [highlightUserId, setHighlightUserId] = useState("");
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const status = searchParams.get("status");
+    const userId = searchParams.get("userId");
+    if (!status && !userId) return;
+
+    if (status === "pending") setStatusFilter("pending");
+    if (userId) setHighlightUserId(userId);
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("userId");
+        next.delete("status");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!highlightUserId || loading) return;
+    const row = users.find((u) => String(u._id) === highlightUserId);
+    if (row) {
+      toast(`Pending approval: ${row["User Name"] || row.Email}`, { icon: "👤" });
+      setHighlightUserId("");
+    }
+  }, [highlightUserId, users, loading]);
 
   const baseColumns = [
     "Employee ID",

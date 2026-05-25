@@ -7,6 +7,7 @@ import {
   Receipt,
   RotateCcw,
   Truck,
+  UserPlus,
   XCircle,
 } from "lucide-react";
 
@@ -29,6 +30,8 @@ export function notificationIconForType(type) {
       return RotateCcw;
     case "product_low_stock":
       return Package;
+    case "user_registration_pending":
+      return UserPlus;
     default:
       return Bell;
   }

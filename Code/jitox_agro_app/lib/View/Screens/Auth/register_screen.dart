@@ -1,7 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:jitox_agro_app/Constants/colors.dart';
-import 'package:jitox_agro_app/models/registration_draft.dart';
 import 'package:jitox_agro_app/services/auth_api.dart';
 import 'package:jitox_agro_app/View/Widgets/button.dart';
 import 'package:jitox_agro_app/View/Widgets/checkbox.dart';
@@ -13,11 +12,11 @@ class RegisterScreen extends StatefulWidget {
   const RegisterScreen({
     super.key,
     this.onSwitchToLogin,
-    this.onOtpSent,
+    this.onRegistered,
   });
 
   final VoidCallback? onSwitchToLogin;
-  final void Function(RegistrationDraft draft)? onOtpSent;
+  final VoidCallback? onRegistered;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -88,13 +87,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       setState(() => _loading = true);
       try {
-        final email = emailController.text.trim().toLowerCase();
-        await AuthApi.sendRegistrationOtp(email: email);
+        final result = await AuthApi.register(_buildRegisterPayload());
         if (!mounted) return;
-        widget.onOtpSent?.call(
-          RegistrationDraft(
-            email: email,
-            payload: _buildRegisterPayload(),
+
+        final message = result['message']?.toString() ??
+            'Registration submitted. Please wait for admin approval before logging in.';
+
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Registration submitted'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  widget.onRegistered?.call();
+                },
+                child: const Text('Go to Login'),
+              ),
+            ],
           ),
         );
       } catch (e) {
@@ -357,10 +370,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
               width: double.infinity,
               child: CustomButton(
                 isOutlined: !isFormValid || _loading,
-                text: _loading ? 'Sending code…' : 'Register',
+                text: _loading ? 'Submitting…' : 'Register',
                 outlineColor: lightFontColor,
                 onPressed: isFormValid && !_loading ? _submit : () {},
               ),
+            ),
+            SizedBox(height: 1.h),
+            Text(
+              'An administrator will review your account before you can log in.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13.sp, color: Colors.black54),
             ),
             SizedBox(height: 2.h),
             RichText(
