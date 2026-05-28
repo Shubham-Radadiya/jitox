@@ -17,7 +17,7 @@ import { Button } from "../../components/ui/CommanUI";
 import { hrmApi } from "../../services/api";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { useEffect } from "react";
+import { createElement, useEffect } from "react";
 import { downloadSalarySlipPdf, formatInr } from "../../utils/hrmPrint";
 
 function sumSalaryLines(lines) {
@@ -29,11 +29,11 @@ const API_BASE =
     ? import.meta.env.VITE_API_BASE_URL
     : "http://localhost:4000";
 
-function ProfileField({ icon: Icon, label, children }) {
+function ProfileField({ icon, label, children }) {
   return (
     <div className="flex min-h-13 items-start gap-2.5">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200/90 bg-slate-50 text-slate-500 shadow-sm dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-400">
-        <Icon className="h-4 w-4" aria-hidden />
+        {icon ? createElement(icon, { className: "h-4 w-4", "aria-hidden": true }) : null}
       </span>
       <div className="min-w-0 flex-1 pt-0.5">
         <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -60,7 +60,7 @@ function ListScroll({ "aria-label": ariaLabel, children }) {
   );
 }
 
-function SidePanel({ icon: Icon, title, children, expandLg = true }) {
+function SidePanel({ icon, title, children, expandLg = true }) {
   const growLg =
     expandLg === true ? "lg:min-h-0 lg:flex-1" : "lg:flex-none lg:shrink-0";
   return (
@@ -69,7 +69,7 @@ function SidePanel({ icon: Icon, title, children, expandLg = true }) {
     >
       <div className="mb-1.5 flex shrink-0 items-center gap-1.5 border-b border-slate-100 pb-1.5 dark:border-slate-700/80">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-          <Icon className="h-3.5 w-3.5" aria-hidden />
+          {icon ? createElement(icon, { className: "h-3.5 w-3.5", "aria-hidden": true }) : null}
         </span>
         <h2 className="text-xs font-semibold leading-tight text-slate-900 dark:text-slate-100">
           {title}

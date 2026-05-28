@@ -121,7 +121,6 @@ const AttendanceTab = ({
             aria-label="Add columns"
             onClick={(e) => {
               e.stopPropagation();
-              const rect = e.currentTarget.getBoundingClientRect();
               columnTriggerRef.current = e.currentTarget;
               setColumnPopup((prev) => {
                 if (prev) {

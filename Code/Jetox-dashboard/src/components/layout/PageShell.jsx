@@ -1,3 +1,5 @@
+import { createElement } from "react";
+
 /**
  * Reusable page layout primitives — spacing follows 8px scale via Tailwind.
  * Prefer wrapping dashboard page roots with PageContainer when not using
@@ -12,8 +14,8 @@ export function PageContainer({ children, className = "" }) {
 }
 
 /** Major vertical blocks — aligns with `ds-stack-major` (16px rhythm). */
-export function PageSection({ children, className = "", as: Tag = "section" }) {
-  return <Tag className={`ds-stack-major ${className}`}>{children}</Tag>;
+export function PageSection({ children, className = "", as = "section" }) {
+  return createElement(as, { className: `ds-stack-major ${className}` }, children);
 }
 
 /** Responsive 12-column grid (1 col &lt; sm, 12 cols ≥ sm) */

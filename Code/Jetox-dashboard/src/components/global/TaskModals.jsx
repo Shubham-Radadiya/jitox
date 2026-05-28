@@ -65,8 +65,6 @@ export const NewTaskModal = ({
   assigneeOptions = [],
   canAssign = false,
 }) => {
-  if (!open) return null;
-
   const [task, setTask] = useState({
     name: "",
     description: "",
@@ -82,6 +80,8 @@ export const NewTaskModal = ({
     const { name, value } = e.target;
     setTask((prev) => ({ ...prev, [name]: value }));
   };
+
+  if (!open) return null;
 
   // const isDisabled =
   //   !task.name ||
@@ -255,9 +255,9 @@ export const TaskListModal = ({
   onDeleteTask,
   onEditTask,
 }) => {
-  if (!open) return null;
-
   const [menuOpenId, setMenuOpenId] = useState(null);
+
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[99] pointer-events-none">

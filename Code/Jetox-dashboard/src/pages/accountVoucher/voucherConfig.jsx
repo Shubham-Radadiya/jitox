@@ -304,7 +304,7 @@ const voucherAddButton = (overrides = {}) => {
 };
 
 // Helper function to create action buttons with tooltips
-const createActionButtons = (actions, { openDetails, navigate, row, openPurchaseModal }) => {
+const createActionButtons = (actions, { openDetails, navigate, row, openPurchaseModal: _openPurchaseModal }) => {
   const tooltipLabels = {
     eye: "View",
     payNow: "Mark as Paid",

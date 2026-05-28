@@ -65,7 +65,6 @@ const OrderListIndex = () => {
   const [clientName, setClientName] = useState("all");
   const [manager, setManager] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [detail, setDetail] = useState(null);
   const [orderDateRange, setOrderDateRange] = useState(null);

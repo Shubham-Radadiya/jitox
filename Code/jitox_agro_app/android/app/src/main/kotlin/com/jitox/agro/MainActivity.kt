@@ -1,4 +1,4 @@
-package com.example.jitox_agro_app
+package com.jitox.agro
 
 import io.flutter.embedding.android.FlutterActivity
 

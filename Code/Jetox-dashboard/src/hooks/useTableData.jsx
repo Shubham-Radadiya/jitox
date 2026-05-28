@@ -52,8 +52,9 @@ export const useTableData = () => {
     return tableRow(value, key);
   };
 
-  /** @param {number} [_rowIndex] — reserved for list keys / debugging */
-  const tableAction = (row, onView, onEdit, onDocument, _rowIndex) => {
+  /** @param {number} [rowIndex] — reserved for list keys / debugging */
+  const tableAction = (row, onView, onEdit, onDocument, rowIndex) => {
+    void rowIndex;
     return (
       <td className={tableTdClasses("Actions")}>
         <div className={TABLE_ACTIONS_ROW}>

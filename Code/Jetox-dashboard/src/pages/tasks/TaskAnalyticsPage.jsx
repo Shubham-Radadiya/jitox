@@ -22,9 +22,7 @@ const COLORS = ["#94a3b8", "#f59e0b", "#0ea5e9", "#10b981", "#ef4444"];
 
 export default function TaskAnalyticsPage() {
   const user = getStoredUser();
-  if (!isAdminUser(user)) {
-    return <Navigate to="/dashboard/tasks/my" replace />;
-  }
+  const isAdmin = isAdminUser(user);
 
   const { data, isLoading } = useQuery({
     queryKey: ["tasks", "analytics"],
@@ -34,7 +32,12 @@ export default function TaskAnalyticsPage() {
     },
     staleTime: 15_000,
     refetchInterval: 15_000,
+    enabled: isAdmin,
   });
+
+  if (!isAdminUser(user)) {
+    return <Navigate to="/dashboard/tasks/my" replace />;
+  }
 
   const pieData = data?.byStatus
     ? Object.entries(data.byStatus).map(([name, value]) => ({

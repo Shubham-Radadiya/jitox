@@ -8,6 +8,7 @@ import 'package:jitox_agro_app/View/Widgets/mr/mr_drawer.dart';
 import 'package:jitox_agro_app/View/Widgets/ui/app_card.dart';
 import 'package:jitox_agro_app/View/Widgets/ui/section_title.dart';
 import 'package:jitox_agro_app/services/auth_session.dart';
+import 'package:jitox_agro_app/services/location_permission.dart';
 import 'package:jitox_agro_app/services/location_tracking_service.dart';
 import 'package:jitox_agro_app/services/notifications_api.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
@@ -63,6 +64,20 @@ class _FieldHomeScreenState extends State<FieldHomeScreen> {
       );
       return;
     }
+    final access = await prepareLocationForTracking(context);
+    if (!mounted) return;
+    if (!access.granted) {
+      final msg = switch (access.issue) {
+        LocationAccessIssue.serviceDisabled =>
+          'Turn on GPS/location on your phone, then tap START again.',
+        LocationAccessIssue.deniedForever =>
+          'Allow location for Jitox Agro in app settings, then tap START again.',
+        _ => 'Location permission is required for field day tracking.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      return;
+    }
+
     final ok = await LocationTrackingService.instance.startDay();
     if (!mounted) return;
     if (ok) {
@@ -73,7 +88,9 @@ class _FieldHomeScreenState extends State<FieldHomeScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not start tracking. Enable location permission.'),
+          content: Text(
+            'Could not get GPS fix. Go outdoors or wait a moment and try again.',
+          ),
         ),
       );
     }

@@ -100,7 +100,7 @@ const AddManufacturing = () => {
   const queryClient = useQueryClient();
   const [voucherNo, setVoucherNo] = useState("");
   const [batchCode, setBatchCode] = useState("");
-  const [batchCodeTouched, setBatchCodeTouched] = useState(false);
+  const [, setBatchCodeTouched] = useState(false);
   const [mfgDate, setMfgDate] = useState(() => dayjs().format("YYYY-MM-DD"));
   const [expDate, setExpDate] = useState(() =>
     dayjs().add(30, "day").format("YYYY-MM-DD")

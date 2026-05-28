@@ -83,7 +83,6 @@ export function mapSalesReturnAggregateRow(v) {
     ? dayjs(v.voucherDate).format("YYYY-MM-DD")
     : "";
   const total = Number(v.totalAmount) || 0;
-  const refunded = Number(v.refundedAmount) || 0;
   const returnedQty = Array.isArray(v.items)
     ? v.items.reduce((s, it) => s + (Number(it.quantity) || 0), 0)
     : 0;

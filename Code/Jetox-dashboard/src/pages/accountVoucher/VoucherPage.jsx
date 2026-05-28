@@ -17,16 +17,13 @@ import { useVoucherListData } from "../../hooks/useVoucherListData";
 import { getApiErrorMessage } from "../../utils/apiError";
 import {
   purchaseRowHasParty,
-  purchaseRowPartyName,
   purchaseReturnRowHasParty,
-  purchaseReturnRowHasRefund,
   salesReturnRowHasParty,
   purchaseReturnRowPartyName,
 } from "../../utils/purchasePaymentStatus";
 import { invalidateProductAndStockQueries } from "../../utils/invalidateStockQueries";
 import {
   hasOrderListDecisionMade,
-  isQuotationOnOrderList,
 } from "../../constants/orderStatus";
 import {
   mapQuotationRow,
@@ -60,7 +57,6 @@ import SalesReturnRejectModal from "./modals/SalesReturnRejectModal";
 import QuotationVoucherModal from "./purchase/QuotationVoucherModal";
 import {
   expenseVouchersApi,
-  journalVouchersApi,
   paymentVouchersApi,
   purchaseReturnVouchersApi,
   purchaseVouchersApi,
@@ -372,19 +368,6 @@ const VoucherPage = () => {
     return null;
   }, [voucherSlug, config, displayedRows]);
 
-  if (!config) {
-    return (
-      <DashboardLayout>
-        <div className="ds-stack-major">
-          <VoucherFilter />
-          <div className="rounded-lg border border-light-border bg-white p-4 text-sm text-light dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
-            Unknown voucher type.
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   const handleToggleColumn = (column) => {
     if (column === "Actions") return;
     setSelectedColumns((prev) => {
@@ -407,14 +390,14 @@ const VoucherPage = () => {
   };
 
   const handleEdit =
-    config.onEdit ||
+    config?.onEdit ||
     ((row) => {
       toast.success(
         `Edit for this row is not configured — use list actions (${row?.["Voucher No"] || row?.["Voucher No."] || ""}).`
       );
     });
   const handleDocument =
-    config.onDocument ||
+    config?.onDocument ||
     ((row) => {
       toast.success(
         row?.["Voucher No"]
@@ -423,7 +406,7 @@ const VoucherPage = () => {
       );
     });
 
-  const DetailsComponent = config.detailsComponent;
+  const DetailsComponent = config?.detailsComponent;
 
   const deletePurchaseVoucher = useCallback(
     async (id) => {
@@ -1281,7 +1264,7 @@ const VoucherPage = () => {
   };
 
   const tableAction =
-    config.buildTableAction?.({
+    config?.buildTableAction?.({
       navigate,
       openDetails: openDetailsForTable,
       openPurchaseModal,
@@ -1318,10 +1301,10 @@ const VoucherPage = () => {
       openFailManufacturingForm,
       openMfgBlockedModal,
     }) ||
-    config.tableAction ||
+    config?.tableAction ||
     defaultTableAction;
 
-  const filteredFooter = config.footerRenderer
+  const filteredFooter = config?.footerRenderer
     ? config.footerRenderer(visibleColumns, displayedRows)
     : null;
 
@@ -1331,6 +1314,19 @@ const VoucherPage = () => {
     () => filterDefinitions.filter((f) => f.type === "button"),
     [filterDefinitions]
   );
+
+  if (!config) {
+    return (
+      <DashboardLayout>
+        <div className="ds-stack-major">
+          <VoucherFilter />
+          <div className="rounded-lg border border-light-border bg-white p-4 text-sm text-light dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
+            Unknown voucher type.
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const renderFilterField = (field) => {
     if (field.type === "button") {

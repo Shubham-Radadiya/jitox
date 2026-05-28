@@ -18,7 +18,7 @@ export function buildSalarySlipBody(slip) {
   const ym = slip.yearMonth || "—";
   const row = (label, val) =>
     `<tr><td>${escapeHtml(label)}</td><td style="text-align:right">${val}</td></tr>`;
-  const rows = (items, emptyLabel) =>
+  const rows = (items) =>
     (items || []).length
       ? (items || [])
           .map((x) => row(x.name, formatInr(x.amount)))

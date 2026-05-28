@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 
 /**
@@ -56,7 +57,7 @@ export function DashboardStatCard({
   label,
   value,
   loading,
-  icon: Icon,
+  icon,
   variant = "neutral",
   trend,
   onActivate,
@@ -84,7 +85,7 @@ export function DashboardStatCard({
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center self-center transition-transform duration-200 ease-in-out group-hover:scale-[1.02] ${v.iconShell}`}
         >
-          <Icon className="h-4.5 w-4.5" strokeWidth={1.75} aria-hidden />
+          {icon ? createElement(icon, { className: "h-4.5 w-4.5", strokeWidth: 1.75, "aria-hidden": true }) : null}
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-5">
           <div className="text-[10px] font-semibold uppercase leading-snug tracking-wider text-slate-500 dark:text-slate-400">

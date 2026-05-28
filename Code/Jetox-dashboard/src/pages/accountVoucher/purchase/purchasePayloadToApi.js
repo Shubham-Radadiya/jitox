@@ -43,7 +43,7 @@ export function purchasePayloadToCreateBody(payload) {
   const items = (payload.productRows || [])
     .filter((r) => r.product)
     .map((row) => {
-      const { taxable, tax } = lineTaxableAndTax(row, gstRate);
+      const { taxable } = lineTaxableAndTax(row, gstRate);
       const subtotal = taxable;
       const discountPct = parseNum(row.discountPct);
       const discountAmt = parseNum(row.discountAmt);

@@ -7,7 +7,6 @@ import DashboardLayout from "../../layouts/DashboardLayout";
 import TargetIncentiveSubNav from "./TargetIncentiveSubNav";
 import { dashboardUiApi } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { tableFooterTdClasses } from "../../utils/tableUi";
 
 function fmt(n) {
   return Number(n || 0).toLocaleString("en-IN");

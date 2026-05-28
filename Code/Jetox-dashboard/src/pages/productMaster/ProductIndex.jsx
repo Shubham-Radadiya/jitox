@@ -88,7 +88,7 @@ const ProductIndex = () => {
       const html = buildPriceListStandaloneHtml(title, rawProducts);
       await downloadHtmlDocumentAsPdf(html, `${title}.pdf`);
       toast.success("Price list exported as PDF");
-    } catch (e) {
+    } catch {
       toast.error("Could not generate PDF");
     }
   };

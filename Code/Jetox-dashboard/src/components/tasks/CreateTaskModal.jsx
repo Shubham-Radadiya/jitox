@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { Modal, Select, DatePicker, Input, Button } from "antd";
-import dayjs from "dayjs";
 import { Plus, Trash2 } from "lucide-react";
 
 const { TextArea } = Input;

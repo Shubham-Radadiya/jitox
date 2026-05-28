@@ -10,7 +10,7 @@ export function useLeafletInvalidateSize(mapRef, containerRef, deps = []) {
     const invalidate = () => {
       try {
         map.invalidateSize({ animate: false });
-      } catch (_) {
+      } catch {
         /* map may be removed */
       }
     };

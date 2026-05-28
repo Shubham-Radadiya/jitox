@@ -71,7 +71,7 @@ const PayableIndex = () => {
     return "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200";
   };
 
-  const renderRowCell = (key, value, row) => {
+  const renderRowCell = (key, value, _row) => {
     if (key === "Status") {
       return (
         <td key={key} className={tableTdClasses("Status")}>

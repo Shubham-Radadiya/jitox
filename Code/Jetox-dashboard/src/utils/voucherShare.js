@@ -1,6 +1,7 @@
 import {
   escapeHtml,
   buildStandalonePrintableHtml,
+  printHtmlDocument,
   downloadHtmlDocumentAsPdf,
   downloadHtmlFile,
 } from "./printAndExport";

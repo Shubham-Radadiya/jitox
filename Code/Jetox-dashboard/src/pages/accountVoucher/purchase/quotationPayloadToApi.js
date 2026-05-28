@@ -3,7 +3,6 @@ import {
   isQuotationOnOrderList,
 } from "../../../constants/orderStatus";
 import {
-  parseNum,
   QUOTATION_INVOICE_PREFIX,
   quotationInvoiceFieldsFromNo,
 } from "./voucherFormConstants";
